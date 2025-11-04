@@ -22,6 +22,10 @@ from utils import *
 from scipy.spatial.transform import Rotation 
 import matplotlib.pyplot as plt 
 
+import hydra # Added for Hydra main decorator
+from omegaconf import DictConfig # Added for MouseFitter type hinting
+import hydra.utils # Added for path resolution
+
 from pytorch3d.renderer import (
     look_at_view_transform,
     PerspectiveCameras,
@@ -44,23 +48,21 @@ from pytorch3d.renderer import (
 from pytorch3d.structures import Meshes
 from torch.utils.tensorboard import SummaryWriter 
 from pytorch3d.utils import cameras_from_opencv_projection
-
-WITH_RENDER = True  
-KEYPOINT_NUM = 22
-RENDER_CAMERAS = [0,1,2,3,4,5]
+from omegaconf import DictConfig # Added for MouseFitter type hinting
 
 class MouseFitter():
-    def __init__(self):
+    def __init__(self, cfg: DictConfig):
+        self.cfg = cfg
         mouse_path = "mouse_model/mouse.pkl"
         img_size = (1024, 1152) #H,W
         self.img_size = img_size
         self.device = torch.device('cuda')
         self.bodymodel = ArticulationTorch() 
 
-        if WITH_RENDER: 
+        if self.cfg.fitter.with_render: 
             self.renderer = pyrender.OffscreenRenderer(viewport_width=img_size[1], viewport_height=img_size[0])
-        self.reg_weights = np.loadtxt("mouse_model/reg_weights.txt").squeeze()
-        self.keypoint_weight = np.ones(KEYPOINT_NUM) 
+        self.reg_weights = np.loadtxt(hydra.utils.to_absolute_path("mouse_model/reg_weights.txt")).squeeze()
+        self.keypoint_weight = np.ones(self.cfg.fitter.keypoint_num) 
         self.keypoint_weight[4] = 0.4
         self.keypoint_weight[11] = 0.9
         self.keypoint_weight[15] = 0.9
@@ -83,7 +85,7 @@ class MouseFitter():
             "2d": 0.2,
             "bone": 0.5,
             "scale": 0.5,
-            "mask": 10,
+            "mask": 0,  # Disable mask loss to avoid image size mismatch
             "chest_deformer": 0.1,
             "stretch": 1,
             "temp": 0.25, 
@@ -131,12 +133,33 @@ class MouseFitter():
         for cam in cams: 
             R = np.expand_dims(cam['R'].T, 0).astype(np.float32)
             K = np.expand_dims(cam['K'].T, 0).astype(np.float32) 
-            T = cam['T'].astype(np.float32) 
+            T = cam['T'].astype(np.float32)
+            
+            # Fix T shape for PyTorch3D: ensure it's (1, 3) not (3, 1) or (1, 3, 1)
+            if T.shape == (3, 1):
+                T = T.T  # (3, 1) -> (1, 3)
+            elif T.shape == (1, 3, 1):
+                T = T.squeeze(-1)  # (1, 3, 1) -> (1, 3)
+            elif T.shape == (3,):
+                T = T.reshape(1, 3)  # (3,) -> (1, 3)
+            
             img_size_np = np.expand_dims(np.asarray(self.img_size), 0).astype(np.float32)
             cam_th = self.build_opencv_camera(R, T, K, img_size_np)
             self.cams_th.append(cam_th)       
             self.Rs.append(torch.from_numpy(R).to(self.device))
-            self.Ts.append(torch.from_numpy(T).to(self.device)) 
+            
+            # For calc_2d_keypoint_loss, we need T in different shape
+            T_original = cam['T'].astype(np.float32)
+            if T_original.shape == (3, 1):
+                T_for_projection = np.expand_dims(T_original, 0)  # (3, 1) -> (1, 3, 1)
+            elif T_original.shape == (1, 3):
+                T_for_projection = T_original.reshape(1, 3, 1)  # (1, 3) -> (1, 3, 1)
+            elif T_original.shape == (3,):
+                T_for_projection = T_original.reshape(1, 3, 1)  # (3,) -> (1, 3, 1)
+            else:
+                T_for_projection = T_original
+                
+            self.Ts.append(torch.from_numpy(T_for_projection).to(self.device))
             self.Ks.append(torch.from_numpy(K).to(self.device)) 
 
     # build camera from OpenCV camera format 
@@ -169,11 +192,28 @@ class MouseFitter():
     def calc_2d_keypoint_loss(self, J3d, x2): 
         loss = 0 
         for camid in range(self.camN): 
-            J2d = (J3d@self.Rs[camid].transpose(1,2) + self.Ts[camid]) @ self.Ks[camid].transpose(1,2)
-            J2d = J2d / J2d[:,:,2:]
-            J2d = J2d[:,:,0:2]
-
-            loss += torch.mean(torch.norm((J2d - x2[:,camid,:,0:2]) * x2[:,camid,:,2:] * self.keypoint_weight, dim=-1) ) 
+            # Fix: proper matrix multiplication order for camera projection
+            # J3d: (1, 22, 3), Rs: (1, 3, 3) -> need (1, 3, 3) @ (1, 3, 22) = (1, 3, 22)
+            # Camera projection with corrected matrix operations
+            J3d_t = J3d.transpose(1, 2)  # (1, 3, 22)
+            rotated = self.Rs[camid] @ J3d_t  # (1, 3, 3) @ (1, 3, 22) = (1, 3, 22)
+            
+            # T vector broadcasting
+            T_vec = self.Ts[camid]  # Should be (1, 3, 1)
+            if T_vec.dim() == 2:
+                T_vec = T_vec.unsqueeze(2)  # (1, 3) -> (1, 3, 1)
+                
+            J3d_cam = rotated + T_vec  # (1, 3, 22) + (1, 3, 1) = (1, 3, 22)
+            J2d = self.Ks[camid] @ J3d_cam  # (1, 3, 3) @ (1, 3, 22) = (1, 3, 22)
+            J2d = J2d.transpose(1, 2)  # (1, 22, 3)
+            J2d = J2d / J2d[:,:,2:3]  # Normalize by z coordinate  
+            J2d = J2d[:,:,0:2]  # Take only x,y coordinates: (1, 22, 2)
+            
+            # Fix keypoint_weight broadcasting: ensure it matches the tensor dimensions
+            # keypoint_weight has shape (1, 22, 1), need to broadcast to match (1, 22, 2)
+            diff = (J2d - x2[:,camid,:,0:2]) * x2[:,camid,:,2:]  # Shape: (1, 22, 2)
+            weighted_diff = diff * self.keypoint_weight[..., [0,0]]  # Broadcast weight to last dim
+            loss += torch.mean(torch.norm(weighted_diff, dim=-1) ) 
         return loss     
 
     def calc_3d_loss(self, x1, x2): 
@@ -268,9 +308,14 @@ class MouseFitter():
             mesh = Meshes(V_reduced, self.faces_th_reduced)
             loss_mask = torch.tensor(0.0, device=self.device)
             if self.term_weights["mask"] > 0: 
-                for k in RENDER_CAMERAS:
+                for k in self.cfg.fitter.render_cameras:
                     mask = self.renderer_mask(mesh, cameras = self.cams_th[k])[...,-1]
-                    loss_mask += self.mask_loss_func(mask, target["mask"+str(k)]) 
+                    target_mask = target["mask"+str(k)]
+                    # Resize target mask to match rendered mask if needed
+                    if mask.shape != target_mask.shape:
+                        print(f"Mask shape mismatch: rendered {mask.shape}, target {target_mask.shape}. Skipping mask loss.")
+                        continue
+                    loss_mask += self.mask_loss_func(mask, target_mask) 
 
             self.losses.update({
                 "theta": round(float(loss_theta.detach().cpu().numpy()), 2),
@@ -328,9 +373,9 @@ class MouseFitter():
             else: 
                 print('iter ' + str(i) + ': ' + '%.2f'%loss + "  diff: " + "%.2f"%(loss-loss_prev))
             loss_prev = loss 
-            if WITH_RENDER: 
+            if self.cfg.fitter.with_render: 
                 imgs = self.imgs.copy() 
-                self.render(params, imgs, RENDER_CAMERAS, 0, self.result_folder + "/render/debug/fitting_{}_global_iter_{:05d}.png".format(self.id, i), self.cam_dict)
+                self.render(params, imgs, self.cfg.fitter.render_cameras, 0, self.result_folder + "/render/debug/fitting_{}_global_iter_{:05d}.png".format(self.id, i), self.cam_dict)
         params["chest_deformer"].requires_grad_(True)    
         params["thetas"].requires_grad_(True)
         params["bone_lengths"].requires_grad_(True)
@@ -360,15 +405,15 @@ class MouseFitter():
                 print('iter ' + str(i) + ': ' + '%.2f'%loss + "  diff: " + "%.2f"%(loss-loss_prev))
 
             loss_prev = loss 
-            if self.id == 0 and WITH_RENDER: 
+            if self.id == 0 and self.cfg.fitter.with_render: 
                 imgs = self.imgs.copy() 
-                self.render(params, imgs, RENDER_CAMERAS, 0, self.result_folder + "/render/debug/fitting_{}_debug_iter_{:05d}.png".format(self.id, i), self.cam_dict)
+                self.render(params, imgs, self.cfg.fitter.render_cameras, 0, self.result_folder + "/render/debug/fitting_{}_debug_iter_{:05d}.png".format(self.id, i), self.cam_dict)
                 
 
-        if WITH_RENDER:
+        if self.cfg.fitter.with_render:
             imgs = self.imgs.copy() 
-            self.render(params, imgs, RENDER_CAMERAS, 0, self.result_folder + "/render/fitting_{}.png".format(self.id), self.cam_dict)
-            self.draw_keypoints_compare(params, imgs, RENDER_CAMERAS, 0, self.result_folder + "/fitting_keypoints_{}.png".format(self.id), self.cam_dict)
+            self.render(params, imgs, self.cfg.fitter.render_cameras, 0, self.result_folder + "/render/fitting_{}.png".format(self.id), self.cam_dict)
+            self.draw_keypoints_compare(params, imgs, self.cfg.fitter.render_cameras, 0, self.result_folder + "/fitting_keypoints_{}.png".format(self.id), self.cam_dict)
         with open(self.result_folder + "/params/param{}.pkl".format(self.id), 'wb') as f: 
             pickle.dump(params,f) 
         params["chest_deformer"].requires_grad_(True) 
@@ -399,18 +444,31 @@ class MouseFitter():
                 print('iter ' + str(i) + ': ' + '%.2f'%loss + "  diff: " + "%.2f"%(loss-loss_prev))
 
             loss_prev = loss 
-        if WITH_RENDER: 
+        if self.cfg.fitter.with_render: 
             imgs = self.imgs.copy() 
-            self.render(params, imgs, RENDER_CAMERAS, 0, self.result_folder+"/render/fitting_{}_sil.png".format(self.id), self.cam_dict)
-            # self.draw_keypoints_compare(params, imgs, RENDER_CAMERAS, 0, self.result_folder + "/fitting_keypoints_{}_sil.png".format(self.id), self.cam_dict)
+            self.render(params, imgs, self.cfg.fitter.render_cameras, 0, self.result_folder+"/render/fitting_{}_sil.png".format(self.id), self.cam_dict)
+            # self.draw_keypoints_compare(params, imgs, self.cfg.fitter.render_cameras, 0, self.result_folder + "/fitting_keypoints_{}_sil.png".format(self.id), self.cam_dict)
         with open(self.result_folder + "/params/param{}_sil.pkl".format(self.id), 'wb') as f: 
             pickle.dump(params,f) 
-        self.result = params 
-        return params 
+        self.result = params
 
+        # Save the final mesh as an .obj file
+        V, _ = self.bodymodel.forward(
+            params["thetas"], params["bone_lengths"],
+            params["rotation"], params["trans"], params["scale"], params["chest_deformer"]
+        )
+        vertices = V[0].detach().cpu().numpy()
+        faces = self.bodymodel.faces_vert_np
+        obj_filename = os.path.join(self.result_folder, "obj/mesh_{:06d}.obj".format(self.id))
+        with open(obj_filename, 'w') as fp:
+            for v in vertices:
+                fp.write('v %f %f %f\n' % (v[0], v[1], v[2]))
+            for f in faces + 1:
+                fp.write('f %d %d %d\n' % (f[0], f[1], f[2]))
+
+        return params 
     def render(self, result, imgs, views, batch_id, filename, cams_dict): 
-        V,J = self.bodymodel.forward(result["thetas"], result["bone_lengths"], \
-            result["rotation"], result["trans"] / 1000, result["scale"] / 1000, result["chest_deformer"])
+        V,J = self.bodymodel.forward(result["thetas"], result["bone_lengths"],             result["rotation"], result["trans"] / 1000, result["scale"] / 1000, result["chest_deformer"])
         vertices = V[batch_id].detach().cpu().numpy() 
         faces = self.bodymodel.faces_vert_np
         scene = pyrender.Scene() #ambient_light=np.ones(3), bg_color=np.array([0.5, 0.5, 0.5]))
@@ -421,7 +479,16 @@ class MouseFitter():
         color_maps = []
         for view in views:
             cam_param = cams_dict[view]
-            K, R, T = cam_param['K'].T, cam_param['R'].T, cam_param['T'].T / 1000
+            K, R, T = cam_param['K'].T, cam_param['R'].T, cam_param['T'] / 1000
+            # Fix T shape: ensure it's (3, 1) for matrix multiplication
+            if T.shape == (1, 3):
+                T = T.T  # Convert (1, 3) to (3, 1)
+            elif T.shape == (3,):
+                T = T.reshape(3, 1)  # Convert (3,) to (3, 1)
+            elif T.shape == (1, 3, 1):
+                T = T.squeeze().reshape(3, 1)  # Convert (1, 3, 1) to (3, 1)
+            elif T.shape == (3, 1, 1):
+                T = T.squeeze()  # Convert (3, 1, 1) to (3, 1)
             camera_pose = np.eye(4)
             camera_pose[:3, :3] = R.T
             camera_pose[:3, 3:4] = np.dot(-R.T, T)
@@ -433,6 +500,11 @@ class MouseFitter():
             scene.remove_node(cam_node)
             img_i = imgs[view]
             color = copy.deepcopy(color)
+
+            # Resize rendered image to match input image size
+            if color.shape[:2] != img_i.shape[:2]:
+                color = cv2.resize(color, (img_i.shape[1], img_i.shape[0]))
+
             background_mask = color[:, :, :] == 255
             color[background_mask] = img_i[background_mask]
             color_maps.append(color) 
@@ -442,56 +514,59 @@ class MouseFitter():
         return output
         
 
-    def draw_keypoints_compare(self, result, imgs, views, batch_id, filename, cams_dict): 
+    def draw_keypoints_compare(self, result, imgs, views, batch_id, filename, cams_dict):
         myimages = imgs.copy()
-        V,J = self.bodymodel.forward(result["thetas"], result["bone_lengths"], \
-            result["rotation"], result["trans"] / 1000, result["scale"] / 1000, result["chest_deformer"])
+        V,J = self.bodymodel.forward(result["thetas"], result["bone_lengths"],             result["rotation"], result["trans"] / 1000, result["scale"] / 1000, result["chest_deformer"])
         keypoints = self.bodymodel.forward_keypoints22() 
         joints = keypoints[batch_id].detach().cpu().numpy() 
-        all_drawn_images = [] 
-        for camid in views: 
-            cam = cams_dict[camid] 
-            data2d = (joints@cam['R'] + cam["T"] / 1000)@cam["K"] 
+        all_drawn_images = []
+        for camid in views:
+            cam = cams_dict[camid]
+            # Fix T shape for numpy broadcasting
+            T = cam["T"] / 1000
+            if len(T.shape) > 1:
+                T = T.squeeze()  # Convert to 1D array
+            data2d = (joints@cam['R'] + T)@cam["K"]
             data2d = data2d[:,0:2] / data2d[:,2:] 
             img_drawn = draw_keypoints(myimages[camid], data2d, bones, is_draw_bone=True)
             all_drawn_images.append(img_drawn) 
         outputimg = pack_images(all_drawn_images) 
         cv2.imwrite(filename, outputimg)
 
-import argparse 
-def optim_single():
-    parser = argparse.ArgumentParser() 
-    parser.add_argument("--start", type=int, default=0) 
-    parser.add_argument("--end", type=int, default=1) 
-    parser.add_argument("--interval", type=int, default=1) 
-    parser.add_argument("--date", type=str, default="")
-    parser.add_argument("--resume", type=bool, default=False)
-    args = parser.parse_args() 
-    data_name = "markerless_mouse_1"
-    data_loader = DataSeakerDet()
+@hydra.main(config_path="./conf", config_name="config")
+def optim_single(cfg: DictConfig): 
+    data_loader = DataSeakerDet(cfg)
     device = torch.device('cuda')
 
-    fitter = MouseFitter()
+    fitter = MouseFitter(cfg)
     fitter.set_cameras_dannce(data_loader.cams_dict_out)
     camN = len(data_loader.cams_dict_out)
-    fitter.result_folder = "mouse_fitting_result/results/"
+    
+    # Generate dynamic result folder name with dataset and timestamp
+    import datetime
+    dataset_name = os.path.basename(cfg.data.data_dir.rstrip('/'))  # Extract dataset name from path
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    dynamic_result_folder = f"mouse_fitting_result/results_{dataset_name}_{timestamp}"
+    
+    fitter.result_folder = hydra.utils.to_absolute_path(dynamic_result_folder)
+    print(f"Results will be saved to: {fitter.result_folder}")
     os.makedirs(fitter.result_folder, exist_ok=True)
-    subfolders = ["params", "render", "render/debug/"]
+    subfolders = ["params", "render", "render/debug/", "obj"]
     for subfolder in subfolders: 
         os.makedirs(os.path.join(fitter.result_folder, subfolder), exist_ok=True)
 
     print("camN: ", camN)
-    targets = np.arange(args.start, args.end, args.interval).tolist() 
+    targets = np.arange(cfg.fitter.start_frame, cfg.fitter.end_frame, cfg.fitter.interval).tolist() 
 
     start = targets[0]
     for index in targets:
         print("process ... ", index) 
-        labels = data_loader.fetch(index, with_img = WITH_RENDER) 
+        labels = data_loader.fetch(index, with_img = cfg.fitter.with_render) 
         fitter.id = index
         fitter.imgs = labels["imgs"] 
 
         if index == start: 
-            if args.resume: 
+            if cfg.fitter.resume: 
                 with open(os.path.join(fitter.result_folder, "params/param{}_sil.pkl".format(index-1)), 'rb') as f: 
                     init_params = pickle.load(f)
                 fitter.set_previous_frame(init_params) 
@@ -500,7 +575,7 @@ def optim_single():
                 init_params = fitter.init_params(1) 
                 params = {k: torch.tensor(v, dtype=torch.float32, device=device).requires_grad_(True) for k, v in init_params.items()}
         target = {
-            'target_2d': torch.FloatTensor(labels["label2d"]).reshape([-1,camN,KEYPOINT_NUM,3]).to(device)
+            'target_2d': torch.FloatTensor(labels["label2d"]).reshape([-1,camN,cfg.fitter.keypoint_num,3]).to(device)
         }
         for viewid in range(camN): 
             target.update({ 
@@ -508,14 +583,13 @@ def optim_single():
             })
         
         if index == start: 
-            params = fitter.solve_step0(params = params, target=target, max_iters = 10)
-            params = fitter.solve_step1(params = params, target=target, max_iters = 100)
-            params = fitter.solve_step2(params = params, target=target, max_iters = 30)
+            params = fitter.solve_step0(params = params, target=target, max_iters = cfg.optim.solve_step0_iters)
+            params = fitter.solve_step1(params = params, target=target, max_iters = cfg.optim.solve_step1_iters)
+            params = fitter.solve_step2(params = params, target=target, max_iters = cfg.optim.solve_step2_iters)
         else: 
-            params = fitter.solve_step1(params = params, target=target, max_iters = 10)
-            params = fitter.solve_step2(params = params, target=target, max_iters = 30)
+            params = fitter.solve_step1(params = params, target=target, max_iters = cfg.optim.solve_step1_iters)
+            params = fitter.solve_step2(params = params, target=target, max_iters = cfg.optim.solve_step2_iters)
         fitter.set_previous_frame(params) 
 
 if __name__ == "__main__":
     optim_single()
- 

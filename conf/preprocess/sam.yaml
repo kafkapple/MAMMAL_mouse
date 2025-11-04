@@ -1,0 +1,18 @@
+# @package _global_
+
+# SAM (Segment Anything Model) based preprocessing configuration
+# NOTE: This is a placeholder for future implementation
+
+preprocess:
+  mask_method: sam
+  sam:
+    model_type: vit_h  # vit_h, vit_l, or vit_b
+    checkpoint: models/sam_vit_h_4b8939.pth
+    device: cuda
+    prompt_mode: center_point  # center_point, bounding_box, or manual
+
+  # Keypoint estimation (still uses geometric for now)
+  keypoint_method: opencv_geometric
+  geometric:
+    min_contour_area: 100
+    confidence_default: 0.7

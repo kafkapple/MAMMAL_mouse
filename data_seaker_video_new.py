@@ -8,16 +8,18 @@ import cv2
 import json 
 import os 
 from utils import * 
-
+from omegaconf import DictConfig
+import hydra.utils # Added for path resolution
 
 class DataSeakerDet():
-    def __init__(self): 
-        self.data_dir = "data/markerless_mouse_1_nerf/"
+    def __init__(self, cfg: DictConfig): 
+        self.cfg = cfg
+        self.data_dir = hydra.utils.to_absolute_path(cfg.data.data_dir)
         self.raw_caps = []
         self.bg_caps  = []  
-        self.views_to_use = [0,1,2,3,4,5]
+        self.views_to_use = cfg.data.views_to_use
         
-        for k in range(6): 
+        for k in self.views_to_use: 
             video_path = os.path.join(self.data_dir, "videos_undist", "{}.mp4".format(k))
             cap = cv2.VideoCapture(video_path) 
             self.raw_caps.append(cap) 
@@ -26,9 +28,11 @@ class DataSeakerDet():
             self.bg_caps.append(cap) 
         self.totalframes = 18000 
 
-        with open(os.path.join(self.data_dir, "new_cam.pkl"), 'rb') as f: 
+        cam_pkl_path = os.path.join(self.data_dir, "new_cam.pkl")
+        print(f"Attempting to open camera pkl: {cam_pkl_path}") # Debug print
+        with open(cam_pkl_path, 'rb') as f: 
             self.cams_dict = pickle.load(f)
-        for camid in range(6): 
+        for camid in self.views_to_use: 
             self.cams_dict[camid]['T'] = np.expand_dims(self.cams_dict[camid]['T'], 0)
             self.cams_dict[camid]['R'] = self.cams_dict[camid]['R'].T
             self.cams_dict[camid]['K'] = self.cams_dict[camid]['K'].T
@@ -39,7 +43,7 @@ class DataSeakerDet():
         self.keypoint_num = 22 
 
         self.poses2d =[] 
-        for camid in range(6): 
+        for camid in self.views_to_use: 
             filename = os.path.join(self.data_dir, "keypoints2d_undist", "result_view_{}.pkl".format(camid) )
             with open(filename, "rb") as f: 
                 data = pickle.load(f) # (18000, 22 ,3)
@@ -113,7 +117,14 @@ class DataSeakerDet():
         cv2.destroyAllWindows() 
 
 if __name__ == "__main__": 
-    loader = DataSeakerDet() 
+    from omegaconf import DictConfig
+    cfg = DictConfig({
+        "data": {
+            "data_dir": "data/markerless_mouse_1_nerf/",
+            "views_to_use": [0,1,2,3,4,5]
+        }
+    })
+    loader = DataSeakerDet(cfg) 
     # output = loader.fetch(8) 
 
     loader.visualize_data(14500) 

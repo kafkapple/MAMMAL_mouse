@@ -1,0 +1,12 @@
+# @package _global_
+
+# Configuration for the shank3 single-view dataset
+# This is a custom single-view dataset preprocessed from video
+
+data:
+  data_dir: data/preprocessed_shank3/
+  views_to_use: [0]  # Single camera view
+
+fitter:
+  render_cameras: [0]  # Render from single camera
+  with_render: false  # Disable render to avoid issues for now

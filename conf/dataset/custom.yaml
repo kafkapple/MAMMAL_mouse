@@ -1,0 +1,18 @@
+# @package _global_
+
+# Template configuration for custom datasets
+# Copy this file and modify for your own dataset
+
+data:
+  data_dir: data/preprocessed_custom/  # Change to your data directory
+  views_to_use: [0]  # Specify which camera views to use (0-indexed)
+
+preprocess:
+  input_video_path: data/custom/video.avi  # Change to your video path
+  output_data_dir: data/preprocessed_custom/  # Change to your output directory
+
+fitter:
+  start_frame: 0
+  end_frame: 10  # Adjust based on your video length
+  render_cameras: [0]  # Specify which cameras to render (subset of views_to_use)
+  with_render: false  # Set to true to generate rendered outputs

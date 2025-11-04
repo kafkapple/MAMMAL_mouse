@@ -14,6 +14,7 @@ from torch.nn import Module
 import os 
 from time import time 
 import json 
+import hydra.utils # Added for path resolution
 
 def to_tensor(array, dtype=torch.float32):
     if 'torch.tensor' not in str(type(array)):
@@ -37,15 +38,15 @@ class ArticulationTorch(Module):
         self.read_reduced()
 
     def read_mapper(self):
-        mapper_file = "mouse_model/keypoint22_mapper.json" 
+        mapper_file = hydra.utils.to_absolute_path("mouse_model/keypoint22_mapper.json") 
         with open(mapper_file, 'r') as f: 
             mapper = json.load(f) 
         mapper = mapper["mapper"]
         self.mapper = mapper 
 
     def read_reduced(self): 
-        self.faces_reduced_7200 = np.loadtxt("mouse_model/mouse_txt/reduced_face_7200.txt", dtype=np.int64)
-        self.reduced_ids = np.loadtxt("mouse_model/mouse_txt/reduced_ids_7200.txt", dtype=np.int64).squeeze().tolist()
+        self.faces_reduced_7200 = np.loadtxt(hydra.utils.to_absolute_path("mouse_model/mouse_txt/reduced_face_7200.txt"), dtype=np.int64)
+        self.reduced_ids = np.loadtxt(hydra.utils.to_absolute_path("mouse_model/mouse_txt/reduced_ids_7200.txt"), dtype=np.int64).squeeze().tolist()
         
 
     def forward_keypoints22(self):
@@ -74,34 +75,34 @@ class ArticulationTorch(Module):
         return self.pose_rot_vec, self.pose_trans
 
     def _read_params(self):
-        pklfolder = "mouse_model/mouse_txt/"
-        txtfolder="mouse_model/mouse_txt"
-        self.vertices_raw_tpose_np = np.loadtxt(txtfolder + "/vertices.txt")
+        pklfolder = hydra.utils.to_absolute_path("mouse_model/mouse_txt/")
+        txtfolder=hydra.utils.to_absolute_path("mouse_model/mouse_txt")
+        self.vertices_raw_tpose_np = np.loadtxt(os.path.join(txtfolder, "vertices.txt"))
 
-        self.textures_np = np.loadtxt(txtfolder+"/textures.txt")
-        self.faces_vert_np = np.loadtxt(txtfolder+"/faces_vert.txt").astype(np.int64)
-        self.faces_tex_np = np.loadtxt(txtfolder+"/faces_tex.txt").astype(np.int64)
-        with open(pklfolder +"/id_to_names.pkl", 'rb') as f: 
+        self.textures_np = np.loadtxt(os.path.join(txtfolder, "textures.txt"))
+        self.faces_vert_np = np.loadtxt(os.path.join(txtfolder, "faces_vert.txt")).astype(np.int64)
+        self.faces_tex_np = np.loadtxt(os.path.join(txtfolder, "faces_tex.txt")).astype(np.int64)
+        with open(os.path.join(pklfolder, "id_to_names.pkl"), 'rb') as f: 
             self.id_to_names = pickle.load(f) # list of names 
-        with open(pklfolder +"/names_to_id.pkl", 'rb') as f: 
+        with open(os.path.join(pklfolder, "names_to_id.pkl"), 'rb') as f: 
             self.names_to_id = pickle.load(f) # dict: from name to id 
-        with open(pklfolder +"/parents.pkl", 'rb') as f: 
+        with open(os.path.join(pklfolder, "parents.pkl"), 'rb') as f: 
             self.parents = pickle.load(f) 
-        with open(pklfolder +"/init_joint_trans.pkl", 'rb') as f: 
+        with open(os.path.join(pklfolder, "init_joint_trans.pkl"), 'rb') as f: 
             self.init_joint_trans_list = pickle.load(f) 
             self.init_joint_trans_np = np.asarray(self.init_joint_trans_list)
-        with open(pklfolder +"/init_joint_rot_mat.pkl", 'rb') as f: 
+        with open(os.path.join(pklfolder, "init_joint_rot_mat.pkl"), 'rb') as f: 
             self.init_joint_rot_mat_list = pickle.load(f) 
             self.init_joint_rot_mat_np = np.asarray(self.init_joint_rot_mat_list)
 
-        with open(pklfolder + "/init_joint_rotvec.pkl", 'rb') as f: 
+        with open(os.path.join(pklfolder, "init_joint_rotvec.pkl"), 'rb') as f: 
             self.init_joint_rotvec_list = pickle.load(f) 
             self.init_joint_rotvec_np = np.asarray(self.init_joint_rotvec_list)
     
         self.jointnum = len(self.id_to_names)
         self.vertexnum = self.vertices_raw_tpose_np.shape[0] 
         self.weights_np = np.zeros((self.vertexnum, self.jointnum))
-        _weights = np.loadtxt(txtfolder + "/skinning_weights.txt")
+        _weights = np.loadtxt(os.path.join(txtfolder, "skinning_weights.txt"))
         
         for i in range(_weights.shape[0]):
             jointid = int(_weights[i,0])
@@ -121,7 +122,7 @@ class ArticulationTorch(Module):
             # print(' Tensor {} shape: '.format(name), _tensor.shape)
             setattr(self, name, _tensor.to(self.device))
 
-        bone_length_mapper = np.loadtxt(txtfolder + "/bone_length_mapper.txt", dtype=np.int64).squeeze() 
+        bone_length_mapper = np.loadtxt(os.path.join(txtfolder, "bone_length_mapper.txt"), dtype=np.int64).squeeze() 
         self.bone_length_mapper = bone_length_mapper
 
     @staticmethod 

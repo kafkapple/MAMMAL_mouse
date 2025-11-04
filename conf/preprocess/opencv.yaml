@@ -1,0 +1,31 @@
+# @package _global_
+
+# OpenCV-based preprocessing configuration (current default)
+# Uses background subtraction for masks and geometric keypoint estimation
+
+preprocess:
+  # Mask generation settings
+  mask_method: opencv_background_subtraction
+  background_subtraction:
+    history: 500
+    var_threshold: 16
+    detect_shadows: true
+
+  # Morphological operations for mask cleanup
+  morphology:
+    kernel_size: 5
+    open_iterations: 1
+    close_iterations: 1
+
+  # Keypoint estimation settings
+  keypoint_method: opencv_geometric
+  geometric:
+    min_contour_area: 100
+    confidence_default: 0.7
+    confidence_center: 1.0
+    confidence_extremes: 0.5
+
+  # Camera parameter generation
+  camera:
+    focal_length: 1000.0
+    z_distance: 1000.0  # Camera distance along Z-axis
