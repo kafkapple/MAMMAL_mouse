@@ -101,7 +101,7 @@ conda activate mammal_stable
 #   preprocess.output_data_dir: "data/preprocessed/custom/"
 
 # 3. Run preprocessing
-python preprocess.py dataset=custom mode=single_view_preprocess
+python scripts/preprocess.py dataset=custom mode=single_view_preprocess
 
 # 4. Run fitting on preprocessed data
 python fitter_articulation.py dataset=custom mode=multi_view fitter.end_frame=100
@@ -262,7 +262,7 @@ ls data/training/manual_labeling/images/  # 20 images ready
 # Time: ~2-3 hours for 20 images
 
 # 3. Fine-tune YOLOv8 (after labeling)
-python train_yolo_pose.py \
+python scripts/train_yolo_pose.py \
   --data data/training/yolo_mouse_pose_enhanced/data.yaml \
   --epochs 100 --batch 8 --imgsz 256 \
   --weights yolov8n-pose.pt \
@@ -315,7 +315,7 @@ python fitter_articulation.py dataset=markerless optim=accurate
 python fitter_articulation.py dataset=shank3 fitter.end_frame=50 fitter.with_render=true
 
 # Run preprocessing with custom config
-python preprocess.py dataset=custom mode=single_view_preprocess
+python scripts/preprocess.py dataset=custom mode=single_view_preprocess
 ```
 
 ### Key Parameters

@@ -193,7 +193,7 @@ python preprocessing_utils/merge_datasets.py \
 
 ```bash
 # Fine-tune with quality labels
-python train_yolo_pose.py \
+python scripts/train_yolo_pose.py \
     --data data/yolo_mouse_pose_enhanced/data.yaml \
     --epochs 100 \
     --batch 8 \

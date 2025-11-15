@@ -215,7 +215,7 @@ python preprocessing_utils/merge_datasets.py \
 
 ```bash
 # Enhanced dataset로 fine-tune
-~/miniconda3/envs/mammal_stable/bin/python train_yolo_pose.py \
+~/miniconda3/envs/mammal_stable/bin/python scripts/train_yolo_pose.py \
   --data data/yolo_mouse_pose_enhanced/data.yaml \
   --epochs 100 \
   --batch 8 \

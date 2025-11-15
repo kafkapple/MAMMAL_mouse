@@ -75,7 +75,7 @@ python -c "import pytorch3d; print(pytorch3d.__version__)"
 python fitter_articulation.py dataset=markerless optim=accurate
 
 # 단일 뷰 전처리 + 빠른 피팅
-python preprocess.py dataset=custom mode=single_view_preprocess
+python scripts/preprocess.py dataset=custom mode=single_view_preprocess
 python fitter_articulation.py dataset=custom optim=fast
 ```
 
@@ -237,7 +237,7 @@ python fitter_articulation.py dataset=markerless fitter.end_frame=1
 2. **새로운 단일 뷰 전체 파이프라인**:
 ```bash
 # 전처리
-python preprocess.py dataset=shank3 mode=single_view_preprocess
+python scripts/preprocess.py dataset=shank3 mode=single_view_preprocess
 
 # 피팅
 python fitter_articulation.py dataset=shank3 fitter.end_frame=5
@@ -339,7 +339,7 @@ python fitter_articulation.py dataset=shank3 optim.solve_step1_iters=50
 
 **테스트**:
 ```bash
-python preprocess.py dataset=custom preprocess=sam mode=single_view_preprocess
+python scripts/preprocess.py dataset=custom preprocess=sam mode=single_view_preprocess
 ```
 
 **예상 효과**:
@@ -399,7 +399,7 @@ python preprocess.py dataset=custom preprocess=sam mode=single_view_preprocess
 
 **테스트**:
 ```bash
-python preprocess.py dataset=custom \
+python scripts/preprocess.py dataset=custom \
     preprocess.keypoint_method=dlc \
     preprocess.dlc.config_path=models/mouse_dlc_config.yaml
 ```
@@ -465,13 +465,13 @@ python preprocess.py dataset=custom \
 2. 설정 조합 테스트:
    ```bash
    # SAM mask + OpenCV keypoints
-   python preprocess.py preprocess.mask_method=sam preprocess.keypoint_method=opencv
+   python scripts/preprocess.py preprocess.mask_method=sam preprocess.keypoint_method=opencv
 
    # OpenCV mask + DLC keypoints
-   python preprocess.py preprocess.mask_method=opencv preprocess.keypoint_method=dlc
+   python scripts/preprocess.py preprocess.mask_method=opencv preprocess.keypoint_method=dlc
 
    # SAM mask + DLC keypoints (최고 품질)
-   python preprocess.py preprocess.mask_method=sam preprocess.keypoint_method=dlc
+   python scripts/preprocess.py preprocess.mask_method=sam preprocess.keypoint_method=dlc
    ```
 
 **성공 기준**:

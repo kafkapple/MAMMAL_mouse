@@ -759,7 +759,7 @@ tree data/yolo_mouse_pose_enhanced/ -L 2
 
 **Step 6.1: Start Training** (1 min)
 ```bash
-~/miniconda3/envs/mammal_stable/bin/python train_yolo_pose.py \
+~/miniconda3/envs/mammal_stable/bin/python scripts/train_yolo_pose.py \
   --data data/yolo_mouse_pose_enhanced/data.yaml \
   --epochs 100 \
   --batch 8 \

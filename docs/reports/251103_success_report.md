@@ -406,7 +406,7 @@ bash setup.sh
 
 # 2. 전처리
 conda activate mammal_stable
-python preprocess.py dataset=custom mode=single_view_preprocess
+python scripts/preprocess.py dataset=custom mode=single_view_preprocess
 
 # 3. 피팅
 python fitter_articulation.py dataset=custom fitter.end_frame=100

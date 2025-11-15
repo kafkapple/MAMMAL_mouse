@@ -263,7 +263,7 @@ python preprocessing_utils/merge_datasets.py \
 
 #### Step 5: YOLOv8 학습 (30분)
 ```bash
-python train_yolo_pose.py \
+python scripts/train_yolo_pose.py \
   --data data/training/yolo_mouse_pose_enhanced/data.yaml \
   --epochs 100 \
   --batch 8 \
@@ -384,7 +384,7 @@ fitter:
 EOF
 
 # Step 2: 전처리 실행
-python preprocess.py \
+python scripts/preprocess.py \
   dataset=my_video \
   mode=single_view_preprocess
 
@@ -424,7 +424,7 @@ python fit_monocular.py \
   --detector geometric
 
 # 또는 전처리 단계에서
-python preprocess.py \
+python scripts/preprocess.py \
   dataset=my_video \
   preprocess.method=opencv  # 기하학적 방법
 ```
@@ -641,10 +641,10 @@ done
 
 ```bash
 # Batch size 감소
-python train_yolo_pose.py --batch 4  # default: 8
+python scripts/train_yolo_pose.py --batch 4  # default: 8
 
 # 이미지 크기 감소
-python train_yolo_pose.py --imgsz 192  # default: 256
+python scripts/train_yolo_pose.py --imgsz 192  # default: 256
 
 # Fitting시 렌더링 비활성화
 python fitter_articulation.py fitter.with_render=false
@@ -666,7 +666,7 @@ conda activate mammal_stable
 **Q: `CUDA out of memory`**
 ```bash
 # 해결 1: Batch size 감소
-python train_yolo_pose.py --batch 2
+python scripts/train_yolo_pose.py --batch 2
 
 # 해결 2: 프레임 수 제한
 python fit_monocular.py --max_images 10
@@ -706,7 +706,7 @@ python preprocessing_utils/visualize_yolo_labels.py ...
 **Q: `FileNotFoundError: new_cam.pkl not found`**
 ```bash
 # 해결: 전처리 먼저 실행
-python preprocess.py dataset=my_video mode=single_view_preprocess
+python scripts/preprocess.py dataset=my_video mode=single_view_preprocess
 ```
 
 ### Rendering 관련
@@ -779,7 +779,7 @@ ls results/test/
 ```bash
 # 1. 20개 이미지 수동 라벨링 (Roboflow)
 # 2. YOLO 학습
-python train_yolo_pose.py --data data/...
+python scripts/train_yolo_pose.py --data data/...
 # 3. Fine-tuned 모델로 피팅
 python fit_monocular.py --detector yolo --yolo_weights ...
 ```
