@@ -1,0 +1,17 @@
+data/
+data.zip 
+__pycache__ 
+
+outputs/
+checkpoints/
+mouse_fitting_result/
+*.pkl
+*.mp4
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.heic
+*.heif
+*.heif-srgb
