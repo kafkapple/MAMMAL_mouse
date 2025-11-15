@@ -1,0 +1,12 @@
+# @package _global_
+
+# Fast optimization configuration for quick testing
+# Lower iteration counts for faster execution
+
+optim:
+  solve_step0_iters: 5    # Reduced from 10
+  solve_step1_iters: 50   # Reduced from 100
+  solve_step2_iters: 15   # Reduced from 30
+
+fitter:
+  interval: 2  # Process every 2nd frame instead of every frame

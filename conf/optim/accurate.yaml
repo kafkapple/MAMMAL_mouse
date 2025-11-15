@@ -1,0 +1,12 @@
+# @package _global_
+
+# Accurate optimization configuration for high-quality results
+# Higher iteration counts for better convergence
+
+optim:
+  solve_step0_iters: 20   # Increased from 10
+  solve_step1_iters: 200  # Increased from 100
+  solve_step2_iters: 50   # Increased from 30
+
+fitter:
+  interval: 1  # Process every frame

@@ -1,0 +1,11 @@
+# @package _global_
+
+# Configuration for the original markerless_mouse_1 dataset
+# This is a multi-view dataset with 6 cameras
+
+data:
+  data_dir: data/markerless_mouse_1_nerf/
+  views_to_use: [0, 1, 2, 3, 4, 5]  # All 6 cameras
+
+fitter:
+  render_cameras: [0, 1, 2, 3, 4, 5]  # Render from all cameras

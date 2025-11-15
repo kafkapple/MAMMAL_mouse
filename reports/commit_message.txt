@@ -1,0 +1,24 @@
+feat(config): Integrate Hydra for flexible configuration management
+
+- Replaced argparse with Hydra for all project settings.
+- Created `conf/config.yaml` for centralized configuration of data paths, views, optimization parameters, and mode selection (multi-view/single-view).
+- Refactored `fitter_articulation.py` and `data_seaker_video_new.py` to consume settings from the Hydra config object.
+
+feat(preprocess): Add single-view video preprocessing pipeline
+
+- Implemented `preprocess.py` to automatically generate required input data (2D keypoints, silhouette masks, dummy camera parameters) from a single input video.
+- Uses OpenCV's background subtraction for mask generation and geometric heuristics for placeholder 2D keypoints.
+- Enables running the 3D fitting pipeline on unannotated single-view videos, albeit with limited accuracy for keypoints.
+
+feat(output): Implement OBJ mesh export per frame
+
+- Added functionality to `fitter_articulation.py` to save the final reconstructed 3D mesh as an `.obj` file for each processed frame.
+- Output `.obj` files are stored in `mouse_fitting_result/results/obj/`.
+
+docs: Update manual.md with detailed pipeline and usage instructions
+
+- Provided comprehensive documentation on data structures, input/output formats, and step-by-step instructions for both multi-view and single-view modes.
+
+refactor: Update run.sh to reflect Hydra-based execution
+
+- Modified `run.sh` to directly call `python fitter_articulation.py` without explicit arguments, relying on Hydra for configuration.
