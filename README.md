@@ -6,14 +6,15 @@ By fitting an articulated 3D mouse model to video data, this project enables mar
 
 ![mouse_model](figs/mouse_1.png)
 
-## Features
+## ✨ Features
 
 - **Multi-view 3D fitting**: Fit 3D mouse model to synchronized multi-camera videos
-- **Single-view preprocessing**: Automatically process single videos without manual annotation
+- **Single-view (monocular) fitting**: NEW! Process single videos with ML-based keypoint detection
+- **ML keypoint detection**: YOLOv8-Pose and SuperAnimal support for anatomically accurate keypoints
 - **Hydra configuration**: Flexible experiment management with dataset-specific configs
 - **Modular pipeline**: Separate preprocessing and fitting stages for easy customization
 
-## Comparison with DANNCE
+## 📊 Comparison with DANNCE
 
 ![mouse_model2](figs/mouse_2.png)
 
@@ -21,7 +22,7 @@ The results above compare DANNCE-T (temporal version) with MAMMAL_mouse on the `
 
 ---
 
-## Quick Start
+## 🚀 Quick Start
 
 ### 1. Environment Setup
 
@@ -48,14 +49,38 @@ This will create a `mammal_stable` conda environment with:
 
 ### 2. Basic Usage
 
-#### Option A: Use Existing Multi-View Data
+#### Option A: Monocular Fitting (Single Video) - NEW! ⭐
+
+Process a single video with ML-based keypoint detection:
+
+```bash
+# Activate environment
+conda activate mammal_stable
+
+# Run monocular fitting
+python fit_monocular.py \
+  --input_dir path/to/your/video_frames/ \
+  --output_dir results/monocular/your_dataset \
+  --detector geometric
+
+# OR with fine-tuned YOLO (after manual labeling)
+python fit_monocular.py \
+  --input_dir path/to/your/video_frames/ \
+  --output_dir results/monocular/your_dataset \
+  --detector yolo \
+  --yolo_weights models/trained/yolo/mammal_mouse_finetuned/weights/best.pt
+```
+
+See `docs/guides/MONOCULAR_FITTING_GUIDE.md` for detailed monocular fitting instructions.
+
+#### Option B: Multi-View Fitting (Multiple Cameras)
 
 If you have the `markerless_mouse_1` dataset:
 
 ```bash
 # Download data from Google Drive
 # https://drive.google.com/file/d/1NbaIFOvpvQ_WLOabUtMrVHS7vVBq-8zD/view?usp=sharing
-# Extract to data/markerless_mouse_1_nerf/
+# Extract to data/examples/markerless_mouse_1_nerf/
 
 # Activate environment
 conda activate mammal_stable
@@ -64,7 +89,7 @@ conda activate mammal_stable
 python fitter_articulation.py dataset=markerless optim=fast fitter.end_frame=10
 ```
 
-#### Option B: Process Your Own Single Video
+#### Option C: Process Your Own Single Video (Traditional Pipeline)
 
 ```bash
 # 1. Activate environment
@@ -73,7 +98,7 @@ conda activate mammal_stable
 # 2. Update config for your video
 # Edit conf/config.yaml or conf/dataset/custom.yaml:
 #   preprocess.input_video_path: "path/to/your/video.mp4"
-#   preprocess.output_data_dir: "data/preprocessed_custom/"
+#   preprocess.output_data_dir: "data/preprocessed/custom/"
 
 # 3. Run preprocessing
 python preprocess.py dataset=custom mode=single_view_preprocess
@@ -82,21 +107,179 @@ python preprocess.py dataset=custom mode=single_view_preprocess
 python fitter_articulation.py dataset=custom mode=multi_view fitter.end_frame=100
 ```
 
-#### Using Shell Scripts
+---
 
-For convenience, use the provided scripts:
+## 📖 Documentation
 
-```bash
-# Preprocessing
-bash run_preprocess.sh
+### User Guides
+- **[Monocular Fitting Guide](docs/guides/MONOCULAR_FITTING_GUIDE.md)** - NEW! Complete guide for single-view fitting
+- **[Quick Start Labeling](docs/guides/QUICK_START_LABELING.md)** - Manual labeling workflow for ML training
+- **[Roboflow Labeling Guide](docs/guides/ROBOFLOW_LABELING_GUIDE.md)** - Step-by-step Roboflow tutorial
+- **[SAM Mask Acquisition](docs/guides/SAM_MASK_ACQUISITION_MANUAL.md)** - Using SAM for high-quality masks
+- **[MAMMAL Architecture Manual](docs/guides/MAMMAL_ARCHITECTURE_MANUAL.md)** - Detailed architecture explanation
 
-# Fitting
-bash run_fitting.sh
+### Technical Reports
+- **[ML Keypoint Detection Integration](docs/reports/251114_ml_keypoint_detection_integration.md)** - Technical report on ML integration
+- **[Comprehensive ML Summary](docs/reports/251115_comprehensive_ml_keypoint_summary.md)** - Complete ML workflow documentation
+- **[Session Reports](docs/reports/)** - All research session summaries and experiment reports
+
+### Implementation Plans
+- **[Implementation Plan](docs/guides/implementation_plan.md)** - Overall implementation roadmap
+- **[SAM Preprocessing Plan](docs/guides/sam_preprocessing_plan.md)** - SAM integration plan
+
+---
+
+## 📁 Project Structure
+
+```
+MAMMAL_mouse/
+├── README.md                    # This file
+├── requirements.txt             # Python dependencies
+│
+├── conf/                        # Hydra configuration files
+│   ├── config.yaml              # Main config
+│   ├── dataset/                 # Dataset configs
+│   ├── preprocess/              # Preprocessing configs
+│   └── optim/                   # Optimization configs
+│
+├── preprocessing_utils/         # Preprocessing modules
+│   ├── keypoint_estimation.py   # Geometric keypoint estimation
+│   ├── mask_processing.py       # Mask processing utilities
+│   ├── yolo_keypoint_detector.py    # YOLOv8-Pose detector
+│   ├── superanimal_detector.py      # SuperAnimal detector
+│   ├── dannce_to_yolo.py            # Dataset conversion
+│   └── visualize_yolo_labels.py     # Label visualization
+│
+├── Core scripts/                # Main execution scripts
+│   ├── fit_monocular.py         # NEW! Monocular fitting
+│   ├── fitter_articulation.py   # Main multi-view fitting
+│   ├── preprocess.py            # Preprocessing pipeline
+│   ├── train_yolo_pose.py       # YOLOv8 training
+│   ├── articulation_th.py       # Articulation model
+│   ├── bodymodel_th.py          # Body model
+│   └── bodymodel_np.py          # NumPy body model
+│
+├── data/                        # Data directory
+│   ├── raw/                     # Raw datasets
+│   ├── preprocessed/            # Preprocessed outputs
+│   ├── training/                # Training data for ML
+│   │   ├── yolo_mouse_pose/     # YOLO dataset (geometric)
+│   │   └── manual_labeling/     # Manual labels (in progress)
+│   └── examples/                # Example datasets
+│       └── markerless_mouse_1_nerf/
+│
+├── models/                      # Model weights
+│   ├── pretrained/              # Pretrained models
+│   │   └── superanimal_topviewmouse/
+│   └── trained/                 # Your trained models
+│       └── yolo/                # YOLO training runs
+│
+├── results/                     # Latest experiment results
+│   ├── monocular/               # Monocular fitting results
+│   ├── preprocessing/           # Preprocessing results
+│   └── training/                # Training results
+│
+├── outputs/                     # Hydra outputs
+│   └── archives/                # Archived old experiments
+│
+├── docs/                        # Documentation
+│   ├── guides/                  # User guides
+│   └── reports/                 # Technical reports
+│
+├── mouse_model/                 # 3D mouse model files
+│   ├── mouse.pkl                # Model definition
+│   └── mouse_txt/               # Model parameters
+│
+├── checkpoints/                 # Training checkpoints
+├── test/                        # Test scripts
+├── colormaps/                   # Visualization colormaps
+└── deprecated/                  # Deprecated files (for reference)
 ```
 
 ---
 
-## Configuration Management
+## 🔬 Processing Pipeline
+
+### Stage 1: Preprocessing (Single-View Only)
+
+Converts raw video into required inputs:
+- **Input**: Single video file (`.mp4`, `.avi`, etc.)
+- **Outputs**:
+  - `videos_undist/0.mp4` - Original video
+  - `simpleclick_undist/0.mp4` - Binary mask video
+  - `keypoints2d_undist/result_view_0.pkl` - 2D keypoints (22 points)
+  - `new_cam.pkl` - Camera parameters
+
+**Available Methods**:
+1. **OpenCV-based** (Current baseline)
+   - Background subtraction for masks (BackgroundSubtractorMOG2)
+   - Geometric keypoint estimation from contours
+   - Automatic camera parameter generation
+
+2. **Monocular Fitting** (NEW!)
+   - ML-based keypoint detection (YOLOv8, SuperAnimal)
+   - Direct 3D fitting from single-view images
+   - No preprocessing stage required
+
+**Future Enhancements**:
+- SAM (Segment Anything Model) for better masks
+- DeepLabCut integration
+
+### Stage 2: 3D Fitting
+
+Fits articulated 3D mouse model to preprocessed data:
+
+**Three-Step Optimization**:
+1. **Step 0**: Global pose initialization (10 iterations)
+2. **Step 1**: Joint optimization with 2D keypoints (100 iterations)
+3. **Step 2**: Silhouette-based refinement with PyTorch3D (30 iterations)
+
+**Outputs**:
+- `results/*/obj/` - 3D mesh files (`.obj`)
+- `results/*/params/` - Fitting parameters (`.pkl`)
+- `results/*/render/` - Visualization overlays (`.png`)
+- `results/*/fitting_keypoints_*.png` - Keypoint comparisons
+
+---
+
+## 🎓 ML Keypoint Detection
+
+### Quick Start: Manual Labeling + Fine-tuning
+
+To improve keypoint detection quality (10-20× improvement expected):
+
+```bash
+# 1. Sample images for labeling (already done)
+ls data/training/manual_labeling/images/  # 20 images ready
+
+# 2. Follow Roboflow guide to label images
+# See: docs/guides/ROBOFLOW_LABELING_GUIDE.md
+# Time: ~2-3 hours for 20 images
+
+# 3. Fine-tune YOLOv8 (after labeling)
+python train_yolo_pose.py \
+  --data data/training/yolo_mouse_pose_enhanced/data.yaml \
+  --epochs 100 --batch 8 --imgsz 256 \
+  --weights yolov8n-pose.pt \
+  --name mammal_mouse_finetuned
+
+# 4. Use fine-tuned model in monocular fitting
+python fit_monocular.py \
+  --detector yolo \
+  --yolo_weights models/trained/yolo/mammal_mouse_finetuned/weights/best.pt
+```
+
+**Expected Improvements**:
+- Confidence: 0.5 → 0.85+ (2× improvement)
+- Loss: ~300K → 15-30K (10-20× improvement)
+- Paw detection: 0% → 70-80%
+- mAP: 0 → 0.6-0.8
+
+See **[Comprehensive ML Summary](docs/reports/251115_comprehensive_ml_keypoint_summary.md)** for complete workflow.
+
+---
+
+## ⚙️ Configuration Management
 
 This project uses [Hydra](https://hydra.cc/) for flexible configuration management.
 
@@ -136,7 +319,7 @@ python preprocess.py dataset=custom mode=single_view_preprocess
 |-----------|-------------|---------|
 | `mode` | Processing mode | `multi_view` |
 | `dataset` | Dataset config to use | `shank3` |
-| `data.data_dir` | Input data directory | `data/preprocessed_shank3/` |
+| `data.data_dir` | Input data directory | `data/preprocessed/shank3_opencv/` |
 | `fitter.start_frame` | First frame to process | `0` |
 | `fitter.end_frame` | Last frame to process | `2` |
 | `fitter.with_render` | Enable visualization rendering | `false` |
@@ -144,111 +327,7 @@ python preprocess.py dataset=custom mode=single_view_preprocess
 
 ---
 
-## Processing Pipeline
-
-### Stage 1: Preprocessing (Single-View Only)
-
-Converts raw video into required inputs:
-- **Input**: Single video file (`.mp4`, `.avi`, etc.)
-- **Outputs**:
-  - `videos_undist/0.mp4` - Original video
-  - `simpleclick_undist/0.mp4` - Binary mask video
-  - `keypoints2d_undist/result_view_0.pkl` - 2D keypoints (22 points)
-  - `new_cam.pkl` - Camera parameters
-
-**Current Method**: OpenCV-based
-- Background subtraction for masks (BackgroundSubtractorMOG2)
-- Geometric keypoint estimation from contours
-- Automatic camera parameter generation
-
-**Limitations**:
-- Keypoint anatomical accuracy depends on geometric heuristics
-- Mask quality sensitive to background changes
-
-**Future Enhancements**:
-- SAM (Segment Anything Model) for better masks
-- DeepLabCut for anatomically accurate keypoints
-- YOLO Pose for real-time processing
-
-### Stage 2: 3D Fitting
-
-Fits articulated 3D mouse model to preprocessed data:
-
-**Three-Step Optimization**:
-1. **Step 0**: Global pose initialization (10 iterations)
-2. **Step 1**: Joint optimization with 2D keypoints (100 iterations)
-3. **Step 2**: Silhouette-based refinement with PyTorch3D (30 iterations)
-
-**Outputs**:
-- `mouse_fitting_result/results/obj/` - 3D mesh files (`.obj`)
-- `mouse_fitting_result/results/params/` - Fitting parameters (`.pkl`)
-- `mouse_fitting_result/results/render/` - Visualization overlays (`.png`)
-- `mouse_fitting_result/results/fitting_keypoints_*.png` - Keypoint comparisons
-
-### Stage 3: Video Generation
-
-Combine output images into video:
-
-```bash
-ffmpeg -framerate 10 -i mouse_fitting_result/results/render/fitting_%d.png \
-       -c:v libx264 -pix_fmt yuv420p -y output.mp4
-```
-
----
-
-## Detailed Workflow
-
-### For Custom Single-View Data
-
-**1. Prepare Your Video**
-- Place video file in `data/your_dataset/`
-- Recommended: Static background, clear mouse visibility
-
-**2. Create Dataset Config**
-```yaml
-# conf/dataset/your_dataset.yaml
-# @package _global_
-
-data:
-  data_dir: data/preprocessed_your_dataset/
-  views_to_use: [0]
-
-preprocess:
-  input_video_path: data/your_dataset/video.mp4
-  output_data_dir: data/preprocessed_your_dataset/
-
-fitter:
-  start_frame: 0
-  end_frame: 100  # Adjust to your video length
-  render_cameras: [0]
-```
-
-**3. Run Preprocessing**
-```bash
-conda activate mammal_stable
-python preprocess.py dataset=your_dataset mode=single_view_preprocess
-```
-
-**4. Verify Preprocessing Outputs**
-```bash
-ls data/preprocessed_your_dataset/
-# Should contain: videos_undist/, simpleclick_undist/, keypoints2d_undist/, new_cam.pkl
-```
-
-**5. Run Fitting**
-```bash
-python fitter_articulation.py dataset=your_dataset mode=multi_view
-```
-
-**6. Create Output Video**
-```bash
-ffmpeg -framerate 10 -i mouse_fitting_result/results/render/fitting_%d.png \
-       -c:v libx264 -pix_fmt yuv420p -y results_your_dataset.mp4
-```
-
----
-
-## Troubleshooting
+## 🔧 Troubleshooting
 
 ### Environment Issues
 
@@ -279,7 +358,7 @@ ffmpeg -framerate 10 -i mouse_fitting_result/results/render/fitting_%d.png \
 - **Solution**: Run preprocessing first: `bash run_preprocess.sh`
 
 **Problem**: Poor keypoint quality in preprocessing
-- **Solution**: Current geometric method has limitations. Future work will integrate ML-based keypoint detectors
+- **Solution**: Use monocular fitting with ML-based keypoint detection (see ML section above)
 
 **Problem**: Fitting converges to incorrect pose
 - **Solution**:
@@ -289,123 +368,7 @@ ffmpeg -framerate 10 -i mouse_fitting_result/results/render/fitting_%d.png \
 
 ---
 
-## Advanced Configuration
-
-### Loss Term Weights
-
-Edit these in `fitter_articulation.py` (line ~82):
-
-```python
-self.term_weights = {
-    "theta": 3,       # Articulation regularization
-    "3d": 2.5,        # 3D keypoint loss
-    "2d": 0.2,        # 2D reprojection loss
-    "bone": 0.5,      # Bone length constraint
-    "scale": 0.5,     # Scale regularization
-    "mask": 0,        # Silhouette loss (disabled by default)
-    "chest_deformer": 0.1,  # Chest deformation regularization
-    "stretch": 1,     # Stretching penalty
-    "temp": 0.25,     # Temporal smoothness
-    "temp_d": 0.2     # Temporal derivative smoothness
-}
-```
-
-### Keypoint Weights
-
-Edit these in `fitter_articulation.py` (line ~65):
-
-```python
-self.keypoint_weight = np.ones(22)
-self.keypoint_weight[4] = 0.4   # Right ear (lower confidence)
-self.keypoint_weight[11] = 0.9  # Left hip (higher weight)
-self.keypoint_weight[15] = 0.9  # Left foot (higher weight)
-# ... adjust based on your data quality
-```
-
----
-
-## Project Structure
-
-```
-MAMMAL_mouse/
-├── conf/                    # Hydra configuration files
-│   ├── config.yaml          # Main config
-│   ├── dataset/             # Dataset configs
-│   ├── preprocess/          # Preprocessing configs
-│   └── optim/               # Optimization configs
-├── mouse_model/             # 3D mouse model files
-│   ├── mouse.pkl            # Model definition
-│   └── reg_weights.txt      # Regularization weights
-├── data/                    # Data directory (gitignored)
-│   ├── markerless_mouse_1_nerf/  # Original multi-view dataset
-│   └── preprocessed_*/      # Preprocessed outputs
-├── mouse_fitting_result/    # Fitting results (gitignored)
-│   └── results/
-│       ├── obj/             # 3D meshes
-│       ├── params/          # Parameters
-│       └── render/          # Visualizations
-├── outputs/                 # Hydra outputs (gitignored)
-├── reports/                 # Analysis reports
-├── fitter_articulation.py   # Main fitting script
-├── preprocess.py            # Preprocessing script
-├── articulation_th.py       # Articulation model
-├── bodymodel_th.py          # Body model
-├── data_seaker_video_new.py # Data loader
-├── setup.sh                 # Environment setup script
-├── run_preprocess.sh        # Preprocessing runner
-├── run_fitting.sh           # Fitting runner
-├── requirements.txt         # Python dependencies
-└── README.md                # This file
-```
-
----
-
-## Known Issues
-
-### Critical Issues (Being Addressed)
-
-1. **Camera projection math error** (Line ~174 in `fitter_articulation.py`)
-   - Matrix dimension mismatch in `calc_2d_keypoint_loss`
-   - Fix in progress (see `reports/shank3_workflow_final_report.md`)
-
-2. **PyTorch3D T vector shape incompatibility**
-   - PyTorch3D expects T in `(N, 3)` format
-   - Current code passes `(1, 3, 1)` or `(3, 1)`
-   - Workaround: Add shape correction before PyTorch3D calls
-
-### Limitations
-
-- **Preprocessing accuracy**: Geometric keypoint estimation is approximate
-- **Single-view ambiguity**: 3D reconstruction from single view is underconstrained
-- **Background dependency**: Mask quality depends on static background
-
----
-
-## Future Enhancements
-
-See `PROJECT_ANALYSIS.md` for detailed implementation roadmap.
-
-### Short-term (Phase 1-2)
-- [x] Hydra configuration system
-- [x] Single-view preprocessing
-- [ ] Fix camera projection bugs
-- [ ] Update environment to `mammal_stable`
-
-### Medium-term (Phase 3-4)
-- [ ] SAM integration for high-quality masks
-- [ ] DeepLabCut/YOLO for accurate keypoints
-- [ ] Multi-method preprocessing system
-- [ ] Comprehensive unit tests
-
-### Long-term
-- [ ] Real-time processing pipeline
-- [ ] Multi-animal tracking
-- [ ] Temporal consistency improvements
-- [ ] Interactive annotation tools
-
----
-
-## Model Information
+## 🎯 Model Information
 
 **Base Model**: C57BL6_Female_V1.2
 - Source: _A three-dimensional virtual mouse generates synthetic training data for behavioral analysis_
@@ -423,25 +386,48 @@ See `PROJECT_ANALYSIS.md` for detailed implementation roadmap.
 
 ---
 
-## Performance Notes
+## 📈 Performance Notes
 
 **Processing Time** (NVIDIA RTX 3090):
-- Preprocessing: ~5-10 seconds per 100 frames
-- Fitting (with render): ~7 minutes per frame
-- Fitting (without render): ~2-3 minutes per frame
+- Monocular fitting: ~30 seconds per frame (ML inference + 3D fitting)
+- Traditional preprocessing: ~5-10 seconds per 100 frames
+- Multi-view fitting (with render): ~7 minutes per frame
+- Multi-view fitting (without render): ~2-3 minutes per frame
 
 **Memory Usage**:
-- Preprocessing: ~2GB GPU memory
-- Fitting: ~4-6GB GPU memory
+- Monocular fitting: ~3-4GB GPU memory
+- Traditional preprocessing: ~2GB GPU memory
+- Multi-view fitting: ~4-6GB GPU memory
 
 **Recommendations**:
 - Start with `optim=fast` and small `end_frame` for testing
 - Use `fitter.with_render=false` for faster iteration
 - Process long videos in frame batches
+- For monocular fitting, use `--max_images` to limit batch size
 
 ---
 
-## Citation
+## 🆕 Recent Updates (2025-11-15)
+
+### NEW Features
+- ✅ **Monocular Fitting Pipeline**: Direct 3D fitting from single-view images
+- ✅ **ML Keypoint Detection**: YOLOv8-Pose and SuperAnimal support
+- ✅ **Manual Labeling Workflow**: Complete end-to-end pipeline for training custom detectors
+- ✅ **Comprehensive Documentation**: 10+ guides and technical reports
+
+### Codebase Cleanup
+- ✅ **Organized Project Structure**: Clear separation of docs/, data/, models/, results/
+- ✅ **Standardized Naming**: YYMMDD_ prefix for all reports
+- ✅ **Modular Architecture**: preprocessing_utils/ with clear responsibilities
+
+### Next Steps
+- ⏳ **Manual Labeling**: 20 images ready, labeling in progress
+- ⏳ **YOLOv8 Fine-tuning**: Expected mAP 0.6-0.8 after labeling
+- 📋 **SAM Integration**: Planned for high-quality mask generation
+
+---
+
+## 📚 Citation
 
 If you found this project useful, please cite:
 
@@ -470,11 +456,11 @@ Mouse model citation:
 
 ---
 
-## Contact
+## 📧 Contact
 
 If you encounter any problems using this code, please:
 1. Check the troubleshooting section above
-2. Review `PROJECT_ANALYSIS.md` for known issues
+2. Review documentation in `docs/guides/` and `docs/reports/`
 3. Open an issue on GitHub with:
    - Error message and full traceback
    - Your environment details (`conda list`)
@@ -485,15 +471,17 @@ For general questions about the MAMMAL framework, please refer to the main paper
 
 ---
 
-## License
-
-[Specify your license here]
-
----
-
-## Acknowledgments
+## 🙏 Acknowledgments
 
 - Original MAMMAL framework by An et al.
 - DANNCE dataset by Dunn et al.
 - Virtual mouse model by Bolanos et al.
 - PyTorch3D by Meta AI Research
+- Ultralytics YOLOv8 by Ultralytics
+- DeepLabCut SuperAnimal by Mathis Lab
+
+---
+
+## 📄 License
+
+[Specify your license here]
