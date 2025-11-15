@@ -4,7 +4,7 @@ Three-dimensional surface motion capture of mice using the MAMMAL framework. Thi
 
 By fitting an articulated 3D mouse model to video data, this project enables markerless 3D pose estimation and mesh reconstruction for behavioral analysis.
 
-![mouse_model](figs/mouse_1.png)
+![mouse_model](assets/figs/mouse_1.png)
 
 ## ✨ Features
 
@@ -16,7 +16,7 @@ By fitting an articulated 3D mouse model to video data, this project enables mar
 
 ## 📊 Comparison with DANNCE
 
-![mouse_model2](figs/mouse_2.png)
+![mouse_model2](assets/figs/mouse_2.png)
 
 The results above compare DANNCE-T (temporal version) with MAMMAL_mouse on the `markerless_mouse_1` sequence.
 
@@ -186,13 +186,18 @@ MAMMAL_mouse/
 │   ├── guides/                  # User guides
 │   └── reports/                 # Technical reports
 │
-├── mouse_model/                 # 3D mouse model files
-│   ├── mouse.pkl                # Model definition
-│   └── mouse_txt/               # Model parameters
+├── assets/                      # Static resources
+│   ├── colormaps/               # Visualization colormaps
+│   ├── figs/                    # README images
+│   └── mouse_model/             # 3D mouse model files
+│       ├── mouse.pkl            # Model definition
+│       └── mouse_txt/           # Model parameters
 │
-├── checkpoints/                 # Training checkpoints
-├── test/                        # Test scripts
-├── colormaps/                   # Visualization colormaps
+├── tests/                       # Test scripts
+│   ├── unit/
+│   ├── integration/
+│   └── outputs/                 # Test outputs
+│
 └── deprecated/                  # Deprecated files (for reference)
 ```
 
