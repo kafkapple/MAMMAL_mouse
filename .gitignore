@@ -93,3 +93,5 @@ htmlcov/
 !docs/**/*.md
 !models/README.md
 !conf/**/*.yaml
+!mouse_model/**/*.pkl
+!mouse_model/*.pkl

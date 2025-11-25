@@ -4,17 +4,35 @@ This file is used to simulate the skinning process and constraints used in blend
 By Liang AN, 2022.10.19
 """
 
-import numpy as np 
-import pickle 
+import numpy as np
+import pickle
 from scipy.sparse import csc_matrix,csr_matrix,coo_matrix
-from scipy.spatial.transform import Rotation 
+from scipy.spatial.transform import Rotation
 
-import torch 
-from torch.nn import Module 
-import os 
-from time import time 
-import json 
-import hydra.utils # Added for path resolution
+import torch
+from torch.nn import Module
+import os
+from time import time
+import json
+
+# Path resolution with Hydra fallback
+def resolve_path(relative_path):
+    """
+    Resolve relative path to absolute path.
+    Tries hydra.utils.to_absolute_path() first, falls back to script directory.
+    """
+    # Try Hydra first (when running under Hydra context)
+    try:
+        import hydra.utils
+        import hydra.core.global_hydra
+        if hydra.core.global_hydra.GlobalHydra.instance().is_initialized():
+            return hydra.utils.to_absolute_path(relative_path)
+    except (ImportError, Exception):
+        pass
+
+    # Fallback: resolve relative to this script's directory
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(script_dir, relative_path)
 
 def to_tensor(array, dtype=torch.float32):
     if 'torch.tensor' not in str(type(array)):
@@ -38,15 +56,15 @@ class ArticulationTorch(Module):
         self.read_reduced()
 
     def read_mapper(self):
-        mapper_file = hydra.utils.to_absolute_path("mouse_model/keypoint22_mapper.json") 
-        with open(mapper_file, 'r') as f: 
-            mapper = json.load(f) 
+        mapper_file = resolve_path("mouse_model/keypoint22_mapper.json")
+        with open(mapper_file, 'r') as f:
+            mapper = json.load(f)
         mapper = mapper["mapper"]
-        self.mapper = mapper 
+        self.mapper = mapper
 
-    def read_reduced(self): 
-        self.faces_reduced_7200 = np.loadtxt(hydra.utils.to_absolute_path("mouse_model/mouse_txt/reduced_face_7200.txt"), dtype=np.int64)
-        self.reduced_ids = np.loadtxt(hydra.utils.to_absolute_path("mouse_model/mouse_txt/reduced_ids_7200.txt"), dtype=np.int64).squeeze().tolist()
+    def read_reduced(self):
+        self.faces_reduced_7200 = np.loadtxt(resolve_path("mouse_model/mouse_txt/reduced_face_7200.txt"), dtype=np.int64)
+        self.reduced_ids = np.loadtxt(resolve_path("mouse_model/mouse_txt/reduced_ids_7200.txt"), dtype=np.int64).squeeze().tolist()
         
 
     def forward_keypoints22(self):
@@ -75,8 +93,8 @@ class ArticulationTorch(Module):
         return self.pose_rot_vec, self.pose_trans
 
     def _read_params(self):
-        pklfolder = hydra.utils.to_absolute_path("mouse_model/mouse_txt/")
-        txtfolder=hydra.utils.to_absolute_path("mouse_model/mouse_txt")
+        pklfolder = resolve_path("mouse_model/mouse_txt/")
+        txtfolder = resolve_path("mouse_model/mouse_txt")
         self.vertices_raw_tpose_np = np.loadtxt(os.path.join(txtfolder, "vertices.txt"))
 
         self.textures_np = np.loadtxt(os.path.join(txtfolder, "textures.txt"))
