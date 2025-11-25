@@ -30,6 +30,25 @@ from preprocessing_utils.keypoint_estimation import (
 )
 from preprocessing_utils.superanimal_detector import SuperAnimalDetector
 
+# Optional: PyTorch3D for mesh rendering
+try:
+    import pytorch3d
+    from pytorch3d.structures import Meshes
+    from pytorch3d.renderer import (
+        look_at_view_transform,
+        FoVPerspectiveCameras,
+        PointLights,
+        RasterizationSettings,
+        MeshRenderer,
+        MeshRasterizer,
+        SoftPhongShader,
+        TexturesVertex
+    )
+    PYTORCH3D_AVAILABLE = True
+except ImportError:
+    PYTORCH3D_AVAILABLE = False
+    print("Warning: PyTorch3D not available, mesh rendering disabled")
+
 
 # Keypoint group definitions
 KEYPOINT_GROUPS = {
@@ -107,6 +126,58 @@ def create_combined_visualization(rgb, mask, keypoints_2d, mesh_vertices=None,
         legend_y += 20
 
     return combined
+
+
+def create_comparison_image(mask, rendered_mesh, overlay, rgb=None):
+    """
+    Create side-by-side comparison image: Mask | Rendered Mesh | Overlay
+
+    Args:
+        mask: (H, W) binary mask or (H, W, 3) mask image
+        rendered_mesh: (H, W, 3) rendered mesh image
+        overlay: (H, W, 3) overlay visualization
+        rgb: (H, W, 3) optional RGB image for 4-panel comparison
+
+    Returns:
+        comparison: Combined comparison image
+    """
+    H, W = mask.shape[:2] if len(mask.shape) == 2 else mask.shape[:2]
+
+    # Convert mask to 3 channel if needed
+    if len(mask.shape) == 2:
+        mask_vis = np.stack([mask, mask, mask], axis=-1)
+    else:
+        mask_vis = mask
+
+    # Resize all images to same size
+    def resize_to(img, target_h, target_w):
+        if img.shape[0] != target_h or img.shape[1] != target_w:
+            return cv2.resize(img, (target_w, target_h))
+        return img
+
+    mask_vis = resize_to(mask_vis, H, W)
+    rendered_mesh = resize_to(rendered_mesh, H, W)
+    overlay = resize_to(overlay, H, W)
+
+    if rgb is not None:
+        rgb = resize_to(rgb, H, W)
+        # 4-panel: RGB | Mask | Rendered | Overlay
+        comparison = np.hstack([rgb, mask_vis, rendered_mesh, overlay])
+        labels = ['Input RGB', 'Mask', 'Rendered Mesh', 'Overlay']
+    else:
+        # 3-panel: Mask | Rendered | Overlay
+        comparison = np.hstack([mask_vis, rendered_mesh, overlay])
+        labels = ['Mask', 'Rendered Mesh', 'Overlay']
+
+    # Add labels
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    panel_width = W
+    for i, label in enumerate(labels):
+        x = i * panel_width + 10
+        cv2.putText(comparison, label, (x, 25), font, 0.6, (255, 255, 255), 2)
+        cv2.putText(comparison, label, (x, 25), font, 0.6, (0, 0, 0), 1)
+
+    return comparison
 
 
 def filter_keypoints_by_selection(keypoints_2d, selection='all'):
@@ -192,6 +263,101 @@ class MonocularMAMMALFitter:
             'image_width': 256,
             'image_height': 256
         }
+
+        # Initialize PyTorch3D renderer if available
+        self.renderer = None
+        if PYTORCH3D_AVAILABLE:
+            self._init_renderer()
+
+    def _init_renderer(self, image_size=256):
+        """Initialize PyTorch3D mesh renderer"""
+        if not PYTORCH3D_AVAILABLE:
+            return
+
+        # Rasterization settings
+        raster_settings = RasterizationSettings(
+            image_size=image_size,
+            blur_radius=0.0,
+            faces_per_pixel=1,
+        )
+
+        # Camera and lights will be set per-frame
+        self.raster_settings = raster_settings
+        self.image_size = image_size
+        print(f"PyTorch3D renderer initialized (image_size={image_size})")
+
+    def render_mesh(self, vertices, faces, image_size=256):
+        """
+        Render mesh to image using PyTorch3D
+
+        Args:
+            vertices: (N, 3) tensor of vertices
+            faces: (F, 3) tensor of face indices
+            image_size: Output image size
+
+        Returns:
+            rendered: (H, W, 3) numpy array RGB image
+        """
+        if not PYTORCH3D_AVAILABLE:
+            # Return placeholder if PyTorch3D not available
+            placeholder = np.ones((image_size, image_size, 3), dtype=np.uint8) * 128
+            cv2.putText(placeholder, "PyTorch3D", (10, image_size//2 - 10),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+            cv2.putText(placeholder, "not installed", (10, image_size//2 + 10),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+            return placeholder
+
+        with torch.no_grad():
+            # Ensure tensors are on device
+            if not isinstance(vertices, torch.Tensor):
+                vertices = torch.tensor(vertices, dtype=torch.float32, device=self.device)
+            if not isinstance(faces, torch.Tensor):
+                faces = torch.tensor(faces, dtype=torch.int64, device=self.device)
+
+            # Add batch dimension if needed
+            if vertices.dim() == 2:
+                vertices = vertices.unsqueeze(0)
+            if faces.dim() == 2:
+                faces = faces.unsqueeze(0)
+
+            # Create vertex colors (light blue)
+            verts_rgb = torch.ones_like(vertices) * torch.tensor([0.6, 0.8, 1.0], device=self.device)
+            textures = TexturesVertex(verts_features=verts_rgb)
+
+            # Create mesh
+            mesh = Meshes(verts=vertices, faces=faces, textures=textures)
+
+            # Calculate camera position based on mesh bounds
+            verts_center = vertices.mean(dim=1)
+            verts_range = (vertices.max(dim=1)[0] - vertices.min(dim=1)[0]).max()
+            dist = float(verts_range * 2.5)
+
+            # Camera: look at mesh center
+            R, T = look_at_view_transform(dist=dist, elev=20, azim=0,
+                                          at=verts_center.cpu())
+            cameras = FoVPerspectiveCameras(device=self.device, R=R, T=T)
+
+            # Lights
+            lights = PointLights(device=self.device, location=[[0.0, 2.0, 2.0]])
+
+            # Renderer
+            raster_settings = RasterizationSettings(
+                image_size=image_size,
+                blur_radius=0.0,
+                faces_per_pixel=1,
+            )
+
+            renderer = MeshRenderer(
+                rasterizer=MeshRasterizer(cameras=cameras, raster_settings=raster_settings),
+                shader=SoftPhongShader(device=self.device, cameras=cameras, lights=lights)
+            )
+
+            # Render
+            images = renderer(mesh)
+            rendered = images[0, ..., :3].cpu().numpy()
+            rendered = (rendered * 255).astype(np.uint8)
+
+            return rendered
 
     def extract_keypoints(self, mask, rgb=None):
         """
@@ -391,6 +557,9 @@ class MonocularMAMMALFitter:
         # Visualization
         vis_keypoints = None
         vis_combined = None
+        vis_rendered = None
+        vis_comparison = None
+
         if visualize:
             # Original keypoint visualization
             vis_keypoints = visualize_keypoints_on_frame(rgb, keypoints_2d)
@@ -398,6 +567,18 @@ class MonocularMAMMALFitter:
             # Combined overlay visualization (RGB + mask + keypoints)
             vis_combined = create_combined_visualization(
                 rgb, mask_binary, keypoints_2d
+            )
+
+            # Render mesh to 2D image
+            H, W = rgb.shape[:2]
+            render_size = max(H, W)
+            vis_rendered = self.render_mesh(
+                mesh.vertices, mesh.faces, image_size=render_size
+            )
+
+            # Create comparison image: RGB | Mask | Rendered | Overlay
+            vis_comparison = create_comparison_image(
+                mask_binary, vis_rendered, vis_combined, rgb=rgb
             )
 
         results = {
@@ -414,7 +595,9 @@ class MonocularMAMMALFitter:
             'rgb': rgb,
             'mask': mask_binary,
             'vis_keypoints': vis_keypoints,
-            'vis_combined': vis_combined
+            'vis_combined': vis_combined,
+            'vis_rendered': vis_rendered,
+            'vis_comparison': vis_comparison
         }
 
         return results
@@ -492,6 +675,20 @@ class MonocularMAMMALFitter:
                     combined_path = output_path / f"{output_name}_overlay.png"
                     cv2.imwrite(str(combined_path), results['vis_combined'])
 
+                # Save rendered mesh image
+                if results['vis_rendered'] is not None:
+                    rendered_path = output_path / f"{output_name}_rendered.png"
+                    cv2.imwrite(str(rendered_path), cv2.cvtColor(results['vis_rendered'], cv2.COLOR_RGB2BGR))
+
+                # Save comparison image (RGB | Mask | Rendered | Overlay)
+                if results['vis_comparison'] is not None:
+                    comparison_path = output_path / f"{output_name}_comparison.png"
+                    cv2.imwrite(str(comparison_path), results['vis_comparison'])
+
+                # Save mask image separately
+                mask_path = output_path / f"{output_name}_mask.png"
+                cv2.imwrite(str(mask_path), results['mask'])
+
                 print(f"  ✓ Processed {rgb_file.name}")
 
             except Exception as e:
@@ -556,6 +753,9 @@ Keypoint Groups:
     print(f"  - *_mesh.obj: 3D mesh (Blender compatible)")
     print(f"  - *_keypoints.png: Keypoint visualization")
     print(f"  - *_overlay.png: Combined overlay (RGB + mask + keypoints)")
+    print(f"  - *_rendered.png: Rendered mesh image")
+    print(f"  - *_comparison.png: Side-by-side comparison (RGB | Mask | Rendered | Overlay)")
+    print(f"  - *_mask.png: Binary mask")
     print(f"  - *_params.pkl: MAMMAL parameters")
 
 
