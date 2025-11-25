@@ -23,7 +23,7 @@ echo "Access at: http://localhost:$PORT"
 echo "========================================="
 echo ""
 
-python keypoint_annotator_v2.py \
+python scripts/annotators/keypoint_annotator_v2.py \
     "$FRAMES_DIR" \
     --output "$OUTPUT_FILE" \
     --port "$PORT"

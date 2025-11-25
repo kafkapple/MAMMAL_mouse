@@ -69,14 +69,14 @@ echo ""
 # Launch annotator
 if [ -z "$SAM_CHECKPOINT" ]; then
     # Without SAM
-    python unified_annotator.py \
+    python scripts/annotators/unified_annotator.py \
         --input "$INPUT_DIR" \
         --output "$OUTPUT_DIR" \
         --mode keypoint \
         --port $PORT
 else
     # With SAM
-    python unified_annotator.py \
+    python scripts/annotators/unified_annotator.py \
         --input "$INPUT_DIR" \
         --output "$OUTPUT_DIR" \
         --mode "$MODE" \

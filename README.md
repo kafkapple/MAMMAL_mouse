@@ -110,10 +110,12 @@ Process the example multi-view dataset:
 # Activate environment
 conda activate mammal_stable
 
-# Run fitting on first 10 frames
+# Run fitting on first 10 frames (using shell script)
+./run_mesh_fitting_default.sh 0 10
+
+# OR run directly with Python
 python fitter_articulation.py \
-  dataset=markerless \
-  optim=fast \
+  dataset=default_markerless \
   fitter.start_frame=0 \
   fitter.end_frame=10 \
   fitter.with_render=true
@@ -122,22 +124,23 @@ python fitter_articulation.py \
 **What happens**:
 1. Loads 6-camera preprocessed data from `data/examples/markerless_mouse_1_nerf/`
 2. Fits 3D mouse model to frames 0-10
-3. Saves results to `outputs/YYYY-MM-DD/HH-MM-SS/`
+3. Saves results to `results/fitting/{dataset}_{timestamp}/`
 
 **Expected output**:
 ```
-outputs/2025-11-15/14-30-00/
+results/fitting/markerless_mouse_1_nerf_20251125_143000/
 ├── obj/                     # 3D mesh files (.obj)
-│   ├── frame_0000.obj
-│   ├── frame_0001.obj
+│   ├── mesh_000000.obj
+│   ├── mesh_000002.obj
 │   └── ...
 ├── params/                  # Fitting parameters (.pkl)
-│   ├── frame_0000.pkl
+│   ├── param0.pkl
+│   ├── param0_sil.pkl
 │   └── ...
-├── render/                  # Visualization overlays (.png)
-│   ├── frame_0000_view_0.png
-│   └── ...
-└── fitting_keypoints_0.png  # Keypoint comparison
+└── render/                  # Visualization overlays (.png)
+    ├── fitting_0.png
+    ├── fitting_0_sil.png
+    └── debug/               # Optimization debug images
 ```
 
 **Processing time**: ~5-10 minutes (RTX 3090)
@@ -233,13 +236,17 @@ data/preprocessed/my_experiment/
 ```bash
 conda activate mammal_stable
 
+# Using shell script (recommended)
+./run_mesh_fitting_default.sh 0 5
+
+# OR using Python directly
 python fitter_articulation.py \
-  dataset=markerless \
+  dataset=default_markerless \
   optim=fast \
   fitter.end_frame=5
 ```
 
-**Results**: `outputs/YYYY-MM-DD/HH-MM-SS/obj/` contains 3D meshes
+**Results**: `results/fitting/{dataset}_{timestamp}/obj/` contains 3D meshes
 
 ### 2️⃣ Process Your Single Video (30 minutes)
 
@@ -252,7 +259,10 @@ conda activate mammal_stable
 mkdir -p data/raw/my_video/frames/
 ffmpeg -i your_video.mp4 data/raw/my_video/frames/%06d.png
 
-# Run monocular fitting
+# Using shell script (recommended)
+./run_mesh_fitting_monocular.sh data/raw/my_video/frames/ results/monocular/my_video yolo
+
+# OR using Python directly
 python fit_monocular.py \
   --input_dir data/raw/my_video/frames/ \
   --output_dir results/monocular/my_video \
@@ -351,27 +361,25 @@ chmod +x batch_process.sh
 
 ### Multi-View Fitting Output
 
-After running `fitter_articulation.py`, outputs are in `outputs/YYYY-MM-DD/HH-MM-SS/`:
+After running `fitter_articulation.py`, outputs are in `results/fitting/{dataset}_{timestamp}/`:
 
 ```
-outputs/2025-11-15/14-30-00/
+results/fitting/markerless_mouse_1_nerf_20251125_143000/
 ├── obj/                           # 3D mesh files (can open in Blender/MeshLab)
-│   ├── frame_0000.obj             # Mesh for frame 0
-│   ├── frame_0001.obj
+│   ├── mesh_000000.obj            # Mesh for frame 0
+│   ├── mesh_000002.obj
 │   └── ...
 │
 ├── params/                        # Fitting parameters (Python pickle)
-│   ├── frame_0000.pkl             # Contains: body_pose, global_orient, betas, etc.
-│   ├── frame_0001.pkl
+│   ├── param0.pkl                 # Contains: body_pose, global_orient, betas, etc.
+│   ├── param0_sil.pkl             # After silhouette refinement
 │   └── ...
 │
-├── render/                        # Visualization overlays
-│   ├── frame_0000_view_0.png      # Fitted model overlaid on view 0
-│   ├── frame_0000_view_1.png      # Fitted model overlaid on view 1
-│   └── ...
+├── render/                        # Visualization overlays (if with_render=true)
+│   ├── fitting_0.png              # Fitted model overlaid on all views
+│   ├── fitting_0_sil.png          # After silhouette refinement
+│   └── debug/                     # Optimization debug images
 │
-├── fitting_keypoints_0.png        # Keypoint comparison (2D projection vs detected)
-├── fitting_keypoints_1.png
 └── .hydra/                        # Hydra config snapshots
     └── config.yaml                # Exact config used for this run
 ```
@@ -379,13 +387,13 @@ outputs/2025-11-15/14-30-00/
 **How to visualize**:
 ```bash
 # View 3D mesh in Blender
-blender outputs/*/obj/frame_0000.obj
+blender results/fitting/*/obj/mesh_000000.obj
 
 # View 3D mesh in MeshLab
-meshlab outputs/*/obj/frame_0000.obj
+meshlab results/fitting/*/obj/mesh_000000.obj
 
 # View overlays
-eog outputs/*/render/frame_0000_view_0.png
+eog results/fitting/*/render/fitting_0.png
 ```
 
 ### Monocular Fitting Output
@@ -650,7 +658,7 @@ python << EOF
 import trimesh
 import glob
 
-for obj_file in glob.glob('outputs/*/obj/*.obj'):
+for obj_file in glob.glob('results/fitting/*/obj/*.obj'):
     mesh = trimesh.load(obj_file)
     ply_file = obj_file.replace('.obj', '.ply')
     mesh.export(ply_file)
@@ -672,7 +680,7 @@ import glob
 
 # Load all meshes
 meshes = []
-for obj_file in sorted(glob.glob('outputs/*/obj/frame_*.obj')):
+for obj_file in sorted(glob.glob('results/fitting/*/obj/mesh_*.obj')):
     meshes.append(pv.read(obj_file))
 
 # Create animation
@@ -860,7 +868,14 @@ This project supports flexible mesh fitting across different dataset formats. Se
 
 **Run with default dataset (multi-view):**
 ```bash
-./run_mesh_fitting_default.sh 0 50 1 true
+./run_mesh_fitting_default.sh 0 50     # frames 0-50
+./run_mesh_fitting_default.sh 0 10 1 true  # with render
+```
+
+**Run with monocular fitting (single-view):**
+```bash
+./run_mesh_fitting_monocular.sh data/frames/ results/monocular/output yolo
+./run_mesh_fitting_monocular.sh data/frames/ results/monocular/output geometric
 ```
 
 **Run with cropped frames (single-view with masks):**
@@ -868,16 +883,10 @@ This project supports flexible mesh fitting across different dataset formats. Se
 ./run_mesh_fitting_cropped.sh data/100-KO-male-56-20200615_cropped
 ```
 
-**Run with custom dataset:**
-```bash
-./run_mesh_fitting_custom.sh cropped /path/to/data 0 100
-```
-
 **Quick test (3 frames):**
 ```bash
-./run_quick_test.sh default_markerless
-# or
-./run_quick_test.sh cropped
+./run_mesh_fitting_default.sh 0 3      # Multi-view test
+./run_mesh_fitting_monocular.sh data/test/ results/test/ geometric 3  # Monocular test
 ```
 
 ### Supported Dataset Types
@@ -912,16 +921,22 @@ python fitter_articulation.py \
 ### Output Structure
 
 ```
-outputs/YYYY-MM-DD/HH-MM-SS/
-├── results/
-│   ├── frame_0000/
-│   │   ├── mesh.obj              # 3D mesh
-│   │   ├── params.json           # Fitted parameters
-│   │   └── comparison.png        # Visualization
-│   └── summary.json              # Overall summary
+results/fitting/{dataset}_{timestamp}/
+├── obj/
+│   ├── mesh_000000.obj           # 3D mesh per frame
+│   └── ...
+├── params/
+│   ├── param0.pkl                # Fitted parameters
+│   ├── param0_sil.pkl            # After silhouette refinement
+│   └── ...
+├── render/                       # (if with_render=true)
+│   ├── fitting_0.png             # Visualization overlay
+│   └── debug/                    # Optimization debug images
 └── .hydra/
     └── config.yaml               # Configuration used
 ```
+
+**Hydra logs** are stored in: `results/logs/YYYY-MM-DD/HH-MM-SS/`
 
 ### Documentation
 
@@ -1003,6 +1018,15 @@ The fitting uses a progressive optimization strategy:
 
 ## 🆕 Recent Updates
 
+### 2025-11-25: Folder Organization and Monocular Pipeline
+- ✅ Consolidated result folders to unified `results/` structure
+- ✅ Added monocular fitting shell script (`run_mesh_fitting_monocular.sh`)
+- ✅ Created monocular config (`conf/monocular.yaml`)
+- ✅ Enhanced visualization with keypoint overlay
+- ✅ Added keypoint selection by groups (head, spine, limbs, tail)
+- ✅ Cleaned up git-tracked large files (2.4GB → 6.5MB)
+- ✅ Updated all output paths in codebase
+
 ### 2025-11-15: Major Cleanup and Documentation
 - ✅ Reorganized project structure (36 → 21 root items)
 - ✅ Created comprehensive README with step-by-step examples
@@ -1048,10 +1072,9 @@ MAMMAL_mouse/
 ├── README.md                      # This file
 ├── requirements.txt               # Python dependencies
 │
-├── # Core Python (Original MAMMAL)
+├── # Core Python Files
 ├── fitter_articulation.py         # Main multi-view mesh fitter
 ├── fit_monocular.py               # Single-view monocular fitting
-├── fit_silhouette_prototype.py    # Silhouette-based fitting
 ├── fit_cropped_frames.py          # Cropped frame fitting
 ├── articulation_th.py             # Articulation model (PyTorch)
 ├── bodymodel_th.py                # Body model (PyTorch)
@@ -1059,50 +1082,74 @@ MAMMAL_mouse/
 ├── mouse_22_defs.py               # 22 keypoint definitions
 ├── utils.py                       # Utility functions
 │
-├── # Annotation Tools
-├── unified_annotator.py           # Mask + Keypoint unified tool
-├── keypoint_annotator_v2.py       # Keypoint-only annotator
-├── extract_video_frames.py        # Video frame extraction
-│
 ├── # Shell Scripts (Quick Start)
-├── run_unified_annotator.sh       # Launch unified annotator
-├── run_keypoint_annotator.sh      # Launch keypoint annotator
-├── run_mesh_fitting_cropped.sh    # Fit cropped frames
-├── run_mesh_fitting_default.sh    # Fit default dataset
-├── run_mesh_fitting_custom.sh     # Custom fitting config
-├── run_quick_test.sh              # Quick test (3 frames)
+├── run_mesh_fitting_default.sh    # Multi-view fitting
+├── run_mesh_fitting_monocular.sh  # Monocular fitting
+├── run_mesh_fitting_cropped.sh    # Cropped frames fitting
+├── run_unified_annotator.sh       # Launch annotation tool
 │
 ├── # Configuration
 ├── conf/                          # Hydra configs
 │   ├── config.yaml                # Main config
+│   ├── monocular.yaml             # Monocular fitting config
 │   └── dataset/                   # Dataset-specific configs
+│       ├── default_markerless.yaml
+│       ├── cropped.yaml
+│       └── custom.yaml
+│
+├── # Scripts (Organized)
+├── scripts/
+│   ├── annotators/                # Annotation tools
+│   │   ├── unified_annotator.py   # Mask + Keypoint tool (Gradio)
+│   │   └── keypoint_annotator_v2.py
+│   ├── preprocessing/             # Video preprocessing
+│   │   └── extract_video_frames.py
+│   ├── setup/                     # Installation scripts
+│   │   ├── setup.sh
+│   │   ├── download_superanimal.py
+│   │   └── sample_images_for_labeling.py
+│   ├── utils/                     # Utility scripts
+│   │   ├── convert_keypoints_to_mammal.py
+│   │   └── process_video_with_sam.py
+│   ├── tests/                     # Test scripts
+│   ├── deprecated/                # Old/replaced scripts
+│   ├── preprocess.py
+│   ├── evaluate.py
+│   └── train_yolo_pose.py
+│
+├── # Preprocessing Utilities
+├── preprocessing_utils/
+│   ├── keypoint_estimation.py     # Geometric keypoint detector
+│   ├── yolo_keypoint_detector.py  # YOLO-Pose detector
+│   ├── superanimal_detector.py    # SuperAnimal detector
+│   ├── mask_processing.py         # Mask utilities
+│   ├── sam_inference.py           # SAM integration
+│   └── silhouette_renderer.py     # PyTorch3D rendering
+│
+├── # Assets (tracked)
+├── mouse_model/                   # MAMMAL parametric model
+│   ├── mouse.pkl                  # Main model file
+│   └── mouse_txt/                 # Auxiliary files
 │
 ├── # Documentation
 ├── docs/
-│   ├── guides/
-│   │   ├── annotation/            # Annotation guides
-│   │   ├── fitting/               # Mesh fitting guides
-│   │   ├── preprocessing/         # Video processing guides
-│   │   └── *.md                   # General guides
-│   ├── reports/                   # Research notes (YYMMDD_*.md)
-│   └── setup/                     # Installation guides
+│   ├── guides/                    # Usage guides
+│   └── reports/                   # Research notes (YYMMDD_*.md)
 │
-├── # Scripts
-├── scripts/
-│   ├── setup/                     # Installation scripts
-│   ├── utils/                     # Utility scripts
-│   ├── deprecated/                # Old/replaced scripts
-│   └── *.py                       # Original scripts
+├── # Models (git-ignored, download separately)
+├── models/
+│   ├── README.md                  # Download instructions
+│   ├── pretrained/                # SAM, YOLO base models
+│   └── trained/                   # Fine-tuned models
 │
-├── # Assets
-├── assets/
-│   ├── mouse_model/               # MAMMAL mouse model
-│   └── figs/                      # Documentation images
+├── # Data (git-ignored)
+├── data/                          # Input datasets
 │
-├── # Other
-├── models/                        # Pretrained/trained models
-├── preprocessing_utils/           # Preprocessing utilities
-└── tests/                         # Test scripts
+└── # Results (git-ignored)
+└── results/
+    ├── fitting/                   # Mesh fitting outputs
+    ├── monocular/                 # Monocular fitting outputs
+    └── logs/                      # Hydra logs
 ```
 
 ---

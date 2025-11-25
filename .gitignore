@@ -1,39 +1,95 @@
-# Data and outputs
+# ===========================================
+# MAMMAL Mouse Project .gitignore
+# ===========================================
+
+# ----- Large Data Folders -----
 data/
 data.zip
-outputs/
 checkpoints/
-results/
-mouse_fitting_result/
 
-# Python
+# ----- All Results (consolidated) -----
+results/
+outputs/                    # Legacy Hydra output (now uses results/logs/)
+mouse_fitting_result/       # Legacy fitting output (now uses results/fitting/)
+
+# ----- Duplicate folders (use mouse_model/ instead) -----
+assets/mouse_model/
+
+# ----- Pre-trained Models (Download separately) -----
+models/pretrained/
+models/trained/
+# Keep models/README.md for download instructions
+
+# ----- Python -----
 __pycache__/
 *.pyc
 *.pyo
 *.egg-info/
 .eggs/
+*.egg
+.Python
+build/
+dist/
+venv/
+env/
+.venv/
 
-# Model files
+# ----- Model Files (large) -----
 *.pkl
 *.pt
 *.pth
 *.onnx
+*.h5
+*.pb
+*.tflite
 
-# Images (generated)
+# ----- Video/Image Files (generated) -----
 *.mp4
 *.avi
+*.mov
+*.mkv
+# Keep example images in assets/
 
-# Logs
+# ----- Logs -----
 *.log
+logs/
 
-# IDE
+# ----- IDE -----
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
-# OS
+# ----- OS -----
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Temporary files
+# ----- Temporary Files -----
 *.tmp
 *.bak
+*.cache
+.cache/
+
+# ----- Jupyter -----
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ----- Testing -----
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ----- Environment -----
+.env
+.env.local
+*.env
+
+# ----- Exceptions (keep these) -----
+!assets/**/*.png
+!assets/**/*.jpg
+!docs/**/*.png
+!docs/**/*.md
+!models/README.md
+!conf/**/*.yaml

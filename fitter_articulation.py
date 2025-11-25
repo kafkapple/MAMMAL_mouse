@@ -546,7 +546,7 @@ def optim_single(cfg: DictConfig):
     import datetime
     dataset_name = os.path.basename(cfg.data.data_dir.rstrip('/'))  # Extract dataset name from path
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    dynamic_result_folder = f"mouse_fitting_result/results_{dataset_name}_{timestamp}"
+    dynamic_result_folder = f"results/fitting/{dataset_name}_{timestamp}"
     
     fitter.result_folder = hydra.utils.to_absolute_path(dynamic_result_folder)
     print(f"Results will be saved to: {fitter.result_folder}")

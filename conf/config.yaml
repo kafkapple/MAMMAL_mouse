@@ -37,12 +37,12 @@ optim:
   solve_step1_iters: 100
   solve_step2_iters: 30
 
-# Paths
-result_folder: mouse_fitting_result/results/
+# Paths (all results go to results/ folder)
+result_folder: results/fitting/
 
 # Hydra configuration
 hydra:
   run:
-    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: results/logs/${now:%Y-%m-%d}/${now:%H-%M-%S}
   job:
     chdir: false  # Important: Do not change working directory
