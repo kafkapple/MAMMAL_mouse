@@ -1,0 +1,56 @@
+# Monocular Fitting Configuration
+# Usage: python fit_monocular.py --config conf/monocular.yaml
+
+# Input/Output
+input_dir: "data/test_images"
+output_dir: "results/monocular_fitting"
+
+# Detector settings
+detector:
+  type: "geometric"  # geometric (PCA-based, mask only) or superanimal (DeepLabCut)
+  superanimal_model: null  # Path to SuperAnimal model (if using superanimal)
+
+# Keypoint settings
+keypoints:
+  use_all: true  # Use all 22 keypoints
+  # If use_all is false, specify which keypoints to use:
+  # groups: ["head", "spine", "limbs", "tail", "centroid"]
+  # Or specific indices: [0, 5, 6, 7, 8, 9, 10, 11, 12, 13, 21]
+  groups: ["head", "spine", "tail", "centroid"]  # Which groups to use if use_all=false
+  indices: []  # Specific keypoint indices (overrides groups if not empty)
+
+  # Confidence thresholds
+  min_confidence: 0.3  # Minimum confidence to use keypoint
+
+# Optimization settings
+optimization:
+  num_iterations: 50
+  learning_rate: 0.01
+
+  # Loss weights
+  weights:
+    keypoint_2d: 1.0
+    silhouette: 0.1
+    pose_prior: 0.01
+    shape_prior: 0.01
+
+# Visualization settings
+visualization:
+  save_keypoints: true      # Save keypoint visualization
+  save_mesh_overlay: true   # Save mesh overlaid on RGB
+  save_mask_overlay: true   # Save mask comparison
+  save_combined: true       # Save combined overlay (RGB + mesh + keypoints + mask)
+
+  # Colors (BGR format)
+  colors:
+    keypoint_head: [255, 0, 0]      # Blue
+    keypoint_spine: [0, 255, 0]     # Green
+    keypoint_limbs: [0, 0, 255]     # Red
+    keypoint_tail: [255, 255, 0]    # Cyan
+    keypoint_centroid: [255, 0, 255] # Magenta
+    mesh: [255, 200, 100]           # Light blue
+    mask_outline: [0, 255, 255]     # Yellow
+
+# Device
+device: "cuda"  # cuda or cpu
+max_images: null  # Limit number of images (null = all)

@@ -31,6 +31,120 @@ from preprocessing_utils.keypoint_estimation import (
 from preprocessing_utils.superanimal_detector import SuperAnimalDetector
 
 
+# Keypoint group definitions
+KEYPOINT_GROUPS = {
+    'head': list(range(0, 6)),       # 0-5: nose, ears, eyes, head center
+    'spine': list(range(6, 14)),     # 6-13: 8 spine points
+    'limbs': list(range(14, 18)),    # 14-17: 4 paws
+    'tail': list(range(18, 21)),     # 18-20: 3 tail points
+    'centroid': [21]                 # 21: body centroid
+}
+
+def create_combined_visualization(rgb, mask, keypoints_2d, mesh_vertices=None,
+                                   mesh_faces=None, camera_params=None):
+    """
+    Create combined overlay visualization: RGB + mesh + keypoints + mask
+
+    Args:
+        rgb: (H, W, 3) BGR image
+        mask: (H, W) binary mask
+        keypoints_2d: (22, 3) keypoints [x, y, confidence]
+        mesh_vertices: (N, 3) 3D vertices (optional)
+        mesh_faces: (F, 3) face indices (optional)
+        camera_params: Camera parameters for projection (optional)
+
+    Returns:
+        combined: (H, W, 3) combined visualization
+    """
+    H, W = rgb.shape[:2]
+    combined = rgb.copy()
+
+    # 1. Draw mask outline (yellow)
+    mask_uint8 = mask.astype(np.uint8)
+    contours, _ = cv2.findContours(mask_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cv2.drawContours(combined, contours, -1, (0, 255, 255), 2)  # Yellow outline
+
+    # 2. Draw keypoints with colors by group
+    keypoint_colors = {
+        'head': (255, 0, 0),        # Blue
+        'spine': (0, 255, 0),       # Green
+        'limbs': (0, 0, 255),       # Red
+        'tail': (255, 255, 0),      # Cyan
+        'centroid': (255, 0, 255)   # Magenta
+    }
+
+    for group_name, indices in KEYPOINT_GROUPS.items():
+        color = keypoint_colors[group_name]
+        for i in indices:
+            x, y, conf = keypoints_2d[i]
+            if conf > 0.3:
+                radius = int(3 + conf * 4)
+                cv2.circle(combined, (int(x), int(y)), radius, color, -1)
+                cv2.circle(combined, (int(x), int(y)), radius + 1, (255, 255, 255), 1)
+
+    # 3. Draw skeleton connections
+    connections = [
+        # Spine chain
+        (5, 6), (6, 7), (7, 8), (8, 9), (9, 10), (10, 11), (11, 12), (12, 13),
+        # Tail
+        (13, 18), (18, 19), (19, 20),
+        # Head connections
+        (0, 5), (1, 5), (2, 5), (3, 5), (4, 5),
+    ]
+
+    for i, j in connections:
+        if keypoints_2d[i, 2] > 0.3 and keypoints_2d[j, 2] > 0.3:
+            pt1 = (int(keypoints_2d[i, 0]), int(keypoints_2d[i, 1]))
+            pt2 = (int(keypoints_2d[j, 0]), int(keypoints_2d[j, 1]))
+            cv2.line(combined, pt1, pt2, (200, 200, 200), 1)
+
+    # 4. Add legend
+    legend_y = 20
+    for group_name, color in keypoint_colors.items():
+        cv2.circle(combined, (15, legend_y), 6, color, -1)
+        cv2.putText(combined, group_name, (30, legend_y + 4),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+        legend_y += 20
+
+    return combined
+
+
+def filter_keypoints_by_selection(keypoints_2d, selection='all'):
+    """
+    Filter keypoints based on selection
+
+    Args:
+        keypoints_2d: (22, 3) all keypoints
+        selection: 'all', group names ('head', 'spine', etc), or comma-separated indices
+
+    Returns:
+        filtered_keypoints: (22, 3) with non-selected keypoints zeroed out
+        selected_indices: List of selected keypoint indices
+    """
+    if selection == 'all':
+        return keypoints_2d, list(range(22))
+
+    selected_indices = []
+
+    # Check if it's indices (comma-separated numbers)
+    if selection.replace(',', '').replace(' ', '').isdigit():
+        selected_indices = [int(x.strip()) for x in selection.split(',')]
+    else:
+        # Parse group names
+        groups = [g.strip().lower() for g in selection.split(',')]
+        for group in groups:
+            if group in KEYPOINT_GROUPS:
+                selected_indices.extend(KEYPOINT_GROUPS[group])
+
+    # Filter keypoints
+    filtered = keypoints_2d.copy()
+    for i in range(22):
+        if i not in selected_indices:
+            filtered[i, 2] = 0  # Zero out confidence
+
+    return filtered, selected_indices
+
+
 class MonocularMAMMALFitter:
     """
     Fits MAMMAL parametric mouse model to monocular images
@@ -230,7 +344,7 @@ class MonocularMAMMALFitter:
         mesh = trimesh.Trimesh(vertices=vertices_np, faces=faces_np)
         return mesh
 
-    def fit_single_image(self, rgb_path, mask_path, visualize=True):
+    def fit_single_image(self, rgb_path, mask_path, visualize=True, keypoint_selection='all'):
         """
         Fit MAMMAL model to a single image
 
@@ -238,6 +352,7 @@ class MonocularMAMMALFitter:
             rgb_path: Path to RGB image
             mask_path: Path to binary mask
             visualize: Whether to return visualization
+            keypoint_selection: Which keypoints to use ('all', 'head,spine', '0,5,6,21', etc)
 
         Returns:
             results: Dict containing mesh, params, keypoints, etc.
@@ -258,12 +373,15 @@ class MonocularMAMMALFitter:
         # Step 1: Extract 2D keypoints (from mask or RGB depending on detector)
         keypoints_2d = self.extract_keypoints(mask_binary, rgb=rgb_rgb)
 
-        # Step 2: Initialize MAMMAL parameters
-        thetas, bone_lengths, R, T, s, chest_deformer = self.initialize_pose_from_keypoints(keypoints_2d)
+        # Step 1.5: Filter keypoints if selection specified
+        keypoints_filtered, selected_indices = filter_keypoints_by_selection(keypoints_2d, keypoint_selection)
 
-        # Step 3: Optimize to fit keypoints
+        # Step 2: Initialize MAMMAL parameters
+        thetas, bone_lengths, R, T, s, chest_deformer = self.initialize_pose_from_keypoints(keypoints_filtered)
+
+        # Step 3: Optimize to fit keypoints (use filtered keypoints)
         thetas_opt, bone_lengths_opt, R_opt, T_opt, s_opt, chest_deformer_opt = self.optimize_pose_to_keypoints(
-            keypoints_2d, thetas, bone_lengths, R, T, s, chest_deformer,
+            keypoints_filtered, thetas, bone_lengths, R, T, s, chest_deformer,
             n_iterations=50, lr=0.01
         )
 
@@ -271,9 +389,16 @@ class MonocularMAMMALFitter:
         mesh = self.generate_mesh(thetas_opt, bone_lengths_opt, R_opt, T_opt, s_opt, chest_deformer_opt)
 
         # Visualization
-        vis_image = None
+        vis_keypoints = None
+        vis_combined = None
         if visualize:
-            vis_image = visualize_keypoints_on_frame(rgb, keypoints_2d)
+            # Original keypoint visualization
+            vis_keypoints = visualize_keypoints_on_frame(rgb, keypoints_2d)
+
+            # Combined overlay visualization (RGB + mask + keypoints)
+            vis_combined = create_combined_visualization(
+                rgb, mask_binary, keypoints_2d
+            )
 
         results = {
             'mesh': mesh,
@@ -284,14 +409,17 @@ class MonocularMAMMALFitter:
             's': s_opt.cpu().numpy(),
             'chest_deformer': chest_deformer_opt.cpu().numpy(),
             'keypoints_2d': keypoints_2d,
+            'keypoints_filtered': keypoints_filtered,
+            'selected_indices': selected_indices,
             'rgb': rgb,
             'mask': mask_binary,
-            'vis_keypoints': vis_image
+            'vis_keypoints': vis_keypoints,
+            'vis_combined': vis_combined
         }
 
         return results
 
-    def process_directory(self, input_dir, output_dir, max_images=None):
+    def process_directory(self, input_dir, output_dir, max_images=None, keypoint_selection='all'):
         """
         Process all images in a directory
 
@@ -299,6 +427,7 @@ class MonocularMAMMALFitter:
             input_dir: Directory containing RGB and mask images
             output_dir: Output directory for results
             max_images: Maximum number of images to process (None = all)
+            keypoint_selection: Which keypoints to use ('all', 'head,spine', '0,5,6,21', etc)
         """
         input_path = Path(input_dir)
         output_path = Path(output_dir)
@@ -311,6 +440,8 @@ class MonocularMAMMALFitter:
             rgb_files = rgb_files[:max_images]
 
         print(f"Found {len(rgb_files)} RGB images")
+        if keypoint_selection != 'all':
+            print(f"Using keypoint selection: {keypoint_selection}")
 
         # Process each image
         for rgb_file in tqdm(rgb_files, desc="Processing images"):
@@ -323,7 +454,11 @@ class MonocularMAMMALFitter:
 
             try:
                 # Fit MAMMAL model
-                results = self.fit_single_image(rgb_file, mask_file, visualize=True)
+                results = self.fit_single_image(
+                    rgb_file, mask_file,
+                    visualize=True,
+                    keypoint_selection=keypoint_selection
+                )
 
                 # Save results
                 output_name = rgb_file.stem.replace("_rgb", "")
@@ -342,13 +477,20 @@ class MonocularMAMMALFitter:
                         'T': results['T'],
                         's': results['s'],
                         'chest_deformer': results['chest_deformer'],
-                        'keypoints_2d': results['keypoints_2d']
+                        'keypoints_2d': results['keypoints_2d'],
+                        'keypoints_filtered': results['keypoints_filtered'],
+                        'selected_indices': results['selected_indices']
                     }, f)
 
-                # Save visualization
+                # Save keypoint visualization
                 if results['vis_keypoints'] is not None:
                     vis_path = output_path / f"{output_name}_keypoints.png"
                     cv2.imwrite(str(vis_path), results['vis_keypoints'])
+
+                # Save combined overlay visualization (RGB + mask + keypoints)
+                if results['vis_combined'] is not None:
+                    combined_path = output_path / f"{output_name}_overlay.png"
+                    cv2.imwrite(str(combined_path), results['vis_combined'])
 
                 print(f"  ✓ Processed {rgb_file.name}")
 
@@ -358,7 +500,24 @@ class MonocularMAMMALFitter:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Monocular MAMMAL Fitting")
+    parser = argparse.ArgumentParser(
+        description="Monocular MAMMAL Fitting",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Keypoint Selection Examples:
+  --keypoints all              Use all 22 keypoints (default)
+  --keypoints head,spine       Use head (0-5) and spine (6-13) keypoints
+  --keypoints spine,tail       Use spine and tail keypoints only
+  --keypoints 0,5,6,13,21      Use specific keypoint indices
+
+Keypoint Groups:
+  head:     0-5   (nose, ears, eyes, head center)
+  spine:    6-13  (8 spine points)
+  limbs:    14-17 (4 paws)
+  tail:     18-20 (3 tail points)
+  centroid: 21    (body center)
+        """
+    )
     parser.add_argument('--input_dir', type=str, required=True,
                        help='Directory containing RGB and mask images')
     parser.add_argument('--output_dir', type=str, required=True,
@@ -373,6 +532,8 @@ def main():
     parser.add_argument('--superanimal_model', type=str,
                        default='models/superanimal_topviewmouse',
                        help='Path to SuperAnimal model directory')
+    parser.add_argument('--keypoints', type=str, default='all',
+                       help='Keypoint selection: all, group names (head,spine,limbs,tail,centroid), or indices (0,5,6,21)')
 
     args = parser.parse_args()
 
@@ -384,10 +545,18 @@ def main():
     )
 
     # Process directory
-    fitter.process_directory(args.input_dir, args.output_dir,
-                            max_images=args.max_images)
+    fitter.process_directory(
+        args.input_dir, args.output_dir,
+        max_images=args.max_images,
+        keypoint_selection=args.keypoints
+    )
 
     print(f"\nProcessing complete! Results saved to {args.output_dir}")
+    print(f"Output files:")
+    print(f"  - *_mesh.obj: 3D mesh (Blender compatible)")
+    print(f"  - *_keypoints.png: Keypoint visualization")
+    print(f"  - *_overlay.png: Combined overlay (RGB + mask + keypoints)")
+    print(f"  - *_params.pkl: MAMMAL parameters")
 
 
 if __name__ == "__main__":

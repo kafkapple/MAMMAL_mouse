@@ -13,7 +13,7 @@ mode: multi_view  # Options: multi_view, single_view_preprocess
 
 # Data settings (can be overridden by dataset config)
 data:
-  data_dir: data/preprocessed_shank3_sam/
+  data_dir: '/home/joon/dev/MAMMAL_mouse/data/100-KO-male-56-20200615_4x' #data/preprocessed_shank3_sam/
   views_to_use: [0]
 
 # Preprocessing settings (can be overridden by preprocess config)

@@ -1,0 +1,19 @@
+# @package _global_
+
+# Configuration for cropped frames dataset
+# This dataset contains:
+# - Cropped images (*_cropped.png)
+# - Mask images (*_mask.png)
+# - Crop info JSON (*_crop_info.json)
+# Suitable for single-view mesh fitting with available masks
+
+data:
+  data_dir: data/100-KO-male-56-20200615_cropped/
+  views_to_use: [0]  # Single camera view
+
+fitter:
+  start_frame: 0
+  end_frame: 19  # Adjust based on available frames
+  interval: 1
+  render_cameras: [0]  # Render from single camera
+  with_render: false  # Set to true for visualization

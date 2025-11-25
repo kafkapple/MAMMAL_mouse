@@ -9,6 +9,8 @@ Three-dimensional surface motion capture of mice using the MAMMAL framework. Thi
 - **Multi-view 3D fitting**: Fit 3D mouse model to synchronized multi-camera videos
 - **Single-view (monocular) fitting**: Process single videos with ML-based keypoint detection
 - **ML keypoint detection**: YOLOv8-Pose and SuperAnimal support for anatomically accurate keypoints
+- **🆕 Flexible keypoint annotation**: Manual annotation tool + automatic format conversion (1-22 keypoints)
+- **Confidence-based filtering**: Missing keypoints automatically ignored (no need for all 22!)
 - **Hydra configuration**: Flexible experiment management with dataset-specific configs
 - **Modular pipeline**: Separate preprocessing and fitting stages for easy customization
 
@@ -505,6 +507,34 @@ conf/
 | `optim.solve_step1_iters` | Step 1 iterations | `100` | `optim.solve_step1_iters=200` |
 | `optim.solve_step2_iters` | Step 2 iterations | `30` | `optim.solve_step2_iters=50` |
 
+### 🆕 Manual Keypoint Annotation Workflow
+
+For detailed mesh fitting with custom keypoint annotations:
+
+**Quick workflow**:
+```bash
+# 1. Annotate keypoints (Gradio UI)
+python keypoint_annotator_v2.py data/100-KO-male-56-20200615_cropped
+
+# 2. Convert to MAMMAL format
+python convert_keypoints_to_mammal.py \
+  --input keypoints.json \
+  --output data/.../keypoints2d_undist/result_view_0.pkl \
+  --num-frames 20
+
+# 3. Run mesh fitting
+python fitter_articulation.py dataset=custom_cropped
+```
+
+**Key features**:
+- ✅ **Flexible keypoint count**: 1-22 keypoints (recomm 5-7)
+- ✅ **Auto-filtering**: Missing keypoints ignored automatically
+- ✅ **Interactive UI**: Zoom, visibility control, progress tracking
+
+📖 **Full guide**: [`KEYPOINT_QUICK_START.md`](KEYPOINT_QUICK_START.md) | [`docs/KEYPOINT_WORKFLOW.md`](docs/KEYPOINT_WORKFLOW.md)
+
+---
+
 ### Usage Examples
 
 ```bash
@@ -822,13 +852,95 @@ python scripts/train_yolo_pose.py --augment
 
 ---
 
+## 🎯 Mesh Fitting with Multiple Datasets
+
+This project supports flexible mesh fitting across different dataset formats. See the comprehensive guide for details.
+
+### Quick Reference
+
+**Run with default dataset (multi-view):**
+```bash
+./run_mesh_fitting_default.sh 0 50 1 true
+```
+
+**Run with cropped frames (single-view with masks):**
+```bash
+./run_mesh_fitting_cropped.sh data/100-KO-male-56-20200615_cropped
+```
+
+**Run with custom dataset:**
+```bash
+./run_mesh_fitting_custom.sh cropped /path/to/data 0 100
+```
+
+**Quick test (3 frames):**
+```bash
+./run_quick_test.sh default_markerless
+# or
+./run_quick_test.sh cropped
+```
+
+### Supported Dataset Types
+
+| Dataset | Location | Has Masks | Has Keypoints | Best Script |
+|---------|----------|-----------|---------------|-------------|
+| **Default Markerless** | `data/examples/markerless_mouse_1_nerf/` | ✅ | ✅ | `fitter_articulation.py` |
+| **Cropped Frames** | `data/100-KO-male-56-20200615_cropped/` | ✅ | Optional | `fit_cropped_frames.py` |
+| **Upsampled Frames** | `data/100-KO-male-56-20200615_upsampled/` | ❌ | ❌ | Needs preprocessing |
+| **Custom** | User-defined | Varies | Varies | Configurable |
+
+### Configuration System
+
+The project uses Hydra for hierarchical configuration. Available dataset configs:
+
+- `default_markerless` - Reference multi-view dataset with 6 cameras
+- `cropped` - Cropped frames with masks (single-view)
+- `upsampled` - Upsampled frames (requires mask generation)
+- `shank3` - Shank3 experiment dataset
+- `custom` - Template for your custom data
+
+**Override configuration from command line:**
+```bash
+python fitter_articulation.py \
+  dataset=cropped \
+  data.data_dir=/path/to/data \
+  fitter.start_frame=0 \
+  fitter.end_frame=100 \
+  fitter.with_render=true
+```
+
+### Output Structure
+
+```
+outputs/YYYY-MM-DD/HH-MM-SS/
+├── results/
+│   ├── frame_0000/
+│   │   ├── mesh.obj              # 3D mesh
+│   │   ├── params.json           # Fitted parameters
+│   │   └── comparison.png        # Visualization
+│   └── summary.json              # Overall summary
+└── .hydra/
+    └── config.yaml               # Configuration used
+```
+
+### Documentation
+
+- **[Mesh Fitting Guide](docs/MESH_FITTING_GUIDE.md)** - Complete workflow and troubleshooting
+- **[Quick Cheatsheet](MESH_FITTING_CHEATSHEET.md)** - Command reference
+
+---
+
 ## 📚 Documentation
 
 ### Complete Guides
+- **[Mesh Fitting Guide](docs/MESH_FITTING_GUIDE.md)** - Multi-dataset mesh fitting workflows
 - **[Monocular Fitting Guide](docs/guides/MONOCULAR_FITTING_GUIDE.md)** - Detailed single-view workflow
 - **[Comprehensive Usage Guide](docs/guides/COMPREHENSIVE_USAGE_GUIDE.md)** - All usage scenarios
 - **[Roboflow Labeling Guide](docs/ROBOFLOW_LABELING_GUIDE.md)** - Manual labeling tutorial
 - **[SAM Mask Acquisition](docs/guides/SAM_MASK_ACQUISITION_MANUAL.md)** - High-quality masks
+
+### Quick Reference
+- **[Mesh Fitting Cheatsheet](MESH_FITTING_CHEATSHEET.md)** - Command quick reference
 
 ### Technical Reports
 - **[ML Keypoint Detection](docs/reports/251115_comprehensive_ml_keypoint_summary.md)** - Complete ML workflow
@@ -926,6 +1038,72 @@ Results comparing DANNCE-T (temporal version) with MAMMAL_mouse on `markerless_m
 - Faster processing
 - Simpler setup (no model fitting)
 - More robust to occlusions
+
+---
+
+## 📁 Project Structure
+
+```
+MAMMAL_mouse/
+├── README.md                      # This file
+├── requirements.txt               # Python dependencies
+│
+├── # Core Python (Original MAMMAL)
+├── fitter_articulation.py         # Main multi-view mesh fitter
+├── fit_monocular.py               # Single-view monocular fitting
+├── fit_silhouette_prototype.py    # Silhouette-based fitting
+├── fit_cropped_frames.py          # Cropped frame fitting
+├── articulation_th.py             # Articulation model (PyTorch)
+├── bodymodel_th.py                # Body model (PyTorch)
+├── bodymodel_np.py                # Body model (NumPy)
+├── mouse_22_defs.py               # 22 keypoint definitions
+├── utils.py                       # Utility functions
+│
+├── # Annotation Tools
+├── unified_annotator.py           # Mask + Keypoint unified tool
+├── keypoint_annotator_v2.py       # Keypoint-only annotator
+├── extract_video_frames.py        # Video frame extraction
+│
+├── # Shell Scripts (Quick Start)
+├── run_unified_annotator.sh       # Launch unified annotator
+├── run_keypoint_annotator.sh      # Launch keypoint annotator
+├── run_mesh_fitting_cropped.sh    # Fit cropped frames
+├── run_mesh_fitting_default.sh    # Fit default dataset
+├── run_mesh_fitting_custom.sh     # Custom fitting config
+├── run_quick_test.sh              # Quick test (3 frames)
+│
+├── # Configuration
+├── conf/                          # Hydra configs
+│   ├── config.yaml                # Main config
+│   └── dataset/                   # Dataset-specific configs
+│
+├── # Documentation
+├── docs/
+│   ├── guides/
+│   │   ├── annotation/            # Annotation guides
+│   │   ├── fitting/               # Mesh fitting guides
+│   │   ├── preprocessing/         # Video processing guides
+│   │   └── *.md                   # General guides
+│   ├── reports/                   # Research notes (YYMMDD_*.md)
+│   └── setup/                     # Installation guides
+│
+├── # Scripts
+├── scripts/
+│   ├── setup/                     # Installation scripts
+│   ├── utils/                     # Utility scripts
+│   ├── deprecated/                # Old/replaced scripts
+│   └── *.py                       # Original scripts
+│
+├── # Assets
+├── assets/
+│   ├── mouse_model/               # MAMMAL mouse model
+│   └── figs/                      # Documentation images
+│
+├── # Other
+├── models/                        # Pretrained/trained models
+├── preprocessing_utils/           # Preprocessing utilities
+└── tests/                         # Test scripts
+```
 
 ---
 

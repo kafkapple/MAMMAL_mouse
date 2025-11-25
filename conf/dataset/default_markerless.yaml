@@ -1,0 +1,24 @@
+# @package _global_
+
+# Configuration for the default markerless_mouse_1_nerf dataset
+# This is the reference multi-view dataset with complete annotations
+# Location: data/examples/markerless_mouse_1_nerf/
+
+data:
+  data_dir: data/examples/markerless_mouse_1_nerf/
+  views_to_use: [0, 1, 2, 3, 4, 5]  # All 6 cameras
+
+fitter:
+  start_frame: 0
+  end_frame: 10  # Adjust based on dataset size
+  interval: 1
+  keypoint_num: 22
+  render_cameras: [0, 1, 2, 3, 4, 5]  # Render from all cameras
+  with_render: true  # Enable visualization for reference dataset
+
+# Dataset structure:
+# - keypoints2d_undist/: 2D keypoint annotations per view
+# - simpleclick_undist/: Segmentation masks per view
+# - videos_undist/: Video frames per view
+# - new_cam.pkl: Camera calibration parameters
+# - add_labels_3d_8keypoints.pkl: 3D keypoint annotations

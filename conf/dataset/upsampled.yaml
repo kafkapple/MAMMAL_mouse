@@ -1,0 +1,22 @@
+# @package _global_
+
+# Configuration for upsampled frames dataset
+# This dataset contains:
+# - Upsampled images (*_upsampled.png)
+# - No masks or keypoints available
+# - Variable image sizes
+# Suitable for basic frame processing or manual annotation
+
+data:
+  data_dir: data/100-KO-male-56-20200615_upsampled/
+  views_to_use: [0]  # Single camera view
+
+fitter:
+  start_frame: 0
+  end_frame: 16  # Adjust based on available frames
+  interval: 1
+  render_cameras: [0]  # Render from single camera
+  with_render: false  # Disable rendering if no masks available
+
+# Note: This dataset may require preprocessing to generate masks
+# Use SAM or other segmentation tools to create masks before fitting

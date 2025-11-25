@@ -1,17 +1,39 @@
+# Data and outputs
 data/
-data.zip 
-__pycache__ 
-
+data.zip
 outputs/
 checkpoints/
+results/
 mouse_fitting_result/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+
+# Model files
 *.pkl
+*.pt
+*.pth
+*.onnx
+
+# Images (generated)
 *.mp4
-*.png
-*.jpg
-*.jpeg
-*.gif
-*.webp
-*.heic
-*.heif
-*.heif-srgb
+*.avi
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
