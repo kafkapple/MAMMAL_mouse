@@ -434,6 +434,77 @@ class MonocularMAMMALFitter:
 
         return thetas, bone_lengths, R, T, s, chest_deformer
 
+    def compute_silhouette_loss(self, vertices, faces, target_mask, image_size=256):
+        """
+        Compute differentiable silhouette loss using PyTorch3D
+
+        Args:
+            vertices: (1, N, 3) mesh vertices
+            faces: (F, 3) face indices
+            target_mask: (H, W) binary target mask
+            image_size: Render size
+
+        Returns:
+            loss: Silhouette IoU loss (1 - IoU)
+        """
+        if not PYTORCH3D_AVAILABLE:
+            return torch.tensor(0.0, device=self.device)
+
+        from pytorch3d.renderer import (
+            SoftSilhouetteShader,
+            BlendParams
+        )
+
+        # Ensure tensors
+        if not isinstance(faces, torch.Tensor):
+            faces = torch.tensor(faces, dtype=torch.int64, device=self.device)
+        if faces.dim() == 2:
+            faces = faces.unsqueeze(0)
+
+        # Create mesh with dummy textures
+        verts_rgb = torch.ones_like(vertices)
+        textures = TexturesVertex(verts_features=verts_rgb)
+        mesh = Meshes(verts=vertices, faces=faces, textures=textures)
+
+        # Camera setup based on mesh bounds
+        verts_center = vertices.mean(dim=1)
+        verts_range = (vertices.max(dim=1)[0] - vertices.min(dim=1)[0]).max()
+        dist = float(verts_range * 2.5)
+
+        R, T_cam = look_at_view_transform(dist=dist, elev=20, azim=0, at=verts_center.cpu())
+        cameras = FoVPerspectiveCameras(device=self.device, R=R, T=T_cam)
+
+        # Soft silhouette renderer
+        blend_params = BlendParams(sigma=1e-4, gamma=1e-4)
+        raster_settings = RasterizationSettings(
+            image_size=image_size,
+            blur_radius=np.log(1. / 1e-4 - 1.) * blend_params.sigma,
+            faces_per_pixel=50,
+        )
+
+        silhouette_renderer = MeshRenderer(
+            rasterizer=MeshRasterizer(cameras=cameras, raster_settings=raster_settings),
+            shader=SoftSilhouetteShader(blend_params=blend_params)
+        )
+
+        # Render silhouette
+        silhouette = silhouette_renderer(mesh)
+        pred_mask = silhouette[0, ..., 3]  # Alpha channel
+
+        # Resize target mask to match
+        target_resized = torch.tensor(
+            cv2.resize(target_mask.astype(np.float32), (image_size, image_size)),
+            dtype=torch.float32, device=self.device
+        ) / 255.0
+
+        # IoU loss
+        intersection = (pred_mask * target_resized).sum()
+        union = pred_mask.sum() + target_resized.sum() - intersection + 1e-6
+        iou = intersection / union
+        loss = 1.0 - iou
+
+        return loss
+
     def optimize_pose_to_keypoints(self, keypoints_2d, thetas, bone_lengths, R, T, s, chest_deformer,
                                      n_iterations=50, lr=0.01, mask=None):
         """
@@ -453,8 +524,9 @@ class MonocularMAMMALFitter:
         thetas = thetas.clone().requires_grad_(True)
         T = T.clone().requires_grad_(True)
         s = s.clone().requires_grad_(True)
+        R = R.clone().requires_grad_(True)
 
-        optimizer = torch.optim.Adam([thetas, T, s], lr=lr)
+        optimizer = torch.optim.Adam([thetas, T, s, R], lr=lr)
 
         # Target keypoints (only use confident ones)
         target_kpts = torch.tensor(keypoints_2d[:, :2], dtype=torch.float32, device=self.device)
@@ -465,11 +537,19 @@ class MonocularMAMMALFitter:
         use_silhouette = mask is not None and not use_keypoints
 
         if use_silhouette:
-            print(f"Optimizing with silhouette loss only (no keypoints)...")
+            if PYTORCH3D_AVAILABLE:
+                print(f"Optimizing with silhouette loss (mask-based fitting)...")
+                n_iterations = 100  # More iterations for silhouette
+            else:
+                print(f"Warning: PyTorch3D not available, silhouette loss disabled")
+                use_silhouette = False
         elif use_keypoints:
-            print(f"Optimizing MAMMAL parameters with keypoint loss...")
+            print(f"Optimizing with keypoint loss...")
         else:
             print(f"Warning: No keypoints and no mask, using regularization only...")
+
+        # Get faces for silhouette rendering
+        faces = torch.tensor(self.model.faces_vert_np, dtype=torch.int64, device=self.device)
 
         for iteration in range(n_iterations):
             optimizer.zero_grad()
@@ -477,9 +557,7 @@ class MonocularMAMMALFitter:
             # Forward pass: Get 3D vertices and joints
             try:
                 vertices, joints = self.model(thetas, bone_lengths, R, T, s, chest_deformer)
-
-                # Get 22 keypoints from model
-                keypoints_3d = self.model.forward_keypoints22()  # (batch, 22, 3)
+                keypoints_3d = self.model.forward_keypoints22()
             except Exception as e:
                 print(f"Warning: Model forward failed at iter {iteration}: {e}")
                 import traceback
@@ -491,24 +569,32 @@ class MonocularMAMMALFitter:
 
             if use_keypoints:
                 # Project 3D keypoints to 2D (simplified orthographic projection)
-                keypoints_2d_pred = keypoints_3d[0, :, :2]  # (22, 2), take x,y only
-
-                # Compute 2D reprojection loss
+                keypoints_2d_pred = keypoints_3d[0, :, :2]
                 diff = (keypoints_2d_pred - target_kpts) * confidence.unsqueeze(1)
                 loss_2d = torch.sum(diff ** 2)
 
-            # Regularization: Keep pose close to T-pose
+            if use_silhouette and mask is not None:
+                # Silhouette loss
+                loss_sil = self.compute_silhouette_loss(vertices, faces, mask, image_size=128)
+
+            # Regularization
             loss_pose_reg = 0.001 * torch.sum(thetas ** 2)
 
             # Total loss
-            loss = loss_2d + loss_pose_reg
+            if use_silhouette:
+                loss = loss_sil * 100.0 + loss_pose_reg
+            else:
+                loss = loss_2d + loss_pose_reg
 
             # Backward and optimize
             loss.backward()
             optimizer.step()
 
             if iteration % 10 == 0:
-                print(f"  Iter {iteration:3d}: Loss={loss.item():.4f}, 2D={loss_2d.item():.4f}")
+                if use_silhouette:
+                    print(f"  Iter {iteration:3d}: Loss={loss.item():.4f}, Sil={loss_sil.item():.4f}")
+                else:
+                    print(f"  Iter {iteration:3d}: Loss={loss.item():.4f}, 2D={loss_2d.item():.4f}")
 
         return thetas.detach(), bone_lengths.detach(), R.detach(), T.detach(), s.detach(), chest_deformer.detach()
 
@@ -566,10 +652,10 @@ class MonocularMAMMALFitter:
         # Step 2: Initialize MAMMAL parameters
         thetas, bone_lengths, R, T, s, chest_deformer = self.initialize_pose_from_keypoints(keypoints_filtered)
 
-        # Step 3: Optimize to fit keypoints (use filtered keypoints)
+        # Step 3: Optimize to fit keypoints (or silhouette if keypoints=none)
         thetas_opt, bone_lengths_opt, R_opt, T_opt, s_opt, chest_deformer_opt = self.optimize_pose_to_keypoints(
             keypoints_filtered, thetas, bone_lengths, R, T, s, chest_deformer,
-            n_iterations=50, lr=0.01
+            n_iterations=50, lr=0.01, mask=mask_binary
         )
 
         # Step 4: Generate final mesh
@@ -581,14 +667,24 @@ class MonocularMAMMALFitter:
         vis_rendered = None
         vis_comparison = None
 
-        if visualize:
-            # Original keypoint visualization
-            vis_keypoints = visualize_keypoints_on_frame(rgb, keypoints_2d)
+        # Check if keypoints are used
+        keypoints_used = len(selected_indices) > 0
 
-            # Combined overlay visualization (RGB + mask + keypoints)
-            vis_combined = create_combined_visualization(
-                rgb, mask_binary, keypoints_2d
-            )
+        if visualize:
+            if keypoints_used:
+                # Original keypoint visualization (only if keypoints are used)
+                vis_keypoints = visualize_keypoints_on_frame(rgb, keypoints_2d)
+
+                # Combined overlay visualization (RGB + mask + keypoints)
+                vis_combined = create_combined_visualization(
+                    rgb, mask_binary, keypoints_2d
+                )
+            else:
+                # No keypoints - just show mask overlay
+                vis_combined = rgb.copy()
+                mask_overlay = np.zeros_like(rgb)
+                mask_overlay[:, :, 1] = mask_binary  # Green channel for mask
+                vis_combined = cv2.addWeighted(vis_combined, 0.7, mask_overlay, 0.3, 0)
 
             # Render mesh to 2D image
             H, W = rgb.shape[:2]
