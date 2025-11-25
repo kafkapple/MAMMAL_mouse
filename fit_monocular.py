@@ -186,7 +186,7 @@ def filter_keypoints_by_selection(keypoints_2d, selection='all'):
 
     Args:
         keypoints_2d: (22, 3) all keypoints
-        selection: 'all', group names ('head', 'spine', etc), or comma-separated indices
+        selection: 'all', 'none', group names ('head', 'spine', etc), or comma-separated indices
 
     Returns:
         filtered_keypoints: (22, 3) with non-selected keypoints zeroed out
@@ -194,6 +194,12 @@ def filter_keypoints_by_selection(keypoints_2d, selection='all'):
     """
     if selection == 'all':
         return keypoints_2d, list(range(22))
+
+    # None = exclude all keypoints (silhouette-only fitting)
+    if selection.lower() == 'none':
+        filtered = keypoints_2d.copy()
+        filtered[:, 2] = 0  # Zero out all confidence
+        return filtered, []
 
     selected_indices = []
 
@@ -429,15 +435,16 @@ class MonocularMAMMALFitter:
         return thetas, bone_lengths, R, T, s, chest_deformer
 
     def optimize_pose_to_keypoints(self, keypoints_2d, thetas, bone_lengths, R, T, s, chest_deformer,
-                                     n_iterations=50, lr=0.01):
+                                     n_iterations=50, lr=0.01, mask=None):
         """
-        Optimize MAMMAL parameters to match 2D keypoints
+        Optimize MAMMAL parameters to match 2D keypoints (and optionally silhouette)
 
         Args:
             keypoints_2d: (22, 3) target 2D keypoints
             thetas, bone_lengths, R, T, s, chest_deformer: Initial parameters
             n_iterations: Number of optimization iterations
             lr: Learning rate
+            mask: Optional (H, W) binary mask for silhouette loss
 
         Returns:
             Optimized parameters
@@ -453,7 +460,17 @@ class MonocularMAMMALFitter:
         target_kpts = torch.tensor(keypoints_2d[:, :2], dtype=torch.float32, device=self.device)
         confidence = torch.tensor(keypoints_2d[:, 2], dtype=torch.float32, device=self.device)
 
-        print(f"Optimizing MAMMAL parameters...")
+        # Check if using keypoints or silhouette-only
+        use_keypoints = confidence.sum() > 0
+        use_silhouette = mask is not None and not use_keypoints
+
+        if use_silhouette:
+            print(f"Optimizing with silhouette loss only (no keypoints)...")
+        elif use_keypoints:
+            print(f"Optimizing MAMMAL parameters with keypoint loss...")
+        else:
+            print(f"Warning: No keypoints and no mask, using regularization only...")
+
         for iteration in range(n_iterations):
             optimizer.zero_grad()
 
@@ -469,12 +486,16 @@ class MonocularMAMMALFitter:
                 traceback.print_exc()
                 break
 
-            # Project 3D keypoints to 2D (simplified orthographic projection)
-            keypoints_2d_pred = keypoints_3d[0, :, :2]  # (22, 2), take x,y only
+            loss_2d = torch.tensor(0.0, device=self.device)
+            loss_sil = torch.tensor(0.0, device=self.device)
 
-            # Compute 2D reprojection loss
-            diff = (keypoints_2d_pred - target_kpts) * confidence.unsqueeze(1)
-            loss_2d = torch.sum(diff ** 2)
+            if use_keypoints:
+                # Project 3D keypoints to 2D (simplified orthographic projection)
+                keypoints_2d_pred = keypoints_3d[0, :, :2]  # (22, 2), take x,y only
+
+                # Compute 2D reprojection loss
+                diff = (keypoints_2d_pred - target_kpts) * confidence.unsqueeze(1)
+                loss_2d = torch.sum(diff ** 2)
 
             # Regularization: Keep pose close to T-pose
             loss_pose_reg = 0.001 * torch.sum(thetas ** 2)
