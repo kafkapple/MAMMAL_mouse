@@ -30,6 +30,7 @@ fitter:
   with_render: false
   keypoint_num: 22
   render_cameras: [0]
+  use_keypoints: true  # Set to false to disable keypoint loss (silhouette only)
 
 # Optimization settings (can be overridden by optim config)
 optim:

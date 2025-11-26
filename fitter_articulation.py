@@ -79,18 +79,23 @@ class MouseFitter():
 
         self.result_folder = ""
 
-        self.term_weights = { 
+        self.term_weights = {
             "theta" : 3,
-            "3d": 2.5, 
+            "3d": 2.5,
             "2d": 0.2,
             "bone": 0.5,
             "scale": 0.5,
             "mask": 0,  # Disable mask loss to avoid image size mismatch
             "chest_deformer": 0.1,
             "stretch": 1,
-            "temp": 0.25, 
+            "temp": 0.25,
             "temp_d": 0.2
         }
+
+        # Disable keypoint loss if use_keypoints is false
+        if not getattr(self.cfg.fitter, 'use_keypoints', True):
+            self.term_weights["2d"] = 0
+            print("Keypoint loss disabled (use_keypoints=false)")
 
         self.losses = {}
 
