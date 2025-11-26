@@ -43,12 +43,40 @@ Three-dimensional surface motion capture of mice using the MAMMAL framework. Thi
 
 Keypoint annotation 없이 **mask silhouette만으로** 메시 피팅을 수행합니다.
 
-```bash
-# 디버그 모드 (빠른 테스트, 2 프레임)
-./run_mesh_fitting_default.sh 0 2 -- --keypoints none
+#### 워크플로우
 
-# 전체 실행
-./run_mesh_fitting_default.sh 0 100 -- --keypoints none --input_dir /path/to/data
+```
+1. 디버그 테스트 (2 프레임) - 오류 확인
+   └─ 성공? → 2. 실험 스크립트로 설정 비교
+              └─ 최적 설정 확인
+                  └─ 3. 전체 프레임 실행
+```
+
+#### Step 1: 디버그 테스트 (필수!)
+
+```bash
+# ⚠️ 중요: --input_dir로 실제 데이터 경로 지정 (서버마다 다름!)
+./run_mesh_fitting_default.sh 0 2 -- --keypoints none \
+    --input_dir /home/joon/MAMMAL_mouse/data/markerless_mouse_1_nerf
+
+# 데이터 위치 확인
+ls /home/joon/MAMMAL_mouse/data/
+```
+
+#### Step 2: 실험 비교 (디버그 성공 후)
+
+```bash
+# 4가지 설정으로 순차 실험
+./run_silhouette_experiments.sh /path/to/your/data 0 2
+```
+
+#### Step 3: 전체 실행
+
+```bash
+# 최적 설정으로 전체 프레임 실행
+./run_mesh_fitting_default.sh 0 100 -- --keypoints none \
+    --input_dir /path/to/data \
+    silhouette.iter_multiplier=3.0 silhouette.theta_weight=15.0
 ```
 
 **Silhouette 모드 설정 옵션** (`conf/config.yaml` 또는 CLI):
@@ -60,21 +88,6 @@ Keypoint annotation 없이 **mask silhouette만으로** 메시 피팅을 수행�
 | `silhouette.bone_weight` | 2.0 | 뼈대 길이 정규화 |
 | `silhouette.scale_weight` | 50.0 | 스케일 정규화 |
 | `silhouette.use_pca_init` | true | PCA 기반 회전 초기화 |
-
-```bash
-# 예: 더 많은 iteration으로 실행
-./run_mesh_fitting_default.sh 0 10 -- --keypoints none \
-    silhouette.iter_multiplier=3.0 silhouette.theta_weight=15.0
-```
-
-**실험 비교 스크립트:**
-```bash
-# 4가지 설정으로 순차 실험 (디버그 모드)
-./run_silhouette_experiments.sh /path/to/data 0 2
-
-# 더 많은 프레임으로 실험
-./run_silhouette_experiments.sh /path/to/data 0 20
-```
 
 ---
 
