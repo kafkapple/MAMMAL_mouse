@@ -39,6 +39,43 @@ Three-dimensional surface motion capture of mice using the MAMMAL framework. Thi
 
 > **Note**: `--` 뒤에 추가 인자를 전달하면 Python 스크립트로 그대로 전달됩니다. EGL 환경변수는 자동 설정됩니다.
 
+### 🆕 Silhouette-Only Fitting (keypoint 없이 마스크만 사용)
+
+Keypoint annotation 없이 **mask silhouette만으로** 메시 피팅을 수행합니다.
+
+```bash
+# 디버그 모드 (빠른 테스트, 2 프레임)
+./run_mesh_fitting_default.sh 0 2 -- --keypoints none
+
+# 전체 실행
+./run_mesh_fitting_default.sh 0 100 -- --keypoints none --input_dir /path/to/data
+```
+
+**Silhouette 모드 설정 옵션** (`conf/config.yaml` 또는 CLI):
+
+| 옵션 | 기본값 | 설명 |
+|------|--------|------|
+| `silhouette.iter_multiplier` | 2.0 | 반복 횟수 배율 (높을수록 정밀) |
+| `silhouette.theta_weight` | 10.0 | 포즈 정규화 (높을수록 안정적) |
+| `silhouette.bone_weight` | 2.0 | 뼈대 길이 정규화 |
+| `silhouette.scale_weight` | 50.0 | 스케일 정규화 |
+| `silhouette.use_pca_init` | true | PCA 기반 회전 초기화 |
+
+```bash
+# 예: 더 많은 iteration으로 실행
+./run_mesh_fitting_default.sh 0 10 -- --keypoints none \
+    silhouette.iter_multiplier=3.0 silhouette.theta_weight=15.0
+```
+
+**실험 비교 스크립트:**
+```bash
+# 4가지 설정으로 순차 실험 (디버그 모드)
+./run_silhouette_experiments.sh /path/to/data 0 2
+
+# 더 많은 프레임으로 실험
+./run_silhouette_experiments.sh /path/to/data 0 20
+```
+
 ---
 
 ## ⚡ Quick Start (5분 안에 실행)
