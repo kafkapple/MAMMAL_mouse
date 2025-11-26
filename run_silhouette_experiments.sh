@@ -36,7 +36,17 @@ fi
 
 # Environment setup
 export PYOPENGL_PLATFORM=egl
-PYTHON="${HOME}/miniconda3/envs/mammal_stable/bin/python"
+
+# Auto-detect Python path (miniconda or anaconda)
+if [ -f "${HOME}/miniconda3/envs/mammal_stable/bin/python" ]; then
+    PYTHON="${HOME}/miniconda3/envs/mammal_stable/bin/python"
+elif [ -f "${HOME}/anaconda3/envs/mammal_stable/bin/python" ]; then
+    PYTHON="${HOME}/anaconda3/envs/mammal_stable/bin/python"
+else
+    # Fallback: use conda run
+    PYTHON="conda run -n mammal_stable python"
+fi
+echo "Using Python: $PYTHON"
 
 # Parameters
 INPUT_DIR="$1"
