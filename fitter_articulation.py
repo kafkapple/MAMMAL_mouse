@@ -95,7 +95,9 @@ class MouseFitter():
         # Disable keypoint loss if use_keypoints is false
         if not getattr(self.cfg.fitter, 'use_keypoints', True):
             self.term_weights["2d"] = 0
-            print("Keypoint loss disabled (use_keypoints=false)")
+            # Increase scale regularization to prevent mask loss from collapsing the model
+            self.term_weights["scale"] = 50  # Much higher to keep scale reasonable
+            print("Keypoint loss disabled (use_keypoints=false), scale weight increased to 50")
 
         self.losses = {}
 
@@ -181,17 +183,119 @@ class MouseFitter():
             tvec=tvec_tensor, camera_matrix=K_tensor, image_size=imgsize_tensor)
 
     def init_params(self, batch_size):
-        body_param = { 
+        body_param = {
             "thetas": np.tile(self.bodymodel.init_joint_rotvec_np, [batch_size, 1, 1]),
-            "trans": np.zeros([batch_size,3]), 
+            "trans": np.zeros([batch_size,3]),
             "scale": np.ones([batch_size,1]) * 115,
-            "rotation": np.zeros([batch_size, 3]), 
+            "rotation": np.zeros([batch_size, 3]),
             "bone_lengths": np.zeros([batch_size, 20]),
             "chest_deformer": np.zeros([batch_size, 1])
         }
 
         self.init_thetas = torch.tensor(body_param["thetas"], dtype=torch.float32, device=self.device)
-        
+
+        return body_param
+
+    def init_params_from_masks(self, masks, cam_dicts, batch_size=1):
+        """
+        Initialize parameters from mask silhouettes when keypoints are not available.
+        Uses mask centroids and bounding boxes to estimate initial position and scale.
+
+        Args:
+            masks: dict of masks for each view {"mask0": tensor, "mask1": tensor, ...}
+            cam_dicts: list of camera parameter dicts
+            batch_size: batch size (default 1)
+
+        Returns:
+            body_param: initialized parameters dict
+        """
+        # Start with default params
+        body_param = self.init_params(batch_size)
+
+        # Collect 2D centroids and areas from all views
+        centroids_2d = []
+        areas = []
+        valid_views = []
+
+        for view_id in range(len(cam_dicts)):
+            mask_key = f"mask{view_id}"
+            if mask_key not in masks:
+                continue
+
+            mask = masks[mask_key]
+            if isinstance(mask, torch.Tensor):
+                mask_np = mask.squeeze().cpu().numpy()
+            else:
+                mask_np = mask.squeeze()
+
+            # Find mask region
+            if mask_np.max() <= 0:
+                continue
+
+            # Binarize mask
+            binary_mask = (mask_np > 0.5).astype(np.uint8)
+
+            # Find contours or use moments
+            moments = cv2.moments(binary_mask)
+            if moments["m00"] > 0:
+                cx = moments["m10"] / moments["m00"]
+                cy = moments["m01"] / moments["m00"]
+                area = moments["m00"]
+                centroids_2d.append([cx, cy])
+                areas.append(area)
+                valid_views.append(view_id)
+
+        if len(valid_views) < 2:
+            print("Warning: Not enough valid masks for initialization, using defaults")
+            return body_param
+
+        # Estimate 3D position using triangulation from multiple views
+        # Simplified: use average back-projection from two views
+        points_3d = []
+        for i, view_id in enumerate(valid_views[:min(4, len(valid_views))]):
+            cam = cam_dicts[view_id]
+            K = cam['K'].T if cam['K'].shape[0] == 3 else cam['K']
+            R = cam['R'].T if cam['R'].shape[0] == 3 else cam['R']
+            T = cam['T'].squeeze() / 1000  # Convert to meters
+
+            cx, cy = centroids_2d[i]
+
+            # Back-project to ray
+            K_inv = np.linalg.inv(K)
+            ray_cam = K_inv @ np.array([cx, cy, 1.0])
+            ray_cam = ray_cam / np.linalg.norm(ray_cam)
+
+            # Transform ray to world coordinates
+            R_inv = R.T
+            ray_world = R_inv @ ray_cam
+            cam_center = -R_inv @ T
+
+            # Estimate depth from mask area (rough approximation)
+            # Larger area = closer to camera
+            avg_area = np.mean(areas)
+            estimated_depth = 0.3 * np.sqrt(100000 / max(avg_area, 1000))  # Heuristic
+            estimated_depth = np.clip(estimated_depth, 0.1, 0.5)
+
+            point_3d = cam_center + ray_world * estimated_depth
+            points_3d.append(point_3d)
+
+        # Average 3D position estimate
+        if len(points_3d) > 0:
+            estimated_trans = np.mean(points_3d, axis=0) * 1000  # Convert back to mm
+            body_param["trans"] = estimated_trans.reshape([batch_size, 3])
+            print(f"Mask-based init: estimated trans = {estimated_trans}")
+
+        # Estimate scale from average mask area
+        avg_area = np.mean(areas)
+        # Heuristic: map area to scale (calibrated for mouse size)
+        # Default scale is 115, so we use that as baseline
+        estimated_scale = np.clip(np.sqrt(avg_area) * 0.2, 100, 130)
+        # If estimation is uncertain, use default
+        if avg_area < 5000:
+            estimated_scale = 115  # Use default for small/uncertain masks
+        body_param["scale"] = np.ones([batch_size, 1]) * estimated_scale
+        print(f"Mask-based init: estimated scale = {estimated_scale} (avg_area={avg_area:.0f})")
+
         return body_param 
 
     def calc_2d_keypoint_loss(self, J3d, x2): 
@@ -635,27 +739,34 @@ def optim_single(cfg: DictConfig):
 
     start = targets[0]
     for index in targets:
-        print("process ... ", index) 
-        labels = data_loader.fetch(index, with_img = cfg.fitter.with_render) 
+        print("process ... ", index)
+        labels = data_loader.fetch(index, with_img = cfg.fitter.with_render)
         fitter.id = index
-        fitter.imgs = labels["imgs"] 
+        fitter.imgs = labels["imgs"]
 
-        if index == start: 
-            if cfg.fitter.resume: 
-                with open(os.path.join(fitter.result_folder, "params/param{}_sil.pkl".format(index-1)), 'rb') as f: 
-                    init_params = pickle.load(f)
-                fitter.set_previous_frame(init_params) 
-                params = init_params 
-            else: 
-                init_params = fitter.init_params(1) 
-                params = {k: torch.tensor(v, dtype=torch.float32, device=device).requires_grad_(True) for k, v in init_params.items()}
+        # Build target dict with masks first (needed for mask-based init)
         target = {
             'target_2d': torch.FloatTensor(labels["label2d"]).reshape([-1,camN,cfg.fitter.keypoint_num,3]).to(device)
         }
-        for viewid in range(camN): 
-            target.update({ 
-                "mask{}".format(viewid): torch.from_numpy(np.expand_dims(labels["bgs"][viewid],axis=0)).to(device) # should be [bs, ]
+        for viewid in range(camN):
+            target.update({
+                "mask{}".format(viewid): torch.from_numpy(np.expand_dims(labels["bgs"][viewid],axis=0)).to(device)
             })
+
+        if index == start:
+            if cfg.fitter.resume:
+                with open(os.path.join(fitter.result_folder, "params/param{}_sil.pkl".format(index-1)), 'rb') as f:
+                    init_params = pickle.load(f)
+                fitter.set_previous_frame(init_params)
+                params = init_params
+            else:
+                # Use mask-based initialization when keypoints are disabled
+                if not getattr(cfg.fitter, 'use_keypoints', True):
+                    print("Using mask-based initialization (silhouette-only mode)")
+                    init_params = fitter.init_params_from_masks(target, data_loader.cams_dict_out, batch_size=1)
+                else:
+                    init_params = fitter.init_params(1)
+                params = {k: torch.tensor(v, dtype=torch.float32, device=device).requires_grad_(True) for k, v in init_params.items()}
         
         if index == start: 
             params = fitter.solve_step0(params = params, target=target, max_iters = cfg.optim.solve_step0_iters)
