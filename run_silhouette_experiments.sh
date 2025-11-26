@@ -1,18 +1,58 @@
 #!/bin/bash
 # Silhouette-only fitting experiments
 # Run sequentially with different configurations to compare results
+#
+# Usage:
+#   ./run_silhouette_experiments.sh <INPUT_DIR> [START_FRAME] [END_FRAME]
+#
+# Examples:
+#   # 디버그 모드 (2 프레임)
+#   ./run_silhouette_experiments.sh /home/joon/MAMMAL_mouse/data/markerless_mouse_1_nerf 0 2
+#
+#   # 더 많은 프레임
+#   ./run_silhouette_experiments.sh /home/joon/MAMMAL_mouse/data/markerless_mouse_1_nerf 0 20
+#
+# ⚠️ 중요: 먼저 디버그 테스트 실행 후 이 스크립트 실행!
+#   ./run_mesh_fitting_default.sh 0 2 -- --keypoints none --input_dir <YOUR_DATA_PATH>
 
 set -e  # Exit on error
+
+# Check required argument
+if [ -z "$1" ]; then
+    echo "================================================"
+    echo "ERROR: INPUT_DIR is required!"
+    echo "================================================"
+    echo ""
+    echo "Usage: $0 <INPUT_DIR> [START_FRAME] [END_FRAME]"
+    echo ""
+    echo "Example:"
+    echo "  $0 /home/joon/MAMMAL_mouse/data/markerless_mouse_1_nerf 0 2"
+    echo ""
+    echo "First, check your data location:"
+    echo "  ls /home/joon/MAMMAL_mouse/data/"
+    echo "================================================"
+    exit 1
+fi
 
 # Environment setup
 export PYOPENGL_PLATFORM=egl
 PYTHON="${HOME}/miniconda3/envs/mammal_stable/bin/python"
 
-# Default parameters
-INPUT_DIR="${1:-data/examples/markerless_mouse_1_nerf}"
+# Parameters
+INPUT_DIR="$1"
 START_FRAME="${2:-0}"
 END_FRAME="${3:-2}"  # Debug mode: only 2 frames
 LOG_DIR="results/silhouette_experiments"
+
+# Verify input directory exists
+if [ ! -d "$INPUT_DIR" ]; then
+    echo "================================================"
+    echo "ERROR: Input directory does not exist: $INPUT_DIR"
+    echo "================================================"
+    echo "Check available data directories:"
+    ls -la "$(dirname "$INPUT_DIR")" 2>/dev/null || echo "Parent directory not found"
+    exit 1
+fi
 
 echo "================================================"
 echo "Silhouette-Only Fitting Experiments"
