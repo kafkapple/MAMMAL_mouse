@@ -4,6 +4,113 @@ Three-dimensional surface motion capture of mice using the MAMMAL framework. Thi
 
 ![mouse_model](assets/figs/mouse_1.png)
 
+---
+
+## ⚡ Quick Start (5분 안에 실행)
+
+### 📁 데이터 준비
+
+```bash
+# 데이터 폴더 구조 (예시)
+data/
+├── my_video/                    # Monocular용 (단일 카메라)
+│   ├── 000000_rgb.png           # RGB 이미지
+│   ├── 000000_mask.png          # 바이너리 마스크
+│   └── ...
+└── examples/markerless_mouse_1_nerf/   # Multi-view용 (다중 카메라)
+    ├── videos_undist/           # 6개 뷰 비디오
+    ├── simpleclick_undist/      # 마스크
+    ├── keypoints2d_undist/      # 2D keypoints
+    └── new_cam.pkl              # 카메라 파라미터
+```
+
+### 🎯 Monocular Fitting (단일 이미지/비디오)
+
+```bash
+# 환경 활성화
+conda activate mammal_stable
+
+# 1. 기본 실행 (keypoint 기반)
+python fit_monocular.py \
+    --input_dir data/my_video/ \
+    --output_dir results/monocular/test/
+
+# 2. Keypoint 선택 (부정확한 부분 제외)
+python fit_monocular.py \
+    --input_dir data/my_video/ \
+    --output_dir results/monocular/test/ \
+    --keypoints spine,head      # head, spine, limbs, tail, centroid
+
+# 3. Silhouette 기반 (keypoint 없이 mask만 사용)
+python fit_monocular.py \
+    --input_dir data/my_video/ \
+    --output_dir results/monocular/test/ \
+    --keypoints none            # mask IoU loss로 fitting
+```
+
+**출력 파일**:
+```
+results/monocular/test/
+├── *_mesh.obj          # 3D 메시 (Blender 호환)
+├── *_comparison.png    # RGB | Mask | Rendered | Overlay
+├── *_keypoints.png     # Keypoint 시각화
+├── *_rendered.png      # 렌더링된 mesh
+└── *_params.pkl        # MAMMAL 파라미터
+```
+
+### 🎥 Multi-View Fitting (다중 카메라)
+
+```bash
+# 환경 활성화 (headless 서버용)
+conda activate mammal_stable
+export PYOPENGL_PLATFORM=egl
+
+# 1. 기본 실행
+python fitter_articulation.py \
+    dataset=default_markerless \
+    fitter.start_frame=0 \
+    fitter.end_frame=10
+
+# 2. 렌더링 포함
+python fitter_articulation.py \
+    dataset=default_markerless \
+    fitter.start_frame=0 \
+    fitter.end_frame=10 \
+    fitter.with_render=true
+
+# 3. Custom 데이터셋 설정 (conf/dataset/custom.yaml 생성 후)
+python fitter_articulation.py dataset=custom
+```
+
+**Config 설정** (`conf/dataset/default_markerless.yaml`):
+```yaml
+video_dir: data/examples/markerless_mouse_1_nerf/videos_undist/
+mask_dir: data/examples/markerless_mouse_1_nerf/simpleclick_undist/
+keypoint_dir: data/examples/markerless_mouse_1_nerf/keypoints2d_undist/
+cam_pkl: data/examples/markerless_mouse_1_nerf/new_cam.pkl
+```
+
+**출력 결과**:
+```
+results/fitting/{dataset}_{timestamp}/
+├── fitting_keypoints_*.png     # 6뷰 keypoint overlay
+├── render/fitting_*.png        # 6뷰 mesh rendering
+├── obj/*.obj                   # Frame별 3D mesh
+└── params/*.pkl                # Frame별 파라미터
+```
+
+### 📊 결과 시각화
+
+```bash
+# Cropped fitting 결과 + GT RGB 비교
+python scripts/utils/visualize_fitting_comparison.py \
+    --results results/cropped_fitting_final \
+    --gt_dir data/cropped_images \
+    --output results/gallery.png
+```
+
+---
+
 ## ✨ Features
 
 - **Multi-view 3D fitting**: Fit 3D mouse model to synchronized multi-camera videos
