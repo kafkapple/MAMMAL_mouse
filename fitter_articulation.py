@@ -538,8 +538,68 @@ class MouseFitter():
         outputimg = pack_images(all_drawn_images) 
         cv2.imwrite(filename, outputimg)
 
-@hydra.main(config_path="./conf", config_name="config")
-def optim_single(cfg: DictConfig): 
+def preprocess_cli_args():
+    """
+    Convert argparse-style arguments to Hydra overrides for CLI consistency.
+
+    Supports:
+        --keypoints none  → fitter.use_keypoints=false
+        --input_dir /path → data.data_dir=/path
+        --output_dir /path → result_folder=/path
+        --start_frame N   → fitter.start_frame=N
+        --end_frame N     → fitter.end_frame=N
+        --with_render     → fitter.with_render=true
+    """
+    import sys
+
+    # Mapping from argparse-style to Hydra overrides
+    arg_mapping = {
+        '--keypoints': lambda v: 'fitter.use_keypoints=false' if v == 'none' else None,
+        '--input_dir': lambda v: f'data.data_dir={v}',
+        '--output_dir': lambda v: f'result_folder={v}',
+        '--start_frame': lambda v: f'fitter.start_frame={v}',
+        '--end_frame': lambda v: f'fitter.end_frame={v}',
+        '--with_render': lambda v: 'fitter.with_render=true',
+    }
+
+    new_argv = [sys.argv[0]]
+    i = 1
+    converted = []
+
+    while i < len(sys.argv):
+        arg = sys.argv[i]
+
+        if arg in arg_mapping:
+            # Get value if needed
+            if arg == '--with_render':
+                override = arg_mapping[arg](None)
+                new_argv.append(override)
+                converted.append(f"{arg} → {override}")
+                i += 1
+            elif i + 1 < len(sys.argv) and not sys.argv[i + 1].startswith('-'):
+                value = sys.argv[i + 1]
+                override = arg_mapping[arg](value)
+                if override:
+                    new_argv.append(override)
+                    converted.append(f"{arg} {value} → {override}")
+                i += 2
+            else:
+                i += 1
+        else:
+            # Keep Hydra-style arguments as-is
+            new_argv.append(arg)
+            i += 1
+
+    if converted:
+        print("CLI arguments converted to Hydra format:")
+        for c in converted:
+            print(f"  {c}")
+
+    sys.argv = new_argv
+
+
+@hydra.main(config_path="./conf", config_name="config", version_base=None)
+def optim_single(cfg: DictConfig):
     data_loader = DataSeakerDet(cfg)
     device = torch.device('cuda')
 
@@ -597,4 +657,6 @@ def optim_single(cfg: DictConfig):
         fitter.set_previous_frame(params) 
 
 if __name__ == "__main__":
+    # Convert argparse-style args to Hydra format for CLI consistency
+    preprocess_cli_args()
     optim_single()
