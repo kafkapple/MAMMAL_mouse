@@ -733,24 +733,45 @@ class MonocularMAMMALFitter:
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
 
-        # Find all RGB images
-        rgb_files = sorted(list(input_path.glob("*_rgb.png")))
+        # Find all RGB images (recursive search)
+        rgb_files = sorted(list(input_path.glob("**/*_rgb.png")))
+
+        # Also try without _rgb suffix for flexibility
+        if len(rgb_files) == 0:
+            rgb_files = sorted(list(input_path.glob("**/*.png")))
+            # Filter to only RGB images (exclude masks)
+            rgb_files = [f for f in rgb_files if '_mask' not in f.name]
 
         if max_images is not None:
             rgb_files = rgb_files[:max_images]
 
-        print(f"Found {len(rgb_files)} RGB images")
+        print(f"Found {len(rgb_files)} RGB images (recursive search)")
         if keypoint_selection != 'all':
             print(f"Using keypoint selection: {keypoint_selection}")
 
         # Process each image
         for rgb_file in tqdm(rgb_files, desc="Processing images"):
-            # Get corresponding mask file
-            mask_file = rgb_file.parent / rgb_file.name.replace("_rgb.png", "_mask.png")
+            # Get corresponding mask file (try multiple patterns)
+            mask_patterns = [
+                rgb_file.parent / rgb_file.name.replace("_rgb.png", "_mask.png"),
+                rgb_file.parent / rgb_file.name.replace(".png", "_mask.png"),
+                rgb_file.parent / (rgb_file.stem + "_mask.png"),
+            ]
 
-            if not mask_file.exists():
+            mask_file = None
+            for pattern in mask_patterns:
+                if pattern.exists():
+                    mask_file = pattern
+                    break
+
+            if mask_file is None:
                 print(f"Warning: Mask not found for {rgb_file.name}, skipping")
                 continue
+
+            # Preserve subfolder structure in output
+            rel_path = rgb_file.parent.relative_to(input_path) if rgb_file.parent != input_path else Path(".")
+            sub_output_path = output_path / rel_path
+            sub_output_path.mkdir(parents=True, exist_ok=True)
 
             try:
                 # Fit MAMMAL model
@@ -760,15 +781,15 @@ class MonocularMAMMALFitter:
                     keypoint_selection=keypoint_selection
                 )
 
-                # Save results
+                # Save results (preserve subfolder structure)
                 output_name = rgb_file.stem.replace("_rgb", "")
 
                 # Save mesh
-                mesh_path = output_path / f"{output_name}_mesh.obj"
+                mesh_path = sub_output_path / f"{output_name}_mesh.obj"
                 results['mesh'].export(str(mesh_path))
 
                 # Save parameters
-                params_path = output_path / f"{output_name}_params.pkl"
+                params_path = sub_output_path / f"{output_name}_params.pkl"
                 with open(params_path, 'wb') as f:
                     pickle.dump({
                         'thetas': results['thetas'],
@@ -784,26 +805,26 @@ class MonocularMAMMALFitter:
 
                 # Save keypoint visualization
                 if results['vis_keypoints'] is not None:
-                    vis_path = output_path / f"{output_name}_keypoints.png"
+                    vis_path = sub_output_path / f"{output_name}_keypoints.png"
                     cv2.imwrite(str(vis_path), results['vis_keypoints'])
 
                 # Save combined overlay visualization (RGB + mask + keypoints)
                 if results['vis_combined'] is not None:
-                    combined_path = output_path / f"{output_name}_overlay.png"
+                    combined_path = sub_output_path / f"{output_name}_overlay.png"
                     cv2.imwrite(str(combined_path), results['vis_combined'])
 
                 # Save rendered mesh image
                 if results['vis_rendered'] is not None:
-                    rendered_path = output_path / f"{output_name}_rendered.png"
+                    rendered_path = sub_output_path / f"{output_name}_rendered.png"
                     cv2.imwrite(str(rendered_path), cv2.cvtColor(results['vis_rendered'], cv2.COLOR_RGB2BGR))
 
                 # Save comparison image (RGB | Mask | Rendered | Overlay)
                 if results['vis_comparison'] is not None:
-                    comparison_path = output_path / f"{output_name}_comparison.png"
+                    comparison_path = sub_output_path / f"{output_name}_comparison.png"
                     cv2.imwrite(str(comparison_path), results['vis_comparison'])
 
                 # Save mask image separately
-                mask_path = output_path / f"{output_name}_mask.png"
+                mask_path = sub_output_path / f"{output_name}_mask.png"
                 cv2.imwrite(str(mask_path), results['mask'])
 
                 print(f"  ✓ Processed {rgb_file.name}")
