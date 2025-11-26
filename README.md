@@ -65,22 +65,32 @@ results/monocular/test/
 conda activate mammal_stable
 export PYOPENGL_PLATFORM=egl
 
-# 1. 기본 실행
+# 1. 기본 실행 (Hydra 방식)
 python fitter_articulation.py \
     dataset=default_markerless \
     fitter.start_frame=0 \
     fitter.end_frame=10
 
-# 2. 렌더링 포함
+# 2. argparse 방식 (fit_monocular.py와 동일한 CLI)
+python fitter_articulation.py \
+    --input_dir /path/to/data \
+    --start_frame 0 \
+    --end_frame 10 \
+    --with_render
+
+# 3. Keypoint 없이 Silhouette만 사용
 python fitter_articulation.py \
     dataset=default_markerless \
-    fitter.start_frame=0 \
-    fitter.end_frame=10 \
-    fitter.with_render=true
+    --keypoints none           # 또는 fitter.use_keypoints=false
 
-# 3. Custom 데이터셋 설정 (conf/dataset/custom.yaml 생성 후)
-python fitter_articulation.py dataset=custom
+# 4. 혼합 사용 (Hydra + argparse)
+python fitter_articulation.py \
+    dataset=default_markerless \
+    --keypoints none \
+    --with_render
 ```
+
+> **CLI 호환성**: `fitter_articulation.py`는 Hydra 방식(`key=value`)과 argparse 방식(`--key value`) 모두 지원합니다.
 
 **Config 설정** (`conf/dataset/default_markerless.yaml`):
 ```yaml
@@ -618,9 +628,23 @@ conf/
 | `fitter.start_frame` | First frame | `0` | `fitter.start_frame=10` |
 | `fitter.end_frame` | Last frame | `2` | `fitter.end_frame=100` |
 | `fitter.with_render` | Enable rendering | `false` | `fitter.with_render=true` |
+| `fitter.use_keypoints` | Enable keypoint loss | `true` | `fitter.use_keypoints=false` |
 | `optim.solve_step0_iters` | Step 0 iterations | `10` | `optim.solve_step0_iters=20` |
 | `optim.solve_step1_iters` | Step 1 iterations | `100` | `optim.solve_step1_iters=200` |
 | `optim.solve_step2_iters` | Step 2 iterations | `30` | `optim.solve_step2_iters=50` |
+
+### CLI 인자 ↔ Hydra 매핑
+
+`fitter_articulation.py`는 argparse 스타일 인자를 자동으로 Hydra 형식으로 변환합니다:
+
+| argparse 스타일 | Hydra 형식 |
+|----------------|-----------|
+| `--keypoints none` | `fitter.use_keypoints=false` |
+| `--input_dir /path` | `data.data_dir=/path` |
+| `--output_dir /path` | `result_folder=/path` |
+| `--start_frame N` | `fitter.start_frame=N` |
+| `--end_frame N` | `fitter.end_frame=N` |
+| `--with_render` | `fitter.with_render=true` |
 
 ### 🆕 Manual Keypoint Annotation Workflow
 
@@ -981,19 +1005,14 @@ This project supports flexible mesh fitting across different dataset formats. Se
 
 **Run with monocular fitting (single-view):**
 ```bash
-./run_mesh_fitting_monocular.sh data/frames/ results/monocular/output yolo
-./run_mesh_fitting_monocular.sh data/frames/ results/monocular/output geometric
-```
-
-**Run with cropped frames (single-view with masks):**
-```bash
-./run_mesh_fitting_cropped.sh data/100-KO-male-56-20200615_cropped
+./run_mesh_fitting_monocular.sh data/frames/ results/monocular/output
+./run_mesh_fitting_monocular.sh data/frames/ results/monocular/output --keypoints none  # silhouette only
 ```
 
 **Quick test (3 frames):**
 ```bash
 ./run_mesh_fitting_default.sh 0 3      # Multi-view test
-./run_mesh_fitting_monocular.sh data/test/ results/test/ geometric 3  # Monocular test
+python fit_monocular.py --input_dir data/test/ --output_dir results/test/ --max_images 3
 ```
 
 ### Supported Dataset Types
@@ -1001,8 +1020,8 @@ This project supports flexible mesh fitting across different dataset formats. Se
 | Dataset | Location | Has Masks | Has Keypoints | Best Script |
 |---------|----------|-----------|---------------|-------------|
 | **Default Markerless** | `data/examples/markerless_mouse_1_nerf/` | ✅ | ✅ | `fitter_articulation.py` |
-| **Cropped Frames** | `data/100-KO-male-56-20200615_cropped/` | ✅ | Optional | `fit_cropped_frames.py` |
-| **Upsampled Frames** | `data/100-KO-male-56-20200615_upsampled/` | ❌ | ❌ | Needs preprocessing |
+| **Single Images** | Any RGB+mask folder | ✅ | Optional | `fit_monocular.py` |
+| **Cropped Frames** | `data/.../cropped/` | ✅ | Optional | `fit_monocular.py --keypoints none` |
 | **Custom** | User-defined | Varies | Varies | Configurable |
 
 ### Configuration System
@@ -1125,6 +1144,13 @@ The fitting uses a progressive optimization strategy:
 
 ## 🆕 Recent Updates
 
+### 2025-11-26: CLI 일관성 개선
+- ✅ `fitter_articulation.py`에 argparse 스타일 CLI 호환성 추가
+- ✅ `--keypoints none`, `--input_dir`, `--output_dir` 등 fit_monocular.py와 동일한 인터페이스
+- ✅ `fitter.use_keypoints` 설정 옵션 추가 (keypoint loss 비활성화)
+- ✅ `fit_cropped_frames.py` deprecated로 이동 (fit_monocular.py로 통합)
+- ✅ README 업데이트: CLI 매핑 테이블, 사용법 통일
+
 ### 2025-11-25: Folder Organization and Monocular Pipeline
 - ✅ Consolidated result folders to unified `results/` structure
 - ✅ Added monocular fitting shell script (`run_mesh_fitting_monocular.sh`)
@@ -1180,9 +1206,8 @@ MAMMAL_mouse/
 ├── requirements.txt               # Python dependencies
 │
 ├── # Core Python Files
-├── fitter_articulation.py         # Main multi-view mesh fitter
-├── fit_monocular.py               # Single-view monocular fitting
-├── fit_cropped_frames.py          # Cropped frame fitting
+├── fitter_articulation.py         # Main multi-view mesh fitter (Hydra + argparse 지원)
+├── fit_monocular.py               # Single-view monocular fitting (argparse)
 ├── articulation_th.py             # Articulation model (PyTorch)
 ├── bodymodel_th.py                # Body model (PyTorch)
 ├── bodymodel_np.py                # Body model (NumPy)
@@ -1192,7 +1217,6 @@ MAMMAL_mouse/
 ├── # Shell Scripts (Quick Start)
 ├── run_mesh_fitting_default.sh    # Multi-view fitting
 ├── run_mesh_fitting_monocular.sh  # Monocular fitting
-├── run_mesh_fitting_cropped.sh    # Cropped frames fitting
 ├── run_unified_annotator.sh       # Launch annotation tool
 │
 ├── # Configuration
