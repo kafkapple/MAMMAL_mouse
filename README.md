@@ -69,7 +69,7 @@ export PYOPENGL_PLATFORM=egl
 python fitter_articulation.py \
     dataset=default_markerless \
     fitter.start_frame=0 \
-    fitter.end_frame=10
+    fitter.end_frame=10 
 
 # 2. argparse 방식 (fit_monocular.py와 동일한 CLI)
 python fitter_articulation.py \
