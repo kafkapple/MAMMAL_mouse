@@ -32,6 +32,19 @@ fitter:
   render_cameras: [0]
   use_keypoints: true  # Set to false to disable keypoint loss (silhouette only)
 
+# Silhouette-only mode settings (only used when use_keypoints=false)
+silhouette:
+  # Iteration multiplier for silhouette-only mode (1.0 = same as keypoint mode)
+  iter_multiplier: 2.0
+  # Theta (pose) regularization weight (higher = less pose variation)
+  theta_weight: 10.0  # Default with keypoints is 3.0
+  # Bone length regularization weight
+  bone_weight: 2.0  # Default is 0.5
+  # Scale regularization weight
+  scale_weight: 50.0  # Default is 0.5
+  # Use mask PCA for initial rotation estimation
+  use_pca_init: true
+
 # Optimization settings (can be overridden by optim config)
 optim:
   solve_step0_iters: 10

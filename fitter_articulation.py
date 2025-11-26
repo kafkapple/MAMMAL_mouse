@@ -95,9 +95,21 @@ class MouseFitter():
         # Disable keypoint loss if use_keypoints is false
         if not getattr(self.cfg.fitter, 'use_keypoints', True):
             self.term_weights["2d"] = 0
-            # Increase scale regularization to prevent mask loss from collapsing the model
-            self.term_weights["scale"] = 50  # Much higher to keep scale reasonable
-            print("Keypoint loss disabled (use_keypoints=false), scale weight increased to 50")
+            # Apply silhouette-specific weights from config
+            sil_cfg = getattr(self.cfg, 'silhouette', None)
+            if sil_cfg:
+                self.term_weights["scale"] = getattr(sil_cfg, 'scale_weight', 50.0)
+                self.term_weights["theta"] = getattr(sil_cfg, 'theta_weight', 10.0)
+                self.term_weights["bone"] = getattr(sil_cfg, 'bone_weight', 2.0)
+                self.silhouette_iter_multiplier = getattr(sil_cfg, 'iter_multiplier', 2.0)
+                self.use_pca_init = getattr(sil_cfg, 'use_pca_init', True)
+            else:
+                self.term_weights["scale"] = 50.0
+                self.term_weights["theta"] = 10.0
+                self.term_weights["bone"] = 2.0
+                self.silhouette_iter_multiplier = 2.0
+                self.use_pca_init = True
+            print(f"Silhouette-only mode: theta={self.term_weights['theta']}, bone={self.term_weights['bone']}, scale={self.term_weights['scale']}, iter_mult={self.silhouette_iter_multiplier}, pca_init={self.use_pca_init}")
 
         self.losses = {}
 
@@ -295,6 +307,56 @@ class MouseFitter():
             estimated_scale = 115  # Use default for small/uncertain masks
         body_param["scale"] = np.ones([batch_size, 1]) * estimated_scale
         print(f"Mask-based init: estimated scale = {estimated_scale} (avg_area={avg_area:.0f})")
+
+        # PCA-based rotation estimation (if enabled)
+        if getattr(self, 'use_pca_init', True):
+            try:
+                rotation_estimates = []
+                for view_id in valid_views[:min(3, len(valid_views))]:
+                    mask_key = f"mask{view_id}"
+                    mask = masks[mask_key]
+                    if isinstance(mask, torch.Tensor):
+                        mask_np = mask.squeeze().cpu().numpy()
+                    else:
+                        mask_np = mask.squeeze()
+
+                    binary_mask = (mask_np > 0.5).astype(np.uint8)
+
+                    # Find contour points
+                    contours, _ = cv2.findContours(binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                    if len(contours) == 0:
+                        continue
+
+                    # Get largest contour
+                    largest_contour = max(contours, key=cv2.contourArea)
+                    points = largest_contour.reshape(-1, 2).astype(np.float32)
+
+                    if len(points) < 10:
+                        continue
+
+                    # PCA on contour points
+                    mean_pt = np.mean(points, axis=0)
+                    centered = points - mean_pt
+                    cov = np.cov(centered.T)
+                    eigenvalues, eigenvectors = np.linalg.eig(cov)
+
+                    # Principal axis (direction of largest variance = body axis)
+                    idx = np.argmax(eigenvalues)
+                    principal_axis = eigenvectors[:, idx]
+
+                    # Convert 2D angle to rotation around Z axis
+                    angle_2d = np.arctan2(principal_axis[1], principal_axis[0])
+                    rotation_estimates.append(angle_2d)
+
+                if len(rotation_estimates) > 0:
+                    # Average rotation estimate
+                    avg_rotation = np.mean(rotation_estimates)
+                    # Convert to rotation vector (rotation around Z axis)
+                    # Mouse typically lies flat, so main rotation is around vertical (Y or Z)
+                    body_param["rotation"] = np.array([[0, avg_rotation, 0]], dtype=np.float32)
+                    print(f"Mask-based init: estimated rotation (Y) = {np.degrees(avg_rotation):.1f} deg")
+            except Exception as e:
+                print(f"PCA rotation estimation failed: {e}, using default rotation")
 
         return body_param 
 
@@ -767,14 +829,20 @@ def optim_single(cfg: DictConfig):
                 else:
                     init_params = fitter.init_params(1)
                 params = {k: torch.tensor(v, dtype=torch.float32, device=device).requires_grad_(True) for k, v in init_params.items()}
-        
-        if index == start: 
-            params = fitter.solve_step0(params = params, target=target, max_iters = cfg.optim.solve_step0_iters)
-            params = fitter.solve_step1(params = params, target=target, max_iters = cfg.optim.solve_step1_iters)
-            params = fitter.solve_step2(params = params, target=target, max_iters = cfg.optim.solve_step2_iters)
-        else: 
-            params = fitter.solve_step1(params = params, target=target, max_iters = cfg.optim.solve_step1_iters)
-            params = fitter.solve_step2(params = params, target=target, max_iters = cfg.optim.solve_step2_iters)
+
+        # Apply iteration multiplier for silhouette-only mode
+        iter_mult = getattr(fitter, 'silhouette_iter_multiplier', 1.0) if not getattr(cfg.fitter, 'use_keypoints', True) else 1.0
+        step0_iters = int(cfg.optim.solve_step0_iters * iter_mult)
+        step1_iters = int(cfg.optim.solve_step1_iters * iter_mult)
+        step2_iters = int(cfg.optim.solve_step2_iters * iter_mult)
+
+        if index == start:
+            params = fitter.solve_step0(params = params, target=target, max_iters = step0_iters)
+            params = fitter.solve_step1(params = params, target=target, max_iters = step1_iters)
+            params = fitter.solve_step2(params = params, target=target, max_iters = step2_iters)
+        else:
+            params = fitter.solve_step1(params = params, target=target, max_iters = step1_iters)
+            params = fitter.solve_step2(params = params, target=target, max_iters = step2_iters)
         fitter.set_previous_frame(params) 
 
 if __name__ == "__main__":
