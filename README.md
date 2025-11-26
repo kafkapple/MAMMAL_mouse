@@ -6,6 +6,41 @@ Three-dimensional surface motion capture of mice using the MAMMAL framework. Thi
 
 ---
 
+## 🚀 Shell 스크립트 사용법 (빠른 참조)
+
+### Multi-View Fitting (`run_mesh_fitting_default.sh`)
+
+```bash
+# 기본 사용 (frame 0-10)
+./run_mesh_fitting_default.sh 0 10
+
+# keypoint 없이 (silhouette only)
+./run_mesh_fitting_default.sh 0 10 -- --keypoints none
+
+# 다른 input_dir 지정 + keypoint 없이
+./run_mesh_fitting_default.sh 0 10 -- --input_dir /home/joon/data/my_data --keypoints none
+
+# Hydra 옵션도 혼합 가능
+./run_mesh_fitting_default.sh 0 10 -- --keypoints none dataset=custom
+```
+
+### Monocular Fitting (`run_mesh_fitting_monocular.sh`)
+
+```bash
+# 기본 사용 (단일 뷰)
+./run_mesh_fitting_monocular.sh data/frames/ results/monocular/output
+
+# keypoint 없이 (silhouette only)
+./run_mesh_fitting_monocular.sh data/frames/ results/monocular/output --keypoints none
+
+# 특정 keypoint 그룹만 사용
+./run_mesh_fitting_monocular.sh data/frames/ results/monocular/output --keypoints spine,head
+```
+
+> **Note**: `--` 뒤에 추가 인자를 전달하면 Python 스크립트로 그대로 전달됩니다. EGL 환경변수는 자동 설정됩니다.
+
+---
+
 ## ⚡ Quick Start (5분 안에 실행)
 
 ### 📁 데이터 준비

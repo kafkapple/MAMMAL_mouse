@@ -365,23 +365,27 @@ class MouseFitter():
         loss_prev = float('inf')
         self.keypoint_weight[:,16:19,:] = 1
         self.keypoint_weight[:,19:22,:] = 1
-        self.term_weights["mask"] = 0
+        # Enable mask loss in step0 when keypoints are disabled (silhouette-only mode)
+        if not getattr(self.cfg.fitter, 'use_keypoints', True):
+            self.term_weights["mask"] = 1000  # Use mask for guidance when no keypoints
+        else:
+            self.term_weights["mask"] = 0
         self.term_weights["stretch"] = 0
-        params["chest_deformer"].requires_grad_(False)    
+        params["chest_deformer"].requires_grad_(False)
         params["thetas"].requires_grad_(False)
         params["bone_lengths"].requires_grad_(False)
-        for i in range(max_iters): 
-            loss = optimizer.step(closure).item() 
-            print(self.losses) 
-            if abs(loss-loss_prev) < tolerate: 
-                break 
-            else: 
+        for i in range(max_iters):
+            loss = optimizer.step(closure).item()
+            print(self.losses)
+            if abs(loss-loss_prev) < tolerate:
+                break
+            else:
                 print('iter ' + str(i) + ': ' + '%.2f'%loss + "  diff: " + "%.2f"%(loss-loss_prev))
-            loss_prev = loss 
-            if self.cfg.fitter.with_render: 
-                imgs = self.imgs.copy() 
+            loss_prev = loss
+            if self.cfg.fitter.with_render:
+                imgs = self.imgs.copy()
                 self.render(params, imgs, self.cfg.fitter.render_cameras, 0, self.result_folder + "/render/debug/fitting_{}_global_iter_{:05d}.png".format(self.id, i), self.cam_dict)
-        params["chest_deformer"].requires_grad_(True)    
+        params["chest_deformer"].requires_grad_(True)
         params["thetas"].requires_grad_(True)
         params["bone_lengths"].requires_grad_(True)
         return params
@@ -398,7 +402,11 @@ class MouseFitter():
         loss_prev = float('inf')
         self.keypoint_weight[:,16:19,:] = 1
         self.keypoint_weight[:,19:22,:] = 1
-        self.term_weights["mask"] = 0
+        # Enable mask loss in step1 when keypoints are disabled (silhouette-only mode)
+        if not getattr(self.cfg.fitter, 'use_keypoints', True):
+            self.term_weights["mask"] = 1500  # Use mask for guidance when no keypoints
+        else:
+            self.term_weights["mask"] = 0
         self.term_weights["stretch"] = 0
         params["chest_deformer"].requires_grad_(False)    
         for i in range(max_iters): 
@@ -416,12 +424,14 @@ class MouseFitter():
                 
 
         if self.cfg.fitter.with_render:
-            imgs = self.imgs.copy() 
+            imgs = self.imgs.copy()
             self.render(params, imgs, self.cfg.fitter.render_cameras, 0, self.result_folder + "/render/fitting_{}.png".format(self.id), self.cam_dict)
-            self.draw_keypoints_compare(params, imgs, self.cfg.fitter.render_cameras, 0, self.result_folder + "/fitting_keypoints_{}.png".format(self.id), self.cam_dict)
-        with open(self.result_folder + "/params/param{}.pkl".format(self.id), 'wb') as f: 
-            pickle.dump(params,f) 
-        params["chest_deformer"].requires_grad_(True) 
+            # Only draw keypoints visualization if keypoints are enabled
+            if getattr(self.cfg.fitter, 'use_keypoints', True):
+                self.draw_keypoints_compare(params, imgs, self.cfg.fitter.render_cameras, 0, self.result_folder + "/fitting_keypoints_{}.png".format(self.id), self.cam_dict)
+        with open(self.result_folder + "/params/param{}.pkl".format(self.id), 'wb') as f:
+            pickle.dump(params,f)
+        params["chest_deformer"].requires_grad_(True)
         return params
 
     def solve_step2(self, params, target, max_iters): 
