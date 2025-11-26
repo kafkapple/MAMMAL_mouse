@@ -77,15 +77,18 @@ mkdir -p "$LOG_DIR"
 # Function to run experiment
 run_experiment() {
     local exp_name="$1"
-    local extra_args="$2"
+    shift  # Remove first argument
+    local extra_args=("$@")  # Remaining arguments as array
 
     echo ""
     echo "=========================================="
     echo "Running: $exp_name"
     echo "=========================================="
+    echo "Extra args: ${extra_args[*]}"
 
     local log_file="$LOG_DIR/${exp_name}.log"
 
+    # Use eval to properly expand the command with Hydra arguments
     $PYTHON fitter_articulation.py \
         dataset=default_markerless \
         fitter.start_frame=$START_FRAME \
@@ -93,7 +96,7 @@ run_experiment() {
         fitter.use_keypoints=false \
         fitter.with_render=true \
         --input_dir "$INPUT_DIR" \
-        $extra_args \
+        "${extra_args[@]}" \
         2>&1 | tee "$log_file"
 
     echo "Log saved to: $log_file"
@@ -102,19 +105,28 @@ run_experiment() {
 
 # Experiment 1: Baseline (default silhouette settings)
 run_experiment "exp1_baseline" \
-    "silhouette.iter_multiplier=2.0 silhouette.theta_weight=10.0 silhouette.use_pca_init=true"
+    silhouette.iter_multiplier=2.0 \
+    silhouette.theta_weight=10.0 \
+    silhouette.use_pca_init=true
 
 # Experiment 2: More iterations
 run_experiment "exp2_more_iters" \
-    "silhouette.iter_multiplier=3.0 silhouette.theta_weight=10.0 silhouette.use_pca_init=true"
+    silhouette.iter_multiplier=3.0 \
+    silhouette.theta_weight=10.0 \
+    silhouette.use_pca_init=true
 
 # Experiment 3: Higher regularization
 run_experiment "exp3_high_reg" \
-    "silhouette.iter_multiplier=2.0 silhouette.theta_weight=15.0 silhouette.bone_weight=3.0 silhouette.use_pca_init=true"
+    silhouette.iter_multiplier=2.0 \
+    silhouette.theta_weight=15.0 \
+    silhouette.bone_weight=3.0 \
+    silhouette.use_pca_init=true
 
 # Experiment 4: No PCA initialization (for comparison)
 run_experiment "exp4_no_pca" \
-    "silhouette.iter_multiplier=2.0 silhouette.theta_weight=10.0 silhouette.use_pca_init=false"
+    silhouette.iter_multiplier=2.0 \
+    silhouette.theta_weight=10.0 \
+    silhouette.use_pca_init=false
 
 echo ""
 echo "================================================"

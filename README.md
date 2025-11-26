@@ -89,6 +89,28 @@ ls /home/joon/MAMMAL_mouse/data/
 | `silhouette.scale_weight` | 50.0 | 스케일 정규화 |
 | `silhouette.use_pca_init` | true | PCA 기반 회전 초기화 |
 
+### 서버 간 호환성 (Portability)
+
+스크립트와 config는 다양한 서버 환경에서 동작하도록 설계되었습니다:
+
+**자동 처리 항목:**
+- Python 경로: `miniconda3` / `anaconda3` 자동 감지
+- EGL 환경변수: 스크립트에서 자동 설정
+
+**수동 지정 필요:**
+```bash
+# 데이터 경로는 서버마다 다르므로 항상 --input_dir 사용
+./run_mesh_fitting_default.sh 0 10 -- --input_dir /your/server/data/path
+
+# 또는 Hydra 방식
+python fitter_articulation.py data.data_dir=/your/server/data/path
+```
+
+**Config 파일의 경로:**
+- 모든 config는 상대 경로 사용 (`data/examples/...`)
+- 절대 경로는 CLI에서 override 권장
+- 서버별 데이터 위치 확인: `ls /home/$USER/*/data/`
+
 ---
 
 ## ⚡ Quick Start (5분 안에 실행)
