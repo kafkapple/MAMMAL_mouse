@@ -1,7 +1,18 @@
-import numpy as np 
-import math 
-import torch 
-import os 
+# ===== GPU Configuration (MUST be before torch import) =====
+import os
+# Set GPU device from environment variable (default: 1)
+# This must happen BEFORE torch is imported
+_gpu_id = os.environ.get('GPU_ID', '1')
+os.environ['CUDA_VISIBLE_DEVICES'] = os.environ.get('CUDA_VISIBLE_DEVICES', _gpu_id)
+os.environ['EGL_DEVICE_ID'] = os.environ.get('EGL_DEVICE_ID', _gpu_id)
+os.environ['PYOPENGL_PLATFORM'] = 'egl'
+# Disable X11 display for headless rendering
+if 'DISPLAY' not in os.environ or os.environ.get('DISPLAY') == ':0':
+    os.environ['DISPLAY'] = ''
+
+import numpy as np
+import math
+import torch
 import pickle 
 from time import time 
 import json 

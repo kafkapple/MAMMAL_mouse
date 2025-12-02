@@ -1,8 +1,14 @@
 """
-This file is used to simulate the skinning process and constraints used in blender. 
+This file is used to simulate the skinning process and constraints used in blender.
 
 By Liang AN, 2022.10.19
 """
+
+# ===== GPU Configuration (MUST be before torch import) =====
+import os
+_gpu_id = os.environ.get('GPU_ID', os.environ.get('CUDA_VISIBLE_DEVICES', '1'))
+if 'CUDA_VISIBLE_DEVICES' not in os.environ:
+    os.environ['CUDA_VISIBLE_DEVICES'] = _gpu_id
 
 import numpy as np
 import pickle
@@ -11,7 +17,6 @@ from scipy.spatial.transform import Rotation
 
 import torch
 from torch.nn import Module
-import os
 from time import time
 import json
 
