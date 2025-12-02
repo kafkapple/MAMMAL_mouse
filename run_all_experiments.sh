@@ -6,9 +6,22 @@
 #   ./run_all_experiments.sh --debug   # Debug mode (5 frames)
 #   ./run_all_experiments.sh --frames 50  # Custom frame count
 #
+# GPU Selection:
+#   GPU_ID=0 ./run_all_experiments.sh  # Use GPU 0
+#   GPU_ID=1 ./run_all_experiments.sh  # Use GPU 1 (default)
+#
 # Results will be saved to results/fitting/ with timestamps
 
 set -e  # Exit on error
+
+# ===== GPU Configuration =====
+# Force both CUDA compute and EGL rendering to use the same GPU
+# Default: GPU 1 (can override with GPU_ID environment variable)
+GPU_ID="${GPU_ID:-1}"
+export CUDA_VISIBLE_DEVICES="$GPU_ID"
+export EGL_DEVICE_ID="$GPU_ID"
+export DISPLAY=""  # Disable X11 rendering (headless mode)
+export PYOPENGL_PLATFORM=egl
 
 # Parse arguments
 EXTRA_ARGS=""
@@ -26,6 +39,7 @@ EXPERIMENTS=(
 
 echo "================================================"
 echo "Running All 4 Experiments"
+echo "GPU: $GPU_ID (CUDA=$CUDA_VISIBLE_DEVICES, EGL=$EGL_DEVICE_ID)"
 echo "Arguments: $EXTRA_ARGS"
 echo "================================================"
 echo ""

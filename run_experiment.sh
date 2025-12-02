@@ -17,6 +17,15 @@
 
 set -e
 
+# ===== GPU Configuration =====
+# Force both CUDA compute and EGL rendering to use the same GPU
+# Default: GPU 1 (can override with GPU_ID environment variable)
+GPU_ID="${GPU_ID:-1}"
+export CUDA_VISIBLE_DEVICES="$GPU_ID"
+export EGL_DEVICE_ID="$GPU_ID"
+export DISPLAY=""  # Disable X11 rendering (headless mode)
+export PYOPENGL_PLATFORM=egl
+
 # Parse arguments
 EXPERIMENT="$1"
 DEBUG_MODE=false
@@ -72,9 +81,6 @@ if [[ ! -f "conf/experiment/${EXPERIMENT}.yaml" ]]; then
     exit 1
 fi
 
-# Set environment
-export PYOPENGL_PLATFORM=egl
-
 # Build command
 CMD="python fitter_articulation.py experiment=$EXPERIMENT"
 
@@ -98,6 +104,7 @@ echo ""
 echo "================================================"
 echo "Experiment: $EXPERIMENT"
 echo "Debug mode: $DEBUG_MODE"
+echo "GPU: $GPU_ID (CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES, EGL_DEVICE_ID=$EGL_DEVICE_ID)"
 if [[ -n "$CUSTOM_FRAMES" ]]; then
     echo "Frames: $CUSTOM_FRAMES"
 fi
