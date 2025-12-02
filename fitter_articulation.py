@@ -799,14 +799,25 @@ def optim_single(cfg: DictConfig):
     fitter.set_cameras_dannce(data_loader.cams_dict_out)
     camN = len(data_loader.cams_dict_out)
     
-    # Generate dynamic result folder name with dataset, views, and timestamp
+    # Generate dynamic result folder name with dataset, views, keypoint info, and timestamp
     import datetime
     from omegaconf import OmegaConf
 
     dataset_name = os.path.basename(cfg.data.data_dir.rstrip('/'))  # Extract dataset name from path
     views_str = f"v{''.join(map(str, cfg.data.views_to_use))}"  # e.g., "v012345" or "v024"
+
+    # Keypoint info string
+    use_kp = getattr(cfg.fitter, 'use_keypoints', True)
+    sparse_indices = getattr(cfg.fitter, 'sparse_keypoint_indices', None)
+    if not use_kp:
+        kp_str = "noKP"  # No keypoints (silhouette only)
+    elif sparse_indices:
+        kp_str = f"sparse{len(sparse_indices)}"  # e.g., "sparse3"
+    else:
+        kp_str = "kp22"  # Full 22 keypoints
+
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    dynamic_result_folder = f"results/fitting/{dataset_name}_{views_str}_{timestamp}"
+    dynamic_result_folder = f"results/fitting/{dataset_name}_{views_str}_{kp_str}_{timestamp}"
 
     fitter.result_folder = hydra.utils.to_absolute_path(dynamic_result_folder)
     print(f"Results will be saved to: {fitter.result_folder}")
