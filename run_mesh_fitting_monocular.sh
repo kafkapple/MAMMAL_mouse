@@ -1,56 +1,49 @@
 #!/bin/bash
 # Run monocular mesh fitting on single images (RGB + mask)
-# Usage: ./run_mesh_fitting_monocular.sh [input_dir] [output_dir] [options]
+# Usage: ./run_mesh_fitting_monocular.sh [input_dir] [output_dir] [max_images] [-- additional_args]
 #
 # Input directory should contain:
-#   - *_rgb.png: RGB images
+#   - *_rgb.png or *_cropped.png: RGB images
 #   - *_mask.png: Corresponding binary masks
 #
 # Examples:
-#   ./run_mesh_fitting_monocular.sh /path/to/images results/output
-#   ./run_mesh_fitting_monocular.sh /path/to/images results/output --detector superanimal
-#   ./run_mesh_fitting_monocular.sh /path/to/images results/output --max-images 10
+#   ./run_mesh_fitting_monocular.sh data/frames/ results/output
+#   ./run_mesh_fitting_monocular.sh data/frames/ results/output 5           # first 5 images
+#   ./run_mesh_fitting_monocular.sh data/frames/ results/output - -- --keypoints none
+#   ./run_mesh_fitting_monocular.sh data/100-KO-male-56-20200615_4x/cropped/ results/shank3_4x/ 5 -- --keypoints none
 
+# Parse arguments
 INPUT_DIR=${1:-"data/test_images"}
 OUTPUT_DIR=${2:-"results/monocular_fitting"}
-shift 2 2>/dev/null  # Remove first two positional args
-
-# Default options
-DETECTOR="geometric"
 MAX_IMAGES=""
-KEYPOINTS="all"  # all, head, spine, limbs, tail, or comma-separated indices
 
-# Parse additional options
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        --detector)
-            DETECTOR="$2"
-            shift 2
-            ;;
-        --max-images)
-            MAX_IMAGES="$2"
-            shift 2
-            ;;
-        --keypoints)
-            KEYPOINTS="$2"
-            shift 2
-            ;;
-        *)
-            echo "Unknown option: $1"
-            exit 1
-            ;;
-    esac
-done
+shift 2 2>/dev/null
+
+# Third arg: max_images (if numeric or "-" for none)
+if [[ "$1" =~ ^[0-9]+$ ]]; then
+    MAX_IMAGES=$1
+    shift
+elif [[ "$1" == "-" ]]; then
+    shift
+fi
+
+# Collect additional arguments after "--"
+EXTRA_ARGS=""
+if [[ "$1" == "--" ]]; then
+    shift
+    EXTRA_ARGS="$@"
+fi
 
 echo "================================================"
 echo "Mesh Fitting: Monocular (Single Image)"
 echo "================================================"
 echo "Input Directory: $INPUT_DIR"
 echo "Output Directory: $OUTPUT_DIR"
-echo "Detector: $DETECTOR"
-echo "Keypoints: $KEYPOINTS"
 if [ -n "$MAX_IMAGES" ]; then
     echo "Max Images: $MAX_IMAGES"
+fi
+if [ -n "$EXTRA_ARGS" ]; then
+    echo "Extra Args: $EXTRA_ARGS"
 fi
 echo "================================================"
 
@@ -58,17 +51,20 @@ echo "================================================"
 export PYOPENGL_PLATFORM=egl
 
 # Build command
-CMD="python fit_monocular.py --input_dir \"$INPUT_DIR\" --output_dir \"$OUTPUT_DIR\" --detector $DETECTOR"
+CMD="python fit_monocular.py"
+CMD="$CMD --input_dir \"$INPUT_DIR\""
+CMD="$CMD --output_dir \"$OUTPUT_DIR\""
 
 if [ -n "$MAX_IMAGES" ]; then
     CMD="$CMD --max_images $MAX_IMAGES"
 fi
 
-if [ "$KEYPOINTS" != "all" ]; then
-    CMD="$CMD --keypoints $KEYPOINTS"
+if [ -n "$EXTRA_ARGS" ]; then
+    CMD="$CMD $EXTRA_ARGS"
 fi
 
-# Execute
+echo "Running: $CMD"
+echo ""
 eval $CMD
 
 echo ""

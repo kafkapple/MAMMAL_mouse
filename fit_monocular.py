@@ -280,11 +280,12 @@ class MonocularMAMMALFitter:
         if not PYTORCH3D_AVAILABLE:
             return
 
-        # Rasterization settings
+        # Rasterization settings (bin_size=0 for naive rasterization, avoids overflow warnings)
         raster_settings = RasterizationSettings(
             image_size=image_size,
             blur_radius=0.0,
             faces_per_pixel=1,
+            bin_size=0,
         )
 
         # Camera and lights will be set per-frame
@@ -351,6 +352,7 @@ class MonocularMAMMALFitter:
                 image_size=image_size,
                 blur_radius=0.0,
                 faces_per_pixel=1,
+                bin_size=0,
             )
 
             renderer = MeshRenderer(
@@ -480,6 +482,7 @@ class MonocularMAMMALFitter:
             image_size=image_size,
             blur_radius=np.log(1. / 1e-4 - 1.) * blend_params.sigma,
             faces_per_pixel=50,
+            bin_size=0,
         )
 
         silhouette_renderer = MeshRenderer(
@@ -661,6 +664,15 @@ class MonocularMAMMALFitter:
         # Step 4: Generate final mesh
         mesh = self.generate_mesh(thetas_opt, bone_lengths_opt, R_opt, T_opt, s_opt, chest_deformer_opt)
 
+        # Step 5: Extract 3D keypoints and joints for geometric prior
+        with torch.no_grad():
+            # Forward pass to get final vertices and joints
+            vertices_3d, joints_3d = self.model(
+                thetas_opt, bone_lengths_opt, R_opt, T_opt, s_opt, chest_deformer_opt
+            )
+            # Get 22 semantic keypoints in 3D
+            keypoints_3d = self.model.forward_keypoints22()
+
         # Visualization
         vis_keypoints = None
         vis_combined = None
@@ -700,17 +712,25 @@ class MonocularMAMMALFitter:
 
         results = {
             'mesh': mesh,
+            # MAMMAL model parameters (for re-generating mesh)
             'thetas': thetas_opt.cpu().numpy(),
             'bone_lengths': bone_lengths_opt.cpu().numpy(),
             'R': R_opt.cpu().numpy(),
             'T': T_opt.cpu().numpy(),
             's': s_opt.cpu().numpy(),
             'chest_deformer': chest_deformer_opt.cpu().numpy(),
+            # 3D geometric outputs
+            'vertices_3d': vertices_3d.cpu().numpy(),   # (1, 14522, 3)
+            'joints_3d': joints_3d.cpu().numpy(),       # (1, 140, 3)
+            'keypoints_3d': keypoints_3d.cpu().numpy(), # (1, 22, 3)
+            # 2D keypoints (image coordinates)
             'keypoints_2d': keypoints_2d,
             'keypoints_filtered': keypoints_filtered,
             'selected_indices': selected_indices,
+            # Input data
             'rgb': rgb,
             'mask': mask_binary,
+            # Visualizations
             'vis_keypoints': vis_keypoints,
             'vis_combined': vis_combined,
             'vis_rendered': vis_rendered,
@@ -754,6 +774,7 @@ class MonocularMAMMALFitter:
             # Get corresponding mask file (try multiple patterns)
             mask_patterns = [
                 rgb_file.parent / rgb_file.name.replace("_rgb.png", "_mask.png"),
+                rgb_file.parent / rgb_file.name.replace("_cropped.png", "_mask.png"),  # 4x upsampled data
                 rgb_file.parent / rgb_file.name.replace(".png", "_mask.png"),
                 rgb_file.parent / (rgb_file.stem + "_mask.png"),
             ]
@@ -782,22 +803,29 @@ class MonocularMAMMALFitter:
                 )
 
                 # Save results (preserve subfolder structure)
-                output_name = rgb_file.stem.replace("_rgb", "")
+                output_name = rgb_file.stem.replace("_rgb", "").replace("_cropped", "")
 
                 # Save mesh
                 mesh_path = sub_output_path / f"{output_name}_mesh.obj"
                 results['mesh'].export(str(mesh_path))
 
-                # Save parameters
+                # Save parameters (complete geometric prior data)
                 params_path = sub_output_path / f"{output_name}_params.pkl"
                 with open(params_path, 'wb') as f:
                     pickle.dump({
+                        # MAMMAL model parameters (for re-generating mesh from canonical)
                         'thetas': results['thetas'],
                         'bone_lengths': results['bone_lengths'],
                         'R': results['R'],
                         'T': results['T'],
                         's': results['s'],
                         'chest_deformer': results['chest_deformer'],
+                        # 3D geometric outputs (direct use as prior)
+                        'vertices_3d': results['vertices_3d'],   # (1, 14522, 3)
+                        'joints_3d': results['joints_3d'],       # (1, 140, 3)
+                        'keypoints_3d': results['keypoints_3d'], # (1, 22, 3)
+                        'faces': self.model.faces_vert_np,       # (F, 3) - mesh topology
+                        # 2D keypoints (image pixel coordinates)
                         'keypoints_2d': results['keypoints_2d'],
                         'keypoints_filtered': results['keypoints_filtered'],
                         'selected_indices': results['selected_indices']

@@ -1,0 +1,47 @@
+# @package _global_
+# Sparse keypoints (3 points) with 3 views (diagonal coverage)
+
+defaults:
+  - override /dataset: markerless
+
+experiment_name: sparse_3view
+experiment_description: "3-view RGB (diagonal) with 3 sparse keypoints (nose, body, tail)"
+
+data:
+  views_to_use: [0, 2, 4]  # Diagonal cameras for better coverage
+
+fitter:
+  render_cameras: [0, 2, 4]
+  use_keypoints: true
+  keypoint_num: 22
+  sparse_keypoint_indices: [0, 18, 21]
+  start_frame: 0
+  end_frame: 100
+  interval: 1
+  with_render: true
+
+optim:
+  solve_step0_iters: 20
+  solve_step1_iters: 180
+  solve_step2_iters: 50
+
+loss_weights:
+  theta: 6.0
+  "3d": 2.5
+  "2d": 0.6
+  bone: 1.5
+  scale: 1.5
+  chest_deformer: 0.1
+  stretch: 1.0
+  temp: 0.4
+  temp_d: 0.35
+  mask_step0: 0.0
+  mask_step1: 800.0
+  mask_step2: 3000.0
+
+keypoint_weights:
+  default: 0.0
+  idx_0: 5.0
+  idx_18: 3.0
+  idx_21: 5.0
+  tail_step2: 10.0

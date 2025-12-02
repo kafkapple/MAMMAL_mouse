@@ -1,0 +1,57 @@
+# @package _global_
+# Experiment 1: BASELINE - 6-view RGB with full 22 keypoints (Original MAMMAL paper setting)
+# This is the reference configuration matching the original paper.
+#
+# Usage:
+#   Debug:  ./run_experiment.sh baseline_6view_keypoint --debug
+#   Full:   ./run_experiment.sh baseline_6view_keypoint
+
+defaults:
+  - override /dataset: markerless
+
+# Experiment metadata
+experiment_name: baseline_6view_keypoint
+experiment_description: "6-view RGB with 22 keypoints (Original MAMMAL paper baseline)"
+
+data:
+  views_to_use: [0, 1, 2, 3, 4, 5]  # All 6 cameras
+
+fitter:
+  render_cameras: [0, 1, 2, 3, 4, 5]
+  use_keypoints: true
+  keypoint_num: 22  # Full 22 keypoints
+  start_frame: 0
+  end_frame: 100    # Full sequence for evaluation
+  interval: 1
+  with_render: true
+
+# Original MAMMAL paper optimization settings
+optim:
+  solve_step0_iters: 10
+  solve_step1_iters: 100
+  solve_step2_iters: 30
+
+# Original MAMMAL paper loss weights
+loss_weights:
+  theta: 3.0
+  "3d": 2.5
+  "2d": 0.2
+  bone: 0.5
+  scale: 0.5
+  chest_deformer: 0.1
+  stretch: 1.0
+  temp: 0.25
+  temp_d: 0.2
+  mask_step0: 0.0
+  mask_step1: 0.0
+  mask_step2: 3000.0
+
+keypoint_weights:
+  default: 1.0
+  idx_4: 0.4
+  idx_5: 2.0
+  idx_6: 1.5
+  idx_7: 1.5
+  idx_11: 0.9
+  idx_15: 0.9
+  tail_step2: 10.0

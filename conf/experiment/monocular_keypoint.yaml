@@ -1,0 +1,48 @@
+# @package _global_
+# Experiment 2: Monocular (1-view) RGB with full 22 keypoints
+# Tests single-view reconstruction capability.
+#
+# Usage:
+#   Debug:  ./run_experiment.sh monocular_keypoint --debug
+#   Full:   ./run_experiment.sh monocular_keypoint
+
+defaults:
+  - override /dataset: markerless
+
+# Experiment metadata
+experiment_name: monocular_keypoint
+experiment_description: "Single-view (monocular) RGB with 22 keypoints"
+
+data:
+  views_to_use: [0]  # Single camera (top view)
+
+fitter:
+  render_cameras: [0]
+  use_keypoints: true
+  keypoint_num: 22
+  start_frame: 0
+  end_frame: 100
+  interval: 1
+  with_render: true
+
+# Same optimization as baseline
+optim:
+  solve_step0_iters: 10
+  solve_step1_iters: 100
+  solve_step2_iters: 30
+
+# Adjusted loss weights for monocular
+loss_weights:
+  theta: 3.0
+  "3d": 2.5
+  "2d": 0.2
+  bone: 0.5
+  scale: 0.5
+  chest_deformer: 0.1
+  stretch: 1.0
+  temp: 0.25
+  temp_d: 0.2
+  # Higher mask weight for monocular to compensate for single view
+  mask_step0: 0.0
+  mask_step1: 0.0
+  mask_step2: 3000.0

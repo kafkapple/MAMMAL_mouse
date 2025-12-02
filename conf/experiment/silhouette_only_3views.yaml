@@ -1,0 +1,24 @@
+# @package _global_
+# Experiment: Silhouette-only mesh fitting (NO keypoints) - 3 diagonal views
+# Usage: python fitter_articulation.py +experiment=silhouette_only_3views
+
+defaults:
+  - override /dataset: markerless
+
+data:
+  views_to_use: [0, 2, 4]
+
+fitter:
+  render_cameras: [0, 2, 4]
+  use_keypoints: false  # Disable keypoint loss
+  start_frame: 0
+  end_frame: 1000
+  interval: 10
+  with_render: true
+
+silhouette:
+  iter_multiplier: 2.5      # Even more iterations for fewer views
+  theta_weight: 15.0        # Stronger regularization needed
+  bone_weight: 3.0
+  scale_weight: 60.0
+  use_pca_init: true

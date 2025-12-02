@@ -1,0 +1,17 @@
+# @package _global_
+# Experiment: 5-view mesh fitting (drop camera 5)
+# Usage: python fitter_articulation.py +experiment=views_5
+
+defaults:
+  - override /dataset: markerless
+
+data:
+  views_to_use: [0, 1, 2, 3, 4]
+
+fitter:
+  render_cameras: [0, 1, 2, 3, 4]
+  use_keypoints: true
+  start_frame: 0
+  end_frame: 1000
+  interval: 10
+  with_render: true

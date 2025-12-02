@@ -79,18 +79,33 @@ class MouseFitter():
 
         self.result_folder = ""
 
+        # Load loss weights from config (with original MAMMAL paper values as defaults)
+        lw_cfg = getattr(self.cfg, 'loss_weights', None)
         self.term_weights = {
-            "theta" : 3,
-            "3d": 2.5,
-            "2d": 0.2,
-            "bone": 0.5,
-            "scale": 0.5,
-            "mask": 0,  # Disable mask loss to avoid image size mismatch
-            "chest_deformer": 0.1,
-            "stretch": 1,
-            "temp": 0.25,
-            "temp_d": 0.2
+            "theta": getattr(lw_cfg, 'theta', 3.0) if lw_cfg else 3.0,
+            "3d": getattr(lw_cfg, '3d', 2.5) if lw_cfg else 2.5,
+            "2d": getattr(lw_cfg, '2d', 0.2) if lw_cfg else 0.2,
+            "bone": getattr(lw_cfg, 'bone', 0.5) if lw_cfg else 0.5,
+            "scale": getattr(lw_cfg, 'scale', 0.5) if lw_cfg else 0.5,
+            "mask": getattr(lw_cfg, 'mask', 10.0) if lw_cfg else 10.0,  # Original MAMMAL value
+            "chest_deformer": getattr(lw_cfg, 'chest_deformer', 0.1) if lw_cfg else 0.1,
+            "stretch": getattr(lw_cfg, 'stretch', 1.0) if lw_cfg else 1.0,
+            "temp": getattr(lw_cfg, 'temp', 0.25) if lw_cfg else 0.25,
+            "temp_d": getattr(lw_cfg, 'temp_d', 0.2) if lw_cfg else 0.2,
         }
+        # Store step-specific mask weights
+        self.mask_weight_step0 = getattr(lw_cfg, 'mask_step0', 0.0) if lw_cfg else 0.0
+        self.mask_weight_step1 = getattr(lw_cfg, 'mask_step1', 0.0) if lw_cfg else 0.0
+        self.mask_weight_step2 = getattr(lw_cfg, 'mask_step2', 3000.0) if lw_cfg else 3000.0
+
+        # Store keypoint weights config for step2 adjustment
+        kw_cfg = getattr(self.cfg, 'keypoint_weights', None)
+        self.tail_weight_step2 = getattr(kw_cfg, 'tail_step2', 10.0) if kw_cfg else 10.0
+
+        # Print loaded loss weights for verification
+        print(f"Loss weights loaded: {self.term_weights}")
+        print(f"Mask weights per step: step0={self.mask_weight_step0}, step1={self.mask_weight_step1}, step2={self.mask_weight_step2}")
+        print(f"Keypoint weights: tail_step2={self.tail_weight_step2}")
 
         # Disable keypoint loss if use_keypoints is false
         if not getattr(self.cfg.fitter, 'use_keypoints', True):
@@ -531,11 +546,11 @@ class MouseFitter():
         loss_prev = float('inf')
         self.keypoint_weight[:,16:19,:] = 1
         self.keypoint_weight[:,19:22,:] = 1
-        # Enable mask loss in step0 when keypoints are disabled (silhouette-only mode)
+        # Set mask weight from config (silhouette-only mode uses higher weight)
         if not getattr(self.cfg.fitter, 'use_keypoints', True):
-            self.term_weights["mask"] = 1000  # Use mask for guidance when no keypoints
+            self.term_weights["mask"] = max(self.mask_weight_step0, 1000.0)  # Use mask for guidance when no keypoints
         else:
-            self.term_weights["mask"] = 0
+            self.term_weights["mask"] = self.mask_weight_step0
         self.term_weights["stretch"] = 0
         params["chest_deformer"].requires_grad_(False)
         params["thetas"].requires_grad_(False)
@@ -568,15 +583,15 @@ class MouseFitter():
         loss_prev = float('inf')
         self.keypoint_weight[:,16:19,:] = 1
         self.keypoint_weight[:,19:22,:] = 1
-        # Enable mask loss in step1 when keypoints are disabled (silhouette-only mode)
+        # Set mask weight from config (silhouette-only mode uses higher weight)
         if not getattr(self.cfg.fitter, 'use_keypoints', True):
-            self.term_weights["mask"] = 1500  # Use mask for guidance when no keypoints
+            self.term_weights["mask"] = max(self.mask_weight_step1, 1500.0)  # Use mask for guidance when no keypoints
         else:
-            self.term_weights["mask"] = 0
+            self.term_weights["mask"] = self.mask_weight_step1
         self.term_weights["stretch"] = 0
-        params["chest_deformer"].requires_grad_(False)    
-        for i in range(max_iters): 
-            loss = optimizer.step(closure).item() 
+        params["chest_deformer"].requires_grad_(False)
+        for i in range(max_iters):
+            loss = optimizer.step(closure).item()
             print(self.losses) 
             if abs(loss-loss_prev) < tolerate: 
                 break 
@@ -610,9 +625,10 @@ class MouseFitter():
                     optimizer, params, target
                 )
 
-        self.keypoint_weight[:,16:19,:] = 10
-        self.keypoint_weight[:,19:22,:] = 10
-        self.term_weights["mask"] = 3000
+        # Apply step2-specific weights from config
+        self.keypoint_weight[:,16:19,:] = self.tail_weight_step2
+        self.keypoint_weight[:,19:22,:] = self.tail_weight_step2
+        self.term_weights["mask"] = self.mask_weight_step2
         self.term_weights["stretch"] = 0
         loss_prev = float('inf')
         optimizer.zero_grad() 
@@ -783,18 +799,27 @@ def optim_single(cfg: DictConfig):
     fitter.set_cameras_dannce(data_loader.cams_dict_out)
     camN = len(data_loader.cams_dict_out)
     
-    # Generate dynamic result folder name with dataset and timestamp
+    # Generate dynamic result folder name with dataset, views, and timestamp
     import datetime
+    from omegaconf import OmegaConf
+
     dataset_name = os.path.basename(cfg.data.data_dir.rstrip('/'))  # Extract dataset name from path
+    views_str = f"v{''.join(map(str, cfg.data.views_to_use))}"  # e.g., "v012345" or "v024"
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    dynamic_result_folder = f"results/fitting/{dataset_name}_{timestamp}"
-    
+    dynamic_result_folder = f"results/fitting/{dataset_name}_{views_str}_{timestamp}"
+
     fitter.result_folder = hydra.utils.to_absolute_path(dynamic_result_folder)
     print(f"Results will be saved to: {fitter.result_folder}")
     os.makedirs(fitter.result_folder, exist_ok=True)
     subfolders = ["params", "render", "render/debug/", "obj"]
-    for subfolder in subfolders: 
+    for subfolder in subfolders:
         os.makedirs(os.path.join(fitter.result_folder, subfolder), exist_ok=True)
+
+    # Save config to result folder for reproducibility
+    config_path = os.path.join(fitter.result_folder, "config.yaml")
+    with open(config_path, 'w') as f:
+        f.write(OmegaConf.to_yaml(cfg))
+    print(f"Config saved to: {config_path}")
 
     print("camN: ", camN)
     targets = np.arange(cfg.fitter.start_frame, cfg.fitter.end_frame, cfg.fitter.interval).tolist() 

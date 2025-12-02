@@ -1,0 +1,22 @@
+# @package _global_
+# Experiment: Ablation - Enable mask loss with keypoints
+# Tests the effect of adding silhouette supervision to keypoint fitting
+# Usage: python fitter_articulation.py +experiment=ablation_mask_weight
+
+defaults:
+  - override /dataset: markerless
+
+data:
+  views_to_use: [0, 1, 2, 3, 4, 5]
+
+fitter:
+  render_cameras: [0, 1, 2, 3, 4, 5]
+  use_keypoints: true
+  start_frame: 0
+  end_frame: 1000
+  interval: 10
+  with_render: true
+
+# Enable mask loss alongside keypoints
+# Note: Requires modifying term_weights in fitter_articulation.py
+# or adding mask_weight to config

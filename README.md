@@ -6,36 +6,89 @@ Three-dimensional surface motion capture of mice using the MAMMAL framework. Thi
 
 ---
 
-## 🚀 Shell 스크립트 사용법 (빠른 참조)
+## 🚀 Shell 스크립트 사용법 (권장)
+
+> **권장**: 쉘 스크립트 사용 시 `PYOPENGL_PLATFORM=egl` 자동 설정, 환경 검증 포함
 
 ### Multi-View Fitting (`run_mesh_fitting_default.sh`)
 
 ```bash
-# 기본 사용 (frame 0-10)
-./run_mesh_fitting_default.sh 0 10
+# 🎯 Experiment 기반 실행 (권장)
+./run_mesh_fitting_default.sh quick_test           # conf/experiment/quick_test.yaml 사용
+./run_mesh_fitting_default.sh quick_test 0 5       # experiment + frame override
+
+# 기본 사용 (frame 0-10, experiment 없이)
+./run_mesh_fitting_default.sh - 0 10               # "-"는 experiment 생략
 
 # keypoint 없이 (silhouette only)
-./run_mesh_fitting_default.sh 0 10 -- --keypoints none
+./run_mesh_fitting_default.sh - 0 10 -- --keypoints none
 
 # 다른 input_dir 지정 + keypoint 없이
-./run_mesh_fitting_default.sh 0 10 -- --input_dir /home/joon/data/my_data --keypoints none
-
-# Hydra 옵션도 혼합 가능
-./run_mesh_fitting_default.sh 0 10 -- --keypoints none dataset=custom
+./run_mesh_fitting_default.sh - 0 10 -- --input_dir /home/joon/data/my_data --keypoints none
 ```
+
+**Experiment configs** (`conf/experiment/`):
+
+| Config | Views | Keypoints | 설명 |
+|--------|-------|-----------|------|
+| `quick_test` | 6 | ✅ | 5 frames, 최소 iterations (디버깅) |
+| `views_6` | 6 | ✅ | Full baseline (100 samples) |
+| `views_5` | 5 | ✅ | [0,1,2,3,4] |
+| `views_4` | 4 | ✅ | [0,1,2,3] |
+| `views_3_diagonal` | 3 | ✅ | [0,2,4] 대각선 배치 |
+| `views_3_consecutive` | 3 | ✅ | [0,1,2] 연속 배치 |
+| `views_2_opposite` | 2 | ✅ | [0,3] 반대편 |
+| `views_1_single` | 1 | ✅ | [0] 단일뷰 |
+| `silhouette_only_6views` | 6 | ❌ | Mask만 사용 (keypoint 없음) |
+| `silhouette_only_4views` | 4 | ❌ | |
+| `silhouette_only_3views` | 3 | ❌ | |
+| `silhouette_only_1view` | 1 | ❌ | |
+| `accurate_6views` | 6 | ✅ | 고정밀 (iterations 증가) |
+
+**데이터셋 정보** (`data/examples/markerless_mouse_1_nerf/`):
+| 항목 | 값 |
+|------|-----|
+| 카메라 | 6개 (0~5) |
+| 총 프레임 | 18,000 frames |
+| 기본 샘플링 | end_frame=1000, interval=10 → 100 samples |
 
 ### Monocular Fitting (`run_mesh_fitting_monocular.sh`)
 
 ```bash
-# 기본 사용 (단일 뷰)
+# 기본 사용 (전체 이미지)
 ./run_mesh_fitting_monocular.sh data/frames/ results/monocular/output
 
-# keypoint 없이 (silhouette only)
-./run_mesh_fitting_monocular.sh data/frames/ results/monocular/output --keypoints none
+# 처음 10개만
+./run_mesh_fitting_monocular.sh data/frames/ results/monocular/output 10
 
-# 특정 keypoint 그룹만 사용
-./run_mesh_fitting_monocular.sh data/frames/ results/monocular/output --keypoints spine,head
+# keypoint 없이 (silhouette only)
+./run_mesh_fitting_monocular.sh data/frames/ results/monocular/output - -- --keypoints none
+
+# 처음 5개 + silhouette only
+./run_mesh_fitting_monocular.sh data/frames/ results/monocular/output 5 -- --keypoints none
 ```
+
+**4x Upsampled 데이터셋** (`data/100-KO-male-56-20200615_4x/`):
+```bash
+# Cropped 이미지로 silhouette-only fitting (권장)
+./run_mesh_fitting_monocular.sh \
+    data/100-KO-male-56-20200615_4x/cropped/ \
+    results/monocular/shank3_4x/ \
+    - -- --keypoints none
+
+# 처음 5개만 테스트
+./run_mesh_fitting_monocular.sh \
+    data/100-KO-male-56-20200615_4x/cropped/ \
+    results/monocular/shank3_4x_test/ \
+    5 -- --keypoints none
+```
+
+| 항목 | 값 |
+|------|-----|
+| 경로 | `data/100-KO-male-56-20200615_4x/cropped/` |
+| 파일 패턴 | `*_cropped.png` + `*_mask.png` |
+| 프레임 수 | 20개 |
+| 해상도 | ~516×556 (4x upsampled) |
 
 > **Note**: `--` 뒤에 추가 인자를 전달하면 Python 스크립트로 그대로 전달됩니다. EGL 환경변수는 자동 설정됩니다.
 
@@ -170,7 +223,7 @@ results/monocular/test/
 ```bash
 # 환경 활성화 (headless 서버용)
 conda activate mammal_stable
-export PYOPENGL_PLATFORM=egl
+export PYOPENGL_PLATFORM=egl  # ⚠️ 필수! 직접 python 실행 시 반드시 설정
 
 # 1. 기본 실행 (Hydra 방식)
 python fitter_articulation.py \

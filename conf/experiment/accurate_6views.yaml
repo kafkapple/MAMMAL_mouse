@@ -1,0 +1,18 @@
+# @package _global_
+# Experiment: High-quality fitting (more iterations)
+# Usage: python fitter_articulation.py +experiment=accurate_6views
+
+defaults:
+  - override /dataset: markerless
+  - /optim: accurate
+
+data:
+  views_to_use: [0, 1, 2, 3, 4, 5]
+
+fitter:
+  render_cameras: [0, 1, 2, 3, 4, 5]
+  use_keypoints: true
+  start_frame: 0
+  end_frame: 1000
+  interval: 10
+  with_render: true

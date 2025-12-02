@@ -5,6 +5,7 @@ defaults:
   - dataset: shank3  # Options: markerless, shank3, custom
   - preprocess: opencv  # Options: opencv, sam (future)
   - optim: fast  # Options: fast, accurate
+  - experiment: null  # Optional: quick_test, full_run, etc.
   - override hydra/job_logging: default
   - override hydra/hydra_logging: default
 
@@ -51,6 +52,37 @@ optim:
   solve_step0_iters: 10
   solve_step1_iters: 100
   solve_step2_iters: 30
+
+# Loss weights (original MAMMAL paper values)
+loss_weights:
+  # Base weights
+  theta: 3.0           # Pose prior regularization
+  "3d": 2.5            # 3D keypoint loss (if GT available)
+  "2d": 0.2            # 2D keypoint reprojection loss
+  bone: 0.5            # Bone length regularization
+  scale: 0.5           # Scale regularization
+  chest_deformer: 0.1  # Chest deformation regularization
+  stretch: 1.0         # Stretch constraint (set to 0 during optimization)
+  temp: 0.25           # Temporal smoothness (params)
+  temp_d: 0.2          # Temporal smoothness (deformer)
+
+  # Mask (silhouette) loss weights per step
+  # Original MAMMAL: step0/step1 = 0 (keypoint-guided), step2 = 3000
+  mask_step0: 0.0      # Step0: global pose (R,T,s) - no mask
+  mask_step1: 0.0      # Step1: pose optimization - no mask
+  mask_step2: 3000.0   # Step2: full optimization with silhouette refinement
+
+# Keypoint weights (per-keypoint confidence)
+keypoint_weights:
+  default: 1.0
+  idx_4: 0.4           # Lower confidence
+  idx_5: 2.0           # Higher confidence (important joint)
+  idx_6: 1.5
+  idx_7: 1.5
+  idx_11: 0.9
+  idx_15: 0.9
+  # Tail keypoints (16-21) get weight=10 in step2
+  tail_step2: 10.0
 
 # Paths (all results go to results/ folder)
 result_folder: results/fitting/

@@ -1,0 +1,25 @@
+# @package _global_
+# Experiment: Silhouette-only mesh fitting (NO keypoints) - Single view
+# WARNING: Very challenging - depth ambiguity without keypoints
+# Usage: python fitter_articulation.py +experiment=silhouette_only_1view
+
+defaults:
+  - override /dataset: markerless
+
+data:
+  views_to_use: [0]
+
+fitter:
+  render_cameras: [0]
+  use_keypoints: false  # Disable keypoint loss
+  start_frame: 0
+  end_frame: 1000
+  interval: 10
+  with_render: true
+
+silhouette:
+  iter_multiplier: 3.0      # Many more iterations needed
+  theta_weight: 20.0        # Very strong pose regularization
+  bone_weight: 5.0          # Strong bone constraint
+  scale_weight: 100.0       # Prevent scale drift
+  use_pca_init: true

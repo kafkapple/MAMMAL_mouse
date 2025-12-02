@@ -1,0 +1,17 @@
+# @package _global_
+# Experiment: 4-view mesh fitting
+# Usage: python fitter_articulation.py +experiment=views_4
+
+defaults:
+  - override /dataset: markerless
+
+data:
+  views_to_use: [0, 1, 2, 3]
+
+fitter:
+  render_cameras: [0, 1, 2, 3]
+  use_keypoints: true
+  start_frame: 0
+  end_frame: 1000
+  interval: 10
+  with_render: true
