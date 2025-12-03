@@ -578,80 +578,70 @@ class MouseFitter():
             return loss_v 
         return closure
 
-    def solve_step0(self, params, target, max_iters):
-        ## step1: optimize skeleton
+    def solve_step0(self, params, target, max_iters, pbar=None):
+        """Step 0: Global positioning (trans, rotation, scale)"""
         tolerate = 1e-2
         optimizer = torch.optim.LBFGS(params.values(), line_search_fn="strong_wolfe")
-        # optimizer = torch.optim.Adam(params.values(), lr=0.001)
-        closure = self.gen_closure(
-                    optimizer, params, target
-                )
+        closure = self.gen_closure(optimizer, params, target)
 
         loss_prev = float('inf')
         self.keypoint_weight[:,16:19,:] = 1
         self.keypoint_weight[:,19:22,:] = 1
-        # Set mask weight from config (silhouette-only mode uses higher weight)
         if not getattr(self.cfg.fitter, 'use_keypoints', True):
-            self.term_weights["mask"] = max(self.mask_weight_step0, 1000.0)  # Use mask for guidance when no keypoints
+            self.term_weights["mask"] = max(self.mask_weight_step0, 1000.0)
         else:
             self.term_weights["mask"] = self.mask_weight_step0
         self.term_weights["stretch"] = 0
         params["chest_deformer"].requires_grad_(False)
         params["thetas"].requires_grad_(False)
         params["bone_lengths"].requires_grad_(False)
+
         for i in range(max_iters):
             loss = optimizer.step(closure).item()
-            print(self.losses)
+            if pbar:
+                pbar.set_postfix(step="S0", iter=f"{i+1}/{max_iters}", loss=f"{loss:.1f}")
             if abs(loss-loss_prev) < tolerate:
                 break
-            else:
-                print('iter ' + str(i) + ': ' + '%.2f'%loss + "  diff: " + "%.2f"%(loss-loss_prev))
             loss_prev = loss
             if self.cfg.fitter.with_render:
                 imgs = self.imgs.copy()
                 self.render(params, imgs, 0, self.result_folder + "/render/debug/fitting_{}_global_iter_{:05d}.png".format(self.id, i), self.cam_dict)
+
         params["chest_deformer"].requires_grad_(True)
         params["thetas"].requires_grad_(True)
         params["bone_lengths"].requires_grad_(True)
         return params
 
-    def solve_step1(self, params, target, max_iters):
-        ## step1: optimize skeleton
+    def solve_step1(self, params, target, max_iters, pbar=None):
+        """Step 1: Articulation fitting (thetas, bone_lengths)"""
         tolerate = 1e-4
         optimizer = torch.optim.LBFGS(params.values(), line_search_fn="strong_wolfe")
-        # optimizer = torch.optim.Adam(params.values(), lr=0.001)
-        closure = self.gen_closure(
-                    optimizer, params, target
-                )
+        closure = self.gen_closure(optimizer, params, target)
 
         loss_prev = float('inf')
         self.keypoint_weight[:,16:19,:] = 1
         self.keypoint_weight[:,19:22,:] = 1
-        # Set mask weight from config (silhouette-only mode uses higher weight)
         if not getattr(self.cfg.fitter, 'use_keypoints', True):
-            self.term_weights["mask"] = max(self.mask_weight_step1, 1500.0)  # Use mask for guidance when no keypoints
+            self.term_weights["mask"] = max(self.mask_weight_step1, 1500.0)
         else:
             self.term_weights["mask"] = self.mask_weight_step1
         self.term_weights["stretch"] = 0
         params["chest_deformer"].requires_grad_(False)
+
         for i in range(max_iters):
             loss = optimizer.step(closure).item()
-            print(self.losses) 
-            if abs(loss-loss_prev) < tolerate: 
-                break 
-            else: 
-                print('iter ' + str(i) + ': ' + '%.2f'%loss + "  diff: " + "%.2f"%(loss-loss_prev))
-
-            loss_prev = loss 
-            if self.id == 0 and self.cfg.fitter.with_render: 
-                imgs = self.imgs.copy() 
+            if pbar:
+                pbar.set_postfix(step="S1", iter=f"{i+1}/{max_iters}", loss=f"{loss:.1f}")
+            if abs(loss-loss_prev) < tolerate:
+                break
+            loss_prev = loss
+            if self.id == 0 and self.cfg.fitter.with_render:
+                imgs = self.imgs.copy()
                 self.render(params, imgs, 0, self.result_folder + "/render/debug/fitting_{}_debug_iter_{:05d}.png".format(self.id, i), self.cam_dict)
-                
 
         if self.cfg.fitter.with_render:
             imgs = self.imgs.copy()
             self.render(params, imgs, 0, self.result_folder + "/render/fitting_{}.png".format(self.id), self.cam_dict)
-            # Only draw keypoints visualization if keypoints are enabled
             if getattr(self.cfg.fitter, 'use_keypoints', True):
                 self.draw_keypoints_compare(params, imgs, 0, self.result_folder + "/fitting_keypoints_{}.png".format(self.id), self.cam_dict)
         with open(self.result_folder + "/params/param{}.pkl".format(self.id), 'wb') as f:
@@ -659,15 +649,11 @@ class MouseFitter():
         params["chest_deformer"].requires_grad_(True)
         return params
 
-    def solve_step2(self, params, target, max_iters): 
-        ## step2: optim with mask 
-        ## enlarge foot keypoint weight because mask on foot are bad. 
+    def solve_step2(self, params, target, max_iters, pbar=None):
+        """Step 2: Silhouette refinement with mask loss"""
         tolerate = 1e-4
         optimizer = torch.optim.LBFGS(params.values(), line_search_fn="strong_wolfe")
-        # optimizer = torch.optim.Adam(params.values(), lr=0.001)
-        closure = self.gen_closure(
-                    optimizer, params, target
-                )
+        closure = self.gen_closure(optimizer, params, target)
 
         # Apply step2-specific weights from config
         self.keypoint_weight[:,16:19,:] = self.tail_weight_step2
@@ -675,22 +661,21 @@ class MouseFitter():
         self.term_weights["mask"] = self.mask_weight_step2
         self.term_weights["stretch"] = 0
         loss_prev = float('inf')
-        optimizer.zero_grad() 
-        for i in range(max_iters): 
-            loss = optimizer.step(closure).item()  
-            print(self.losses) 
-            if abs(loss-loss_prev) < tolerate: 
-                break 
-            else: 
-                print('iter ' + str(i) + ': ' + '%.2f'%loss + "  diff: " + "%.2f"%(loss-loss_prev))
+        optimizer.zero_grad()
 
-            loss_prev = loss 
-        if self.cfg.fitter.with_render: 
-            imgs = self.imgs.copy() 
+        for i in range(max_iters):
+            loss = optimizer.step(closure).item()
+            if pbar:
+                pbar.set_postfix(step="S2", iter=f"{i+1}/{max_iters}", loss=f"{loss:.1f}")
+            if abs(loss-loss_prev) < tolerate:
+                break
+            loss_prev = loss
+
+        if self.cfg.fitter.with_render:
+            imgs = self.imgs.copy()
             self.render(params, imgs, 0, self.result_folder+"/render/fitting_{}_sil.png".format(self.id), self.cam_dict)
-            # self.draw_keypoints_compare(params, imgs, self.cfg.fitter.render_cameras, 0, self.result_folder + "/fitting_keypoints_{}_sil.png".format(self.id), self.cam_dict)
-        with open(self.result_folder + "/params/param{}_sil.pkl".format(self.id), 'wb') as f: 
-            pickle.dump(params,f) 
+        with open(self.result_folder + "/params/param{}_sil.pkl".format(self.id), 'wb') as f:
+            pickle.dump(params,f)
         self.result = params
 
         # Save the final mesh as an .obj file
@@ -949,12 +934,12 @@ def optim_single(cfg: DictConfig):
         step2_iters = int(cfg.optim.solve_step2_iters * iter_mult)
 
         if index == start:
-            params = fitter.solve_step0(params = params, target=target, max_iters = step0_iters)
-            params = fitter.solve_step1(params = params, target=target, max_iters = step1_iters)
-            params = fitter.solve_step2(params = params, target=target, max_iters = step2_iters)
+            params = fitter.solve_step0(params=params, target=target, max_iters=step0_iters, pbar=pbar)
+            params = fitter.solve_step1(params=params, target=target, max_iters=step1_iters, pbar=pbar)
+            params = fitter.solve_step2(params=params, target=target, max_iters=step2_iters, pbar=pbar)
         else:
-            params = fitter.solve_step1(params = params, target=target, max_iters = step1_iters)
-            params = fitter.solve_step2(params = params, target=target, max_iters = step2_iters)
+            params = fitter.solve_step1(params=params, target=target, max_iters=step1_iters, pbar=pbar)
+            params = fitter.solve_step2(params=params, target=target, max_iters=step2_iters, pbar=pbar)
         fitter.set_previous_frame(params)
 
     # Print total elapsed time
