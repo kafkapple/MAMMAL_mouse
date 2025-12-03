@@ -902,11 +902,18 @@ def optim_single(cfg: DictConfig):
     print(f"Config saved to: {config_path}")
 
     print("camN: ", camN)
-    targets = np.arange(cfg.fitter.start_frame, cfg.fitter.end_frame, cfg.fitter.interval).tolist() 
+    targets = np.arange(cfg.fitter.start_frame, cfg.fitter.end_frame, cfg.fitter.interval).tolist()
 
     start = targets[0]
-    for index in targets:
-        print("process ... ", index)
+    total_frames = len(targets)
+    start_time = time()
+
+    # Progress bar with ETA
+    pbar = tqdm(targets, desc="Fitting frames", unit="frame",
+                bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]')
+
+    for index in pbar:
+        pbar.set_postfix(frame=index)
         labels = data_loader.fetch(index, with_img = cfg.fitter.with_render)
         fitter.id = index
         fitter.imgs = labels["imgs"]
@@ -948,7 +955,14 @@ def optim_single(cfg: DictConfig):
         else:
             params = fitter.solve_step1(params = params, target=target, max_iters = step1_iters)
             params = fitter.solve_step2(params = params, target=target, max_iters = step2_iters)
-        fitter.set_previous_frame(params) 
+        fitter.set_previous_frame(params)
+
+    # Print total elapsed time
+    elapsed = time() - start_time
+    print(f"\n{'='*50}")
+    print(f"Fitting complete: {total_frames} frames in {elapsed:.1f}s ({elapsed/total_frames:.2f}s/frame)")
+    print(f"Results saved to: {fitter.result_folder}")
+    print(f"{'='*50}") 
 
 if __name__ == "__main__":
     # Convert argparse-style args to Hydra format for CLI consistency
