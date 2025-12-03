@@ -20,10 +20,11 @@
 
 ### Commands
 ```bash
-# Debug (5 frames)
+# Debug (2 frames, minimal iterations)
 ./run_experiment.sh baseline_6view_keypoint --debug
 
-# Full run (100 frames)
+# Full run (5 frames default, use --frames N for more)
+# Note: Frame count = temporal samples, NOT quality. Each frame fitted independently.
 ./run_experiment.sh baseline_6view_keypoint
 ```
 

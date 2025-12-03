@@ -98,11 +98,13 @@ fi
 CMD="python fitter_articulation.py experiment=$EXPERIMENT"
 
 # Debug mode: override with minimal settings
+# Note: Frame count affects temporal coverage, NOT reconstruction quality
+#       Each frame is fitted independently, so fewer frames = faster test
 if [[ "$DEBUG_MODE" == "true" ]]; then
     echo "================================================"
-    echo "DEBUG MODE: Quick test with 5 frames"
+    echo "DEBUG MODE: Quick test with 2 frames"
     echo "================================================"
-    CMD="$CMD fitter.end_frame=5"
+    CMD="$CMD fitter.end_frame=2"
     CMD="$CMD optim.solve_step0_iters=5"
     CMD="$CMD optim.solve_step1_iters=20"
     CMD="$CMD optim.solve_step2_iters=10"

@@ -16,7 +16,7 @@ fitter:
   keypoint_num: 22
   sparse_keypoint_indices: [0, 18, 21]
   start_frame: 0
-  end_frame: 100
+  end_frame: 5    # Full: 100 frames, minimized for quick iteration
   interval: 1
   with_render: true
 
