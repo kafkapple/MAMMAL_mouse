@@ -6,7 +6,12 @@ By Liang AN, 2022.10.19
 
 # ===== GPU Configuration (MUST be before torch import) =====
 import os
-_gpu_id = os.environ.get('GPU_ID', os.environ.get('CUDA_VISIBLE_DEVICES', '1'))
+import socket
+
+_hostname = socket.gethostname()
+_gpu_defaults = {'gpu05': '1', 'bori': '0'}
+_default_gpu = _gpu_defaults.get(_hostname.split('.')[0], '0')
+_gpu_id = os.environ.get('GPU_ID', os.environ.get('CUDA_VISIBLE_DEVICES', _default_gpu))
 if 'CUDA_VISIBLE_DEVICES' not in os.environ:
     os.environ['CUDA_VISIBLE_DEVICES'] = _gpu_id
 

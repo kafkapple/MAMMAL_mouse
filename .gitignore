@@ -9,6 +9,7 @@ checkpoints/
 
 # ----- All Results (consolidated) -----
 results/
+
 outputs/                    # Legacy Hydra output (now uses results/logs/)
 mouse_fitting_result/       # Legacy fitting output (now uses results/fitting/)
 

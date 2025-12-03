@@ -18,13 +18,9 @@
 set -e
 
 # ===== GPU Configuration =====
-# Force both CUDA compute and EGL rendering to use the same GPU
-# Default: GPU 1 (can override with GPU_ID environment variable)
-GPU_ID="${GPU_ID:-1}"
-export CUDA_VISIBLE_DEVICES="$GPU_ID"
-export EGL_DEVICE_ID="$GPU_ID"
-export DISPLAY=""  # Disable X11 rendering (headless mode)
-export PYOPENGL_PLATFORM=egl
+# Auto-detect server and set GPU (can override with GPU_ID env var)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/env_config.sh"
 
 # Parse arguments
 EXPERIMENT="$1"
