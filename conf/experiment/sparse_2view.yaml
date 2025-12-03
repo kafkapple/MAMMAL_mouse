@@ -5,7 +5,7 @@ defaults:
   - override /dataset: markerless
 
 experiment_name: sparse_2view
-experiment_description: "2-view RGB (opposite) with 3 sparse keypoints (nose, body, tail)"
+experiment_description: "2-view RGB (opposite) with 3 sparse keypoints (nose, tail_base, neck)"
 
 data:
   views_to_use: [0, 3]  # Opposite cameras for stereo-like setup
@@ -14,7 +14,11 @@ fitter:
   render_cameras: [0, 3]
   use_keypoints: true
   keypoint_num: 22
-  sparse_keypoint_indices: [0, 18, 21]
+  # Sparse keypoint indices (from keypoint22_mapper.json):
+  #   idx 0: Nose (Vertices)
+  #   idx 5: Tail base (lumbar_vertebrae_0 + tail_0)
+  #   idx 3: Neck/Body center (neck_stretch)
+  sparse_keypoint_indices: [0, 5, 3]
   start_frame: 0
   end_frame: 5    # Full: 100 frames, minimized for quick iteration
   interval: 1
@@ -41,7 +45,7 @@ loss_weights:
 
 keypoint_weights:
   default: 0.0
-  idx_0: 5.0
-  idx_18: 3.0
-  idx_21: 5.0
+  idx_0: 5.0           # Nose
+  idx_5: 3.0           # Tail base (lumbar + tail_0)
+  idx_3: 5.0           # Neck/Body center
   tail_step2: 10.0

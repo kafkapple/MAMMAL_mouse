@@ -35,13 +35,13 @@
 | Experiment | Views | Keypoints | Description |
 |------------|-------|-----------|-------------|
 | `baseline_6view_keypoint` | 6 | 22 (full) | Full keypoints |
-| `sixview_sparse_keypoint` | 6 | 3 (sparse) | Nose, body center, tail base only |
+| `sixview_sparse_keypoint` | 6 | 3 (sparse) | Nose, tail base, neck only |
 | `sixview_no_keypoint` | 6 | 0 (none) | Silhouette only (mask-based) |
 
-### Sparse Keypoint Indices
-- **idx_0**: Nose (weight: 5.0)
-- **idx_18**: Tail base (weight: 3.0)
-- **idx_21**: Body center (weight: 5.0)
+### Sparse Keypoint Indices (from keypoint22_mapper.json)
+- **idx_0**: Nose (Vertices [12274, 12225]) - weight: 5.0
+- **idx_5**: Tail base (lumbar_vertebrae_0 + tail_0) - weight: 3.0
+- **idx_3**: Neck/Body center (neck_stretch) - weight: 5.0
 
 ### Commands
 ```bash
@@ -99,7 +99,11 @@ fitter:
   render_cameras: [0, 2, 4]      # Should match views_to_use
   use_keypoints: true            # Enable keypoint loss
   keypoint_num: 22               # Total keypoint count
-  sparse_keypoint_indices: [0, 18, 21]  # Active keypoint indices
+  # Sparse keypoint indices (from keypoint22_mapper.json):
+  #   idx 0: Nose (Vertices)
+  #   idx 5: Tail base (lumbar_vertebrae_0 + tail_0)
+  #   idx 3: Neck/Body center (neck_stretch)
+  sparse_keypoint_indices: [0, 5, 3]  # Active keypoint indices
   start_frame: 0
   end_frame: 100
   interval: 1
@@ -122,8 +126,8 @@ loss_weights:
 keypoint_weights:
   default: 0.0                   # Default weight (0 for sparse mode)
   idx_0: 5.0                     # Nose weight
-  idx_18: 3.0                    # Tail base weight
-  idx_21: 5.0                    # Body center weight
+  idx_5: 3.0                     # Tail base weight (lumbar + tail_0)
+  idx_3: 5.0                     # Neck/Body center weight
   tail_step2: 10.0               # Tail weight in step2
 ```
 
@@ -160,17 +164,18 @@ results/fitting/
 
 ### Change Sparse Keypoint Indices
 ```yaml
-# In your config yaml
+# In your config yaml - Use indices from keypoint22_mapper.json
+# See "22 Keypoint Semantic Labels" section below for full mapping
 fitter:
-  sparse_keypoint_indices: [0, 5, 10, 18, 21]  # Custom 5 keypoints
+  sparse_keypoint_indices: [0, 3, 5, 6, 7]  # Custom 5 keypoints example
 
 keypoint_weights:
   default: 0.0
-  idx_0: 5.0
-  idx_5: 3.0
-  idx_10: 3.0
-  idx_18: 3.0
-  idx_21: 5.0
+  idx_0: 5.0    # Nose
+  idx_3: 3.0    # Neck
+  idx_5: 3.0    # Tail base
+  idx_6: 3.0    # Tail mid
+  idx_7: 3.0    # Tail tip
 ```
 
 ### Change Camera Configuration
@@ -222,4 +227,50 @@ for exp in baseline_6view_keypoint sixview_sparse_keypoint sixview_no_keypoint \
     echo "=== Running $exp ==="
     ./run_experiment.sh $exp
 done
+```
+
+---
+
+## 22 Keypoint Semantic Labels
+
+**Source**: `mouse_model/keypoint22_mapper.json`
+
+| Index | Type | Source IDs | Semantic Meaning |
+|-------|------|------------|------------------|
+| 0 | V | [12274, 12225] | **Nose** |
+| 1 | V | [4966, 5011] | Left ear |
+| 2 | V | [13492, ...] | Right ear |
+| 3 | J | [64, 65] | **Neck** (neck_stretch) |
+| 4 | V | [9043] | Body vertex |
+| 5 | J | [48, 51] | **Tail base** (lumbar_vertebrae_0 + tail_0) |
+| 6 | J | [54, 55] | Tail mid (tail_3 + tail_4) |
+| 7 | J | [61] | **Tail tip** (tail_9_end) |
+| 8 | J | [79] | Left forepaw digit |
+| 9 | J | [74] | Left forepaw |
+| 10 | J | [73] | Left ulna |
+| 11 | J | [70] | Left humerus |
+| 12 | J | [104] | Right forepaw digit |
+| 13 | J | [99] | Right forepaw |
+| 14 | J | [98] | Right ulna |
+| 15 | J | [95] | Right humerus |
+| 16 | J | [15] | Left hindpaw digit |
+| 17 | J | [5] | Left hindpaw |
+| 18 | J | [4] | Left tibia |
+| 19 | J | [38] | Right hindpaw digit |
+| 20 | J | [28] | Right hindpaw |
+| 21 | J | [27] | Right tibia |
+
+**Note**:
+- `V` = Vertex (mesh vertices average)
+- `J` = Joint (skeleton joint position)
+
+### Recommended Sparse Keypoints
+
+For minimal annotation, use these 3 keypoints that span the body:
+- **idx 0**: Nose (head)
+- **idx 5**: Tail base (body junction)
+- **idx 3**: Neck (body center)
+
+```yaml
+sparse_keypoint_indices: [0, 5, 3]
 ```

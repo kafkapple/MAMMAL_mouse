@@ -170,6 +170,8 @@ class MouseFitter():
             print(f"Silhouette-only mode: theta={self.term_weights['theta']}, bone={self.term_weights['bone']}, scale={self.term_weights['scale']}, iter_mult={self.silhouette_iter_multiplier}, pca_init={self.use_pca_init}")
 
         self.losses = {}
+        self.loss_history = []  # For storing loss values over iterations
+        self.param_history = []  # For storing parameter values over iterations
 
         ## init differentiable renderer
         sigma = 3e-5
@@ -196,9 +198,150 @@ class MouseFitter():
         self.imgs = [] 
         self.id = None 
         
-        self.last_params = None 
-        self.V_last = None 
-        self.J_last = None 
+        self.last_params = None
+        self.V_last = None
+        self.J_last = None
+
+    def _log_iteration(self, step, iteration, total_loss, params):
+        """Log iteration details with loss and parameter values."""
+        # Store to history
+        record = {
+            'frame': self.id,
+            'step': step,
+            'iteration': iteration,
+            'total_loss': total_loss,
+            **self.losses,
+            'scale': float(params['scale'].detach().cpu().mean()),
+            'trans_norm': float(torch.norm(params['trans'].detach()).cpu()),
+            'theta_norm': float(torch.norm(params['thetas'].detach()).cpu()),
+        }
+        self.loss_history.append(record)
+
+        # Print detailed log to console
+        loss_parts = ' | '.join([f"{k}:{v:.2f}" for k, v in self.losses.items()])
+        print(f"  [{step}] iter {iteration:3d}: total={total_loss:.2f} | {loss_parts}")
+
+    def save_loss_history(self, filepath):
+        """Save loss history to JSON file."""
+        import json
+        with open(filepath, 'w') as f:
+            json.dump(self.loss_history, f, indent=2)
+        print(f"Loss history saved to: {filepath}")
+
+    def plot_loss_history(self, save_dir):
+        """Generate and save loss visualization plots."""
+        if not self.loss_history:
+            print("No loss history to plot")
+            return
+
+        import pandas as pd
+        df = pd.DataFrame(self.loss_history)
+
+        # Plot 1: Total loss over iterations (all frames combined)
+        fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+
+        # Total loss by step
+        ax = axes[0, 0]
+        for step in ['Step0', 'Step1', 'Step2']:
+            step_data = df[df['step'] == step]
+            if not step_data.empty:
+                ax.plot(step_data.index, step_data['total_loss'], label=step, alpha=0.7)
+        ax.set_xlabel('Record Index')
+        ax.set_ylabel('Total Loss')
+        ax.set_title('Total Loss by Optimization Step')
+        ax.legend()
+        ax.set_yscale('log')
+        ax.grid(True, alpha=0.3)
+
+        # Individual loss components
+        ax = axes[0, 1]
+        loss_cols = ['2d', 'mask', 'theta', 'bone', 'scale']
+        available_cols = [c for c in loss_cols if c in df.columns]
+        for col in available_cols:
+            ax.plot(df.index, df[col], label=col, alpha=0.7)
+        ax.set_xlabel('Record Index')
+        ax.set_ylabel('Loss Value')
+        ax.set_title('Individual Loss Components')
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+
+        # Loss by frame (final values)
+        ax = axes[1, 0]
+        frames = df['frame'].unique()
+        final_losses = []
+        for frame in sorted(frames):
+            frame_data = df[df['frame'] == frame]
+            if not frame_data.empty:
+                final_losses.append(frame_data['total_loss'].iloc[-1])
+        ax.bar(range(len(final_losses)), final_losses)
+        ax.set_xlabel('Frame Index')
+        ax.set_ylabel('Final Total Loss')
+        ax.set_title('Final Loss per Frame')
+        ax.grid(True, alpha=0.3)
+
+        # Parameter evolution
+        ax = axes[1, 1]
+        if 'scale' in df.columns:
+            ax.plot(df.index, df['scale'], label='scale', alpha=0.7)
+        if 'trans_norm' in df.columns:
+            ax.plot(df.index, df['trans_norm'], label='trans_norm', alpha=0.7)
+        if 'theta_norm' in df.columns:
+            ax.plot(df.index, df['theta_norm'], label='theta_norm', alpha=0.7)
+        ax.set_xlabel('Record Index')
+        ax.set_ylabel('Value')
+        ax.set_title('Parameter Evolution')
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+
+        plt.tight_layout()
+        plot_path = os.path.join(save_dir, 'loss_history.png')
+        plt.savefig(plot_path, dpi=150)
+        plt.close()
+        print(f"Loss plot saved to: {plot_path}")
+
+        # Also save per-frame loss plots
+        self._plot_per_frame_losses(df, save_dir)
+
+    def _plot_per_frame_losses(self, df, save_dir):
+        """Generate per-frame loss convergence plots."""
+        frames = df['frame'].unique()
+        if len(frames) <= 1:
+            return
+
+        n_frames = len(frames)
+        n_cols = min(4, n_frames)
+        n_rows = (n_frames + n_cols - 1) // n_cols
+
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=(4*n_cols, 3*n_rows))
+        axes = np.atleast_2d(axes)
+
+        for idx, frame in enumerate(sorted(frames)):
+            row, col = idx // n_cols, idx % n_cols
+            ax = axes[row, col]
+
+            frame_data = df[df['frame'] == frame]
+            for step in ['Step0', 'Step1', 'Step2']:
+                step_data = frame_data[frame_data['step'] == step]
+                if not step_data.empty:
+                    ax.plot(step_data['iteration'], step_data['total_loss'],
+                           label=step, marker='o', markersize=2)
+
+            ax.set_title(f'Frame {frame}')
+            ax.set_xlabel('Iteration')
+            ax.set_ylabel('Loss')
+            ax.legend(fontsize=6)
+            ax.grid(True, alpha=0.3)
+
+        # Hide empty subplots
+        for idx in range(len(frames), n_rows * n_cols):
+            row, col = idx // n_cols, idx % n_cols
+            axes[row, col].set_visible(False)
+
+        plt.tight_layout()
+        plot_path = os.path.join(save_dir, 'loss_per_frame.png')
+        plt.savefig(plot_path, dpi=150)
+        plt.close()
+        print(f"Per-frame loss plot saved to: {plot_path}")
 
     def set_cameras_dannce(self, cams):
         self.camN = len(cams)
@@ -601,9 +744,14 @@ class MouseFitter():
                          bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}')
         for i in iter_pbar:
             loss = optimizer.step(closure).item()
-            iter_pbar.set_postfix(loss=f"{loss:.1f}", **{k: f"{v:.1f}" for k, v in self.losses.items() if k in ['2d', 'mask']})
+            # Show all loss components in progress bar
+            loss_str = {k: f"{v:.1f}" for k, v in self.losses.items()}
+            iter_pbar.set_postfix(total=f"{loss:.1f}", **loss_str)
             if pbar:
                 pbar.set_postfix(step="S0", iter=f"{i+1}/{max_iters}", loss=f"{loss:.1f}")
+            # Log detailed parameters every 10 iterations
+            if i % 10 == 0:
+                self._log_iteration("Step0", i, loss, params)
             if abs(loss-loss_prev) < tolerate:
                 break
             loss_prev = loss
@@ -638,9 +786,14 @@ class MouseFitter():
                          bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}')
         for i in iter_pbar:
             loss = optimizer.step(closure).item()
-            iter_pbar.set_postfix(loss=f"{loss:.1f}", **{k: f"{v:.1f}" for k, v in self.losses.items() if k in ['2d', 'mask']})
+            # Show all loss components in progress bar
+            loss_str = {k: f"{v:.1f}" for k, v in self.losses.items()}
+            iter_pbar.set_postfix(total=f"{loss:.1f}", **loss_str)
             if pbar:
                 pbar.set_postfix(step="S1", iter=f"{i+1}/{max_iters}", loss=f"{loss:.1f}")
+            # Log detailed parameters every 10 iterations
+            if i % 10 == 0:
+                self._log_iteration("Step1", i, loss, params)
             if abs(loss-loss_prev) < tolerate:
                 break
             loss_prev = loss
@@ -653,7 +806,9 @@ class MouseFitter():
             imgs = self.imgs.copy()
             self.render(params, imgs, 0, self.result_folder + "/render/fitting_{}.png".format(self.id), self.cam_dict)
             if getattr(self.cfg.fitter, 'use_keypoints', True):
-                self.draw_keypoints_compare(params, imgs, 0, self.result_folder + "/fitting_keypoints_{}.png".format(self.id), self.cam_dict)
+                # Pass target_2d for GT vs Predicted comparison visualization
+                target_2d = target.get('target_2d', None)
+                self.draw_keypoints_compare(params, imgs, 0, self.result_folder + "/fitting_keypoints_{}.png".format(self.id), self.cam_dict, target_2d)
         with open(self.result_folder + "/params/param{}.pkl".format(self.id), 'wb') as f:
             pickle.dump(params,f)
         params["chest_deformer"].requires_grad_(True)
@@ -678,9 +833,14 @@ class MouseFitter():
                          bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}')
         for i in iter_pbar:
             loss = optimizer.step(closure).item()
-            iter_pbar.set_postfix(loss=f"{loss:.1f}", **{k: f"{v:.1f}" for k, v in self.losses.items() if k in ['2d', 'mask']})
+            # Show all loss components in progress bar
+            loss_str = {k: f"{v:.1f}" for k, v in self.losses.items()}
+            iter_pbar.set_postfix(total=f"{loss:.1f}", **loss_str)
             if pbar:
                 pbar.set_postfix(step="S2", iter=f"{i+1}/{max_iters}", loss=f"{loss:.1f}")
+            # Log detailed parameters every 10 iterations
+            if i % 10 == 0:
+                self._log_iteration("Step2", i, loss, params)
             if abs(loss-loss_prev) < tolerate:
                 break
             loss_prev = loss
@@ -767,9 +927,15 @@ class MouseFitter():
         return output
         
 
-    def draw_keypoints_compare(self, result, imgs, batch_id, filename, cams_dict):
+    def draw_keypoints_compare(self, result, imgs, batch_id, filename, cams_dict, target_2d=None):
         """
         Draw keypoints comparison visualization for all available views.
+        In sparse mode, only draws the sparse keypoint indices.
+
+        Saves three images:
+        1. {filename} - Predicted keypoints only (backward compatible)
+        2. {filename}_gt.png - GT keypoints only
+        3. {filename}_compare.png - Side-by-side GT vs Predicted
 
         Args:
             result: body model parameters
@@ -777,27 +943,97 @@ class MouseFitter():
             batch_id: batch index
             filename: output filename
             cams_dict: list of camera dicts (indexed by position in views_to_use)
+            target_2d: GT 2D keypoints tensor [batch, views, keypoints, 3] (optional)
         """
         myimages = imgs.copy()
         V,J = self.bodymodel.forward(result["thetas"], result["bone_lengths"],
             result["rotation"], result["trans"] / 1000, result["scale"] / 1000, result["chest_deformer"])
         keypoints = self.bodymodel.forward_keypoints22()
         joints = keypoints[batch_id].detach().cpu().numpy()
-        all_drawn_images = []
-        # Iterate over all available views
+
+        # Get sparse indices if in sparse mode
+        sparse_indices = getattr(self.cfg.fitter, 'sparse_keypoint_indices', None)
+
+        pred_images = []
+        gt_images = []
+        compare_images = []
         num_views = len(imgs)
+
         for view_idx in range(num_views):
             cam = cams_dict[view_idx]
-            # Fix T shape for numpy broadcasting
             T = cam["T"] / 1000
             if len(T.shape) > 1:
                 T = T.squeeze()
-            data2d = (joints@cam['R'] + T)@cam["K"]
-            data2d = data2d[:,0:2] / data2d[:,2:]
-            img_drawn = draw_keypoints(myimages[view_idx], data2d, bones, is_draw_bone=True)
-            all_drawn_images.append(img_drawn)
-        outputimg = pack_images(all_drawn_images)
+
+            # Predicted keypoints (project 3D to 2D)
+            data2d_pred = (joints@cam['R'] + T)@cam["K"]
+            data2d_pred = data2d_pred[:,0:2] / data2d_pred[:,2:]
+
+            # GT keypoints (from target_2d if available)
+            data2d_gt = None
+            if target_2d is not None:
+                gt_data = target_2d[batch_id, view_idx].detach().cpu().numpy()  # [22, 3]
+                data2d_gt = gt_data[:, :2]  # [22, 2] - xy only
+                gt_conf = gt_data[:, 2]  # confidence
+
+            # Filter to sparse indices if applicable
+            if sparse_indices:
+                data2d_pred_filtered = np.zeros_like(data2d_pred)
+                for idx in sparse_indices:
+                    data2d_pred_filtered[idx] = data2d_pred[idx]
+
+                if data2d_gt is not None:
+                    data2d_gt_filtered = np.zeros_like(data2d_gt)
+                    for idx in sparse_indices:
+                        if gt_conf[idx] > 0.25:  # Only show confident GT points
+                            data2d_gt_filtered[idx] = data2d_gt[idx]
+                else:
+                    data2d_gt_filtered = None
+            else:
+                data2d_pred_filtered = data2d_pred
+                data2d_gt_filtered = data2d_gt
+
+            # Draw predicted keypoints (green circles)
+            img_pred = myimages[view_idx].copy()
+            img_pred = draw_keypoints(img_pred, data2d_pred_filtered, [], is_draw_bone=False)
+            pred_images.append(img_pred)
+
+            # Draw GT keypoints (red circles) if available
+            if data2d_gt_filtered is not None:
+                img_gt = myimages[view_idx].copy()
+                img_gt = self._draw_keypoints_color(img_gt, data2d_gt_filtered, color=(0, 0, 255))  # Red for GT
+                gt_images.append(img_gt)
+
+                # Draw comparison (GT=red, Pred=green on same image)
+                img_compare = myimages[view_idx].copy()
+                img_compare = self._draw_keypoints_color(img_compare, data2d_gt_filtered, color=(0, 0, 255), radius=7)  # Red GT
+                img_compare = self._draw_keypoints_color(img_compare, data2d_pred_filtered, color=(0, 255, 0), radius=5)  # Green Pred
+                compare_images.append(img_compare)
+
+        # Save predicted keypoints image (backward compatible)
+        outputimg = pack_images(pred_images)
         cv2.imwrite(filename, outputimg)
+
+        # Save GT and comparison images if GT available
+        if gt_images:
+            base_name = filename.rsplit('.', 1)[0]
+
+            # GT only
+            gt_outputimg = pack_images(gt_images)
+            cv2.imwrite(f"{base_name}_gt.png", gt_outputimg)
+
+            # Comparison (GT red + Pred green)
+            compare_outputimg = pack_images(compare_images)
+            cv2.imwrite(f"{base_name}_compare.png", compare_outputimg)
+
+    def _draw_keypoints_color(self, img, proj, color=(0, 255, 0), radius=9):
+        """Draw keypoints with specified color."""
+        for k in range(proj.shape[0]):
+            if math.isnan(proj[k,0]) or (proj[k,0] == 0 and proj[k,1] == 0):
+                continue
+            p = (int(proj[k,0]), int(proj[k,1]))
+            cv2.circle(img, p, radius, color, -1)
+        return img
 
 def preprocess_cli_args():
     """
@@ -962,7 +1198,11 @@ def optim_single(cfg: DictConfig):
     print(f"\n{'='*50}")
     print(f"Fitting complete: {total_frames} frames in {elapsed:.1f}s ({elapsed/total_frames:.2f}s/frame)")
     print(f"Results saved to: {fitter.result_folder}")
-    print(f"{'='*50}") 
+    print(f"{'='*50}")
+
+    # Save loss history and generate plots
+    fitter.save_loss_history(os.path.join(fitter.result_folder, 'loss_history.json'))
+    fitter.plot_loss_history(fitter.result_folder) 
 
 if __name__ == "__main__":
     # Convert argparse-style args to Hydra format for CLI consistency

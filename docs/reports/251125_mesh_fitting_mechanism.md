@@ -93,19 +93,34 @@ python fit_monocular.py \
 
 ### 3.2 22 Semantic Keypoints
 
-```
- 0: nose              11: spine_6
- 1: left_ear          12: spine_7
- 2: right_ear         13: spine_8 (tail base)
- 3: left_eye          14: left_front_paw
- 4: right_eye         15: right_front_paw
- 5: head_center       16: left_rear_paw
- 6: spine_1 (neck)    17: right_rear_paw
- 7: spine_2           18: tail_base
- 8: spine_3           19: tail_mid
- 9: spine_4           20: tail_tip
-10: spine_5           21: centroid
-```
+**Source**: `mouse_model/keypoint22_mapper.json`
+
+| Index | Type | Joint/Vertex IDs | Semantic Meaning |
+|-------|------|------------------|------------------|
+| 0 | V | [12274, 12225] | **Nose** |
+| 1 | V | [4966, 5011] | Left ear |
+| 2 | V | [13492, ...] | Right ear |
+| 3 | J | [64, 65] | **Neck** (neck_stretch) |
+| 4 | V | [9043] | Body vertex |
+| 5 | J | [48, 51] | **Tail base** (lumbar_vertebrae_0 + tail_0) |
+| 6 | J | [54, 55] | Tail mid (tail_3 + tail_4) |
+| 7 | J | [61] | **Tail tip** (tail_9_end) |
+| 8 | J | [79] | Left forepaw digit |
+| 9 | J | [74] | Left forepaw |
+| 10 | J | [73] | Left ulna |
+| 11 | J | [70] | Left humerus |
+| 12 | J | [104] | Right forepaw digit |
+| 13 | J | [99] | Right forepaw |
+| 14 | J | [98] | Right ulna |
+| 15 | J | [95] | Right humerus |
+| 16 | J | [15] | Left hindpaw digit |
+| 17 | J | [5] | Left hindpaw |
+| 18 | J | [4] | Left tibia |
+| 19 | J | [38] | Right hindpaw digit |
+| 20 | J | [28] | Right hindpaw |
+| 21 | J | [27] | Right tibia |
+
+**Note**: `V` = Vertex average, `J` = Joint position
 
 ### 3.3 모델 파일 구조
 
