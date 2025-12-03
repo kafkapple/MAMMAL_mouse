@@ -51,41 +51,43 @@ class DataSeakerDet():
         self.last_index = -1
 
     def fetch(self, index, with_img = True):
-        if index >= self.totalframes: 
-            print("error: index out of range.") 
+        if index >= self.totalframes:
+            print("error: index out of range.")
             return None
-        ## 2. read rgb images 
+        ## 2. read rgb images
+        # Note: caps are stored in order of views_to_use, so use enumerate index
         imgs = []
         if with_img:
-            if index - self.last_index == 1: 
-                for camid in self.views_to_use:
-                    _,img = self.raw_caps[camid].read() 
-                    imgs.append(img) 
-            else: 
-                for camid in self.views_to_use: 
-                    self.raw_caps[camid].set(cv2.CAP_PROP_POS_FRAMES, index) 
-                    _, img = self.raw_caps[camid].read() 
-                    imgs.append(img) 
+            if index - self.last_index == 1:
+                for cap_idx, camid in enumerate(self.views_to_use):
+                    _,img = self.raw_caps[cap_idx].read()
+                    imgs.append(img)
+            else:
+                for cap_idx, camid in enumerate(self.views_to_use):
+                    self.raw_caps[cap_idx].set(cv2.CAP_PROP_POS_FRAMES, index)
+                    _, img = self.raw_caps[cap_idx].read()
+                    imgs.append(img)
 
         ## 3. read masks
         bgs = []
-        if index - self.last_index == 1: 
-            for camid in self.views_to_use:
-                _, bg = self.bg_caps[camid].read() 
-                bgs.append(bg.astype(np.float32)[:,:,0] / 255) 
+        if index - self.last_index == 1:
+            for cap_idx, camid in enumerate(self.views_to_use):
+                _, bg = self.bg_caps[cap_idx].read()
+                bgs.append(bg.astype(np.float32)[:,:,0] / 255)
             self.last_index = index
-        else: 
-            for camid in self.views_to_use: 
-                self.bg_caps[camid].set(cv2.CAP_PROP_POS_FRAMES, index) 
-                _, bg = self.bg_caps[camid].read() 
-       
-                bgs.append(bg.astype(np.float32)[:,:,0] / 255) 
-            self.last_index = index     
-    
-        ## 4: fetch keypoints 
+        else:
+            for cap_idx, camid in enumerate(self.views_to_use):
+                self.bg_caps[cap_idx].set(cv2.CAP_PROP_POS_FRAMES, index)
+                _, bg = self.bg_caps[cap_idx].read()
+
+                bgs.append(bg.astype(np.float32)[:,:,0] / 255)
+            self.last_index = index
+
+        ## 4: fetch keypoints
+        # Note: poses2d is stored in order of views_to_use, so use enumerate index
         all_keypoints =[]
-        for camid in self.views_to_use: 
-            data = self.poses2d[camid][index]
+        for pose_idx, camid in enumerate(self.views_to_use):
+            data = self.poses2d[pose_idx][index]
             w = data[:,2]
             data[w<0.25,:] = 0
             all_keypoints.append(data) 

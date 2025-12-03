@@ -79,13 +79,39 @@ class MouseFitter():
         if self.cfg.fitter.with_render: 
             self.renderer = pyrender.OffscreenRenderer(viewport_width=img_size[1], viewport_height=img_size[0])
         self.reg_weights = np.loadtxt(hydra.utils.to_absolute_path("mouse_model/reg_weights.txt")).squeeze()
-        self.keypoint_weight = np.ones(self.cfg.fitter.keypoint_num) 
-        self.keypoint_weight[4] = 0.4
-        self.keypoint_weight[11] = 0.9
-        self.keypoint_weight[15] = 0.9
-        self.keypoint_weight[5] = 2 
-        self.keypoint_weight[6] = 1.5
-        self.keypoint_weight[7] = 1.5
+
+        # Initialize keypoint weights from config
+        kw_cfg = getattr(self.cfg, 'keypoint_weights', None)
+        sparse_indices = getattr(self.cfg.fitter, 'sparse_keypoint_indices', None)
+
+        # Get default weight (1.0 for full keypoints, 0.0 for sparse mode)
+        default_weight = getattr(kw_cfg, 'default', 1.0) if kw_cfg else 1.0
+        self.keypoint_weight = np.ones(self.cfg.fitter.keypoint_num) * default_weight
+
+        # If sparse mode with default=0, set specified indices to have weight
+        if sparse_indices and default_weight == 0.0:
+            print(f"Sparse keypoint mode: using indices {sparse_indices}")
+            # Sparse indices will get weight from idx_* config or default to 1.0
+            for idx in sparse_indices:
+                self.keypoint_weight[idx] = 1.0  # Base weight, will be overridden by idx_* if set
+
+        # Apply individual index weights from config (idx_0, idx_4, idx_18, etc.)
+        if kw_cfg:
+            for idx in range(self.cfg.fitter.keypoint_num):
+                attr_name = f'idx_{idx}'
+                if hasattr(kw_cfg, attr_name):
+                    self.keypoint_weight[idx] = getattr(kw_cfg, attr_name)
+
+        # Fallback: if no config, use original MAMMAL paper weights
+        if kw_cfg is None:
+            self.keypoint_weight[4] = 0.4
+            self.keypoint_weight[11] = 0.9
+            self.keypoint_weight[15] = 0.9
+            self.keypoint_weight[5] = 2
+            self.keypoint_weight[6] = 1.5
+            self.keypoint_weight[7] = 1.5
+
+        print(f"Keypoint weights: {self.keypoint_weight}")
         self.keypoint_weight = torch.from_numpy(self.keypoint_weight).reshape([1,-1,1]).to(self.device)
         
         bone_weight = np.ones(20) 
@@ -510,10 +536,11 @@ class MouseFitter():
             V_reduced = V[:,self.bodymodel.reduced_ids,:]
             mesh = Meshes(V_reduced, self.faces_th_reduced)
             loss_mask = torch.tensor(0.0, device=self.device)
-            if self.term_weights["mask"] > 0: 
-                for k in self.cfg.fitter.render_cameras:
-                    mask = self.renderer_mask(mesh, cameras = self.cams_th[k])[...,-1]
-                    target_mask = target["mask"+str(k)]
+            if self.term_weights["mask"] > 0:
+                # Use position indices (0, 1, 2, ...) for cams_th and target masks
+                for view_idx in range(self.camN):
+                    mask = self.renderer_mask(mesh, cameras = self.cams_th[view_idx])[...,-1]
+                    target_mask = target["mask"+str(view_idx)]
                     # Resize target mask to match rendered mask if needed
                     if mask.shape != target_mask.shape:
                         print(f"Mask shape mismatch: rendered {mask.shape}, target {target_mask.shape}. Skipping mask loss.")
@@ -681,28 +708,40 @@ class MouseFitter():
                 fp.write('f %d %d %d\n' % (f[0], f[1], f[2]))
 
         return params 
-    def render(self, result, imgs, views, batch_id, filename, cams_dict): 
-        V,J = self.bodymodel.forward(result["thetas"], result["bone_lengths"],             result["rotation"], result["trans"] / 1000, result["scale"] / 1000, result["chest_deformer"])
-        vertices = V[batch_id].detach().cpu().numpy() 
+    def render(self, result, imgs, views, batch_id, filename, cams_dict):
+        """
+        Render mesh overlay on images.
+
+        Args:
+            result: body model parameters
+            imgs: list of images (indexed by position in views_to_use, NOT original camera ID)
+            views: list of view indices to render (these are positions, not original camera IDs)
+            batch_id: batch index
+            filename: output filename
+            cams_dict: list of camera dicts (indexed by position in views_to_use)
+        """
+        V,J = self.bodymodel.forward(result["thetas"], result["bone_lengths"],
+            result["rotation"], result["trans"] / 1000, result["scale"] / 1000, result["chest_deformer"])
+        vertices = V[batch_id].detach().cpu().numpy()
         faces = self.bodymodel.faces_vert_np
-        scene = pyrender.Scene() #ambient_light=np.ones(3), bg_color=np.array([0.5, 0.5, 0.5]))
-        # light_node = scene.add(pyrender.DirectionalLight(color=np.ones(3), intensity=3.0))
+        scene = pyrender.Scene()
         light_node = scene.add(pyrender.PointLight(color=np.ones(3), intensity=0.2))
         scene.add(pyrender.Mesh.from_trimesh(trimesh.Trimesh(
             vertices=vertices, faces=faces, vertex_colors=np.array([0.8, 0.6, 0.4]))))
         color_maps = []
-        for view in views:
-            cam_param = cams_dict[view]
+        # views are now position indices (0, 1, 2, ...) matching imgs and cams_dict order
+        for view_idx in range(len(views)):
+            cam_param = cams_dict[view_idx]
             K, R, T = cam_param['K'].T, cam_param['R'].T, cam_param['T'] / 1000
             # Fix T shape: ensure it's (3, 1) for matrix multiplication
             if T.shape == (1, 3):
-                T = T.T  # Convert (1, 3) to (3, 1)
+                T = T.T
             elif T.shape == (3,):
-                T = T.reshape(3, 1)  # Convert (3,) to (3, 1)
+                T = T.reshape(3, 1)
             elif T.shape == (1, 3, 1):
-                T = T.squeeze().reshape(3, 1)  # Convert (1, 3, 1) to (3, 1)
+                T = T.squeeze().reshape(3, 1)
             elif T.shape == (3, 1, 1):
-                T = T.squeeze()  # Convert (3, 1, 1) to (3, 1)
+                T = T.squeeze()
             camera_pose = np.eye(4)
             camera_pose[:3, :3] = R.T
             camera_pose[:3, 3:4] = np.dot(-R.T, T)
@@ -712,7 +751,7 @@ class MouseFitter():
             light_node._matrix = camera_pose
             color, _ = self.renderer.render(scene, flags=RenderFlags.SHADOWS_DIRECTIONAL)
             scene.remove_node(cam_node)
-            img_i = imgs[view]
+            img_i = imgs[view_idx]  # Use position index
             color = copy.deepcopy(color)
 
             # Resize rendered image to match input image size
@@ -721,30 +760,43 @@ class MouseFitter():
 
             background_mask = color[:, :, :] == 255
             color[background_mask] = img_i[background_mask]
-            color_maps.append(color) 
-        output = pack_images(color_maps) 
-        if filename is not None: 
+            color_maps.append(color)
+        output = pack_images(color_maps)
+        if filename is not None:
             cv2.imwrite(filename, output)
         return output
         
 
     def draw_keypoints_compare(self, result, imgs, views, batch_id, filename, cams_dict):
+        """
+        Draw keypoints comparison visualization.
+
+        Args:
+            result: body model parameters
+            imgs: list of images (indexed by position in views_to_use)
+            views: list of view indices (positions, not original camera IDs)
+            batch_id: batch index
+            filename: output filename
+            cams_dict: list of camera dicts (indexed by position in views_to_use)
+        """
         myimages = imgs.copy()
-        V,J = self.bodymodel.forward(result["thetas"], result["bone_lengths"],             result["rotation"], result["trans"] / 1000, result["scale"] / 1000, result["chest_deformer"])
-        keypoints = self.bodymodel.forward_keypoints22() 
-        joints = keypoints[batch_id].detach().cpu().numpy() 
+        V,J = self.bodymodel.forward(result["thetas"], result["bone_lengths"],
+            result["rotation"], result["trans"] / 1000, result["scale"] / 1000, result["chest_deformer"])
+        keypoints = self.bodymodel.forward_keypoints22()
+        joints = keypoints[batch_id].detach().cpu().numpy()
         all_drawn_images = []
-        for camid in views:
-            cam = cams_dict[camid]
+        # Use position indices to access imgs and cams_dict
+        for view_idx in range(len(views)):
+            cam = cams_dict[view_idx]
             # Fix T shape for numpy broadcasting
             T = cam["T"] / 1000
             if len(T.shape) > 1:
-                T = T.squeeze()  # Convert to 1D array
+                T = T.squeeze()
             data2d = (joints@cam['R'] + T)@cam["K"]
-            data2d = data2d[:,0:2] / data2d[:,2:] 
-            img_drawn = draw_keypoints(myimages[camid], data2d, bones, is_draw_bone=True)
-            all_drawn_images.append(img_drawn) 
-        outputimg = pack_images(all_drawn_images) 
+            data2d = data2d[:,0:2] / data2d[:,2:]
+            img_drawn = draw_keypoints(myimages[view_idx], data2d, bones, is_draw_bone=True)
+            all_drawn_images.append(img_drawn)
+        outputimg = pack_images(all_drawn_images)
         cv2.imwrite(filename, outputimg)
 
 def preprocess_cli_args():

@@ -4,16 +4,25 @@
 # Usage:
 #   ./run_experiment.sh <experiment_name> [--debug] [--frames N]
 #
-# Experiments:
-#   baseline_6view_keypoint   - 6-view RGB with 22 keypoints (paper baseline)
-#   monocular_keypoint        - Single-view RGB with 22 keypoints
-#   sixview_no_keypoint       - 6-view RGB silhouette only (no keypoints)
-#   sixview_sparse_keypoint   - 6-view RGB with 3 sparse keypoints
+# ============ Experiment Groups ============
 #
-# Examples:
+# Group 1: BASELINE (Paper reference)
+#   baseline_6view_keypoint   - 6-view RGB + 22 keypoints (MAMMAL paper baseline)
+#
+# Group 2: Keypoint Ablation (6-view fixed)
+#   sixview_sparse_keypoint   - 6-view + 3 sparse keypoints (nose, body, tail)
+#   sixview_no_keypoint       - 6-view + silhouette only (no keypoints)
+#
+# Group 3: Viewpoint Ablation (sparse 3 keypoints fixed)
+#   sparse_5view              - 5-view (0,1,2,3,4) + sparse 3
+#   sparse_4view              - 4-view (0,1,2,3) + sparse 3
+#   sparse_3view              - 3-view diagonal (0,2,4) + sparse 3
+#   sparse_2view              - 2-view opposite (0,3) + sparse 3
+#
+# ============ Examples ============
 #   ./run_experiment.sh baseline_6view_keypoint --debug    # Quick test (5 frames)
 #   ./run_experiment.sh baseline_6view_keypoint            # Full run (100 frames)
-#   ./run_experiment.sh monocular_keypoint --frames 50     # Custom frame count
+#   ./run_experiment.sh sparse_3view --frames 50           # Custom frame count
 
 set -e
 
@@ -47,10 +56,18 @@ done
 
 # Validate experiment name
 VALID_EXPERIMENTS=(
-    "baseline_6view_keypoint"
+    # Group 1: Baseline (Paper reference)
+    "baseline_6view_keypoint"    # 6-view + 22 keypoints (MAMMAL paper baseline)
+    # Group 2: Keypoint ablation (6-view fixed)
+    "sixview_sparse_keypoint"    # 6-view + 3 sparse keypoints
+    "sixview_no_keypoint"        # 6-view + silhouette only (no keypoints)
+    # Group 3: Viewpoint ablation (sparse 3 keypoints fixed)
+    "sparse_5view"               # 5-view (0,1,2,3,4) + sparse 3
+    "sparse_4view"               # 4-view (0,1,2,3) + sparse 3
+    "sparse_3view"               # 3-view diagonal (0,2,4) + sparse 3
+    "sparse_2view"               # 2-view opposite (0,3) + sparse 3
+    # Other
     "monocular_keypoint"
-    "sixview_no_keypoint"
-    "sixview_sparse_keypoint"
     "quick_test"
 )
 
