@@ -1,19 +1,26 @@
-import cv2 
-import numpy as np 
-import math 
-import torch 
+"""MAMMAL Mouse utilities."""
+
+import cv2
+import numpy as np
+import math
+import torch
+
+from .debug_grid import DebugGridCollector, compress_existing_debug_folder
 
 ## for dannce labeling (22 keypoints)
-colormap = np.loadtxt("colormaps/anliang_paper.txt", dtype=np.uint8)
+import os
+_colormap_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "colormaps/anliang_paper.txt")
+colormap = np.loadtxt(_colormap_path, dtype=np.uint8)
+
 bones = [
-    [0,2], [1,2], 
+    [0,2], [1,2],
     [2,3],[3,4],[4,5],[5,6],[6,7],
     [8,9], [9,10], [10,11], [11,3],
     [12,13], [13,14], [14,15], [15,3],
     [16,17],[17,18],[18,5],
     [19,20],[20,21],[21,5]
-] 
-bone_color_index = [ 
+]
+bone_color_index = [
     0,0,
     3,3,3,3,3,
     1,1,1,1,
@@ -22,17 +29,17 @@ bone_color_index = [
     5,5,5
 ]
 # RGB
-g_colors = [ 
-    [92,94,170], # purple  
-    [187,97,166], # pink 
-    [109, 192, 91], # green 
-    [221,94,86], # red 
+g_colors = [
+    [92,94,170], # purple
+    [187,97,166], # pink
+    [109, 192, 91], # green
+    [221,94,86], # red
     [210, 220, 88], # yellow
-    [98,201,211], #blue 
+    [98,201,211], #blue
 ]
-g_colors = np.asarray(g_colors, dtype=np.float32) 
+g_colors = np.asarray(g_colors, dtype=np.float32)
 
-joint_color_index = [ 
+joint_color_index = [
     0,0,0,
     3,3,3,3,3,
     1,1,1,1,
@@ -59,7 +66,7 @@ def pack_images(imgs):
             if k >= N:  # Skip empty grid cells
                 break
             output[r*h:(r+1)*h, c*w:(c+1)*w,:] = imgs[k]
-    return output 
+    return output
 
 def rodrigues_batch(axis):
     # axis : bs * 3
@@ -114,34 +121,50 @@ def Rmat2axis(R):
 points: [N,2]
 '''
 def undist_points_cv2(points, K, coeff, newcameramtx):
-    points_cv = points.copy() 
+    points_cv = points.copy()
     points_cv = points_cv.reshape([points_cv.shape[0], 1, points_cv.shape[1]])
-    new_points_2 = cv2.undistortPoints(points_cv, K, coeff, P=newcameramtx) 
-    new_points_2 = new_points_2.squeeze() 
+    new_points_2 = cv2.undistortPoints(points_cv, K, coeff, P=newcameramtx)
+    new_points_2 = new_points_2.squeeze()
     return new_points_2 # [N,2]
 
-def draw_keypoints(img, proj, bone, is_draw_bone=False): 
+def draw_keypoints(img, proj, bone, is_draw_bone=False):
     for k in range(proj.shape[0]):
-        if math.isnan(proj[k,0]): 
-            continue 
-        if proj[k,0] == 0 or proj[k,1] == 0: 
-            continue 
+        if math.isnan(proj[k,0]):
+            continue
+        if proj[k,0] == 0 or proj[k,1] == 0:
+            continue
         p = (int(proj[k,0]), int(proj[k,1]))
-        if k < len(joint_color_index): 
+        if k < len(joint_color_index):
             colorid = joint_color_index[k]
-        else: 
-            colorid = k % colormap.shape[0] 
-        cv2.circle(img, p, 9, colormap[colorid].tolist(), -1) 
+        else:
+            colorid = k % colormap.shape[0]
+        cv2.circle(img, p, 9, colormap[colorid].tolist(), -1)
         # cv2.putText(img, str(k), p, fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=0.5, color=(0,128,255))
-    if not is_draw_bone: 
-        return img 
-    for index, b in enumerate(bone): 
+    if not is_draw_bone:
+        return img
+    for index, b in enumerate(bone):
         if math.isnan(proj[b[0],0]) or math.isnan(proj[b[1],0]):
-            continue 
+            continue
         p0 = (int(proj[b[0],0]), int(proj[b[0],1]))
         p1 = (int(proj[b[1],0]), int(proj[b[1],1]))
-        if p0[0] == 0 or p0[1] == 0 or p1[0] == 1 or p1[1] == 0: 
-            continue 
+        if p0[0] == 0 or p0[1] == 0 or p1[0] == 1 or p1[1] == 0:
+            continue
         color = colormap[bone_color_index[index]].tolist()
         cv2.line(img, p0, p1, color, 4)
-    return img 
+    return img
+
+
+__all__ = [
+    'DebugGridCollector',
+    'compress_existing_debug_folder',
+    'pack_images',
+    'rodrigues_batch',
+    'Rmat2axis',
+    'undist_points_cv2',
+    'draw_keypoints',
+    'colormap',
+    'bones',
+    'bone_color_index',
+    'g_colors',
+    'joint_color_index',
+]

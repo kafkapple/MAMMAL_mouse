@@ -36,8 +36,8 @@ from bodymodel_th import BodyModelTorch
 from data_seaker_video_new import DataSeakerDet
 import copy 
 from utils import *
-from scipy.spatial.transform import Rotation 
-import matplotlib.pyplot as plt 
+from scipy.spatial.transform import Rotation
+import matplotlib.pyplot as plt
 
 import hydra # Added for Hydra main decorator
 from omegaconf import DictConfig # Added for MouseFitter type hinting
@@ -201,6 +201,13 @@ class MouseFitter():
         self.last_params = None
         self.V_last = None
         self.J_last = None
+
+        # Debug grid collector for compressed iteration images
+        self.debug_collector = DebugGridCollector(
+            thumbnail_size=(320, 240),
+            grid_cols=5,
+            jpeg_quality=85
+        )
 
     def _log_iteration(self, step, iteration, total_loss, params):
         """Log iteration details with loss and parameter values."""
@@ -757,8 +764,16 @@ class MouseFitter():
             loss_prev = loss
             if self.cfg.fitter.with_render:
                 imgs = self.imgs.copy()
-                self.render(params, imgs, 0, self.result_folder + "/render/debug/step_0_frame_{:06d}_iter_{:05d}.png".format(self.id, i), self.cam_dict, step_name='Step0')
+                # Render to memory and add to grid collector instead of saving individual files
+                render_img = self.render(params, imgs, 0, None, self.cam_dict, step_name='Step0', return_image=True)
+                if render_img is not None:
+                    self.debug_collector.add_image('step0', i, render_img)
         iter_pbar.close()
+
+        # Save Step0 debug images as compressed grid
+        if self.cfg.fitter.with_render and self.debug_collector.images.get('step0'):
+            grid_path = f"{self.result_folder}/render/debug/step0_frame_{self.id:06d}_grid.jpg"
+            self.debug_collector._save_single_grid('step0', grid_path)
 
         params["chest_deformer"].requires_grad_(True)
         params["thetas"].requires_grad_(True)
@@ -799,8 +814,16 @@ class MouseFitter():
             loss_prev = loss
             if self.id == 0 and self.cfg.fitter.with_render:
                 imgs = self.imgs.copy()
-                self.render(params, imgs, 0, self.result_folder + "/render/debug/step_1_frame_{:06d}_iter_{:05d}.png".format(self.id, i), self.cam_dict, step_name='Step1')
+                # Render to memory and add to grid collector instead of saving individual files
+                render_img = self.render(params, imgs, 0, None, self.cam_dict, step_name='Step1', return_image=True)
+                if render_img is not None:
+                    self.debug_collector.add_image('step1', i, render_img)
         iter_pbar.close()
+
+        # Save Step1 debug images as compressed grid
+        if self.id == 0 and self.cfg.fitter.with_render and self.debug_collector.images.get('step1'):
+            grid_path = f"{self.result_folder}/render/debug/step1_frame_{self.id:06d}_grid.jpg"
+            self.debug_collector._save_single_grid('step1', grid_path)
 
         if self.cfg.fitter.with_render:
             imgs = self.imgs.copy()
@@ -872,7 +895,7 @@ class MouseFitter():
 
         return params 
     def render(self, result, imgs, batch_id, filename, cams_dict,
-               show_keypoints=False, step_name=None, target_2d=None):
+               show_keypoints=False, step_name=None, target_2d=None, return_image=False):
         """
         Render mesh overlay on images for all available views.
 
@@ -880,11 +903,12 @@ class MouseFitter():
             result: body model parameters
             imgs: list of images (indexed by position in views_to_use)
             batch_id: batch index
-            filename: output filename
+            filename: output filename (None to skip saving)
             cams_dict: list of camera dicts (indexed by position in views_to_use)
             show_keypoints: if True, overlay keypoints with part-aware colors
             step_name: if provided, add step description text to image
             target_2d: GT 2D keypoints tensor for comparison overlay
+            return_image: if True, always return the rendered image
         """
         V,J = self.bodymodel.forward(result["thetas"], result["bone_lengths"],
             result["rotation"], result["trans"] / 1000, result["scale"] / 1000, result["chest_deformer"])
