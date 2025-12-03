@@ -24,9 +24,6 @@ fitter:
   # Minimal+ keypoints (GT annotation indices):
   #   0: L_ear, 1: R_ear, 2: nose, 3: neck, 5: tail_root
   sparse_keypoint_indices: [0, 1, 2, 3, 5]
-  start_frame: 0
-  end_frame: 100
-  interval: 1
   with_render: true
 
 optim:

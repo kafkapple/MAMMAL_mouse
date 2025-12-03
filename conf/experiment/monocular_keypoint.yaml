@@ -20,9 +20,6 @@ fitter:
   render_cameras: [0]
   use_keypoints: true
   keypoint_num: 22
-  start_frame: 0
-  end_frame: 5    # Full: 100 frames, minimized for quick iteration
-  interval: 1
   with_render: true
 
 # Same optimization as baseline

@@ -59,15 +59,25 @@ VALID_EXPERIMENTS=(
     # Group 1: Baseline (Paper reference)
     "baseline_6view_keypoint"    # 6-view + 22 keypoints (MAMMAL paper baseline)
     # Group 2: Keypoint ablation (6-view fixed)
+    "sparse_9kp_dlc"             # 6-view + 9 keypoints (DeepLabCut style)
+    "sparse_7kp_mars"            # 6-view + 7 keypoints (MARS style)
+    "sparse_5kp_minimal"         # 6-view + 5 keypoints (ears added)
     "sixview_sparse_keypoint"    # 6-view + 3 sparse keypoints
     "sixview_no_keypoint"        # 6-view + silhouette only (no keypoints)
-    # Group 3: Viewpoint ablation (sparse 3 keypoints fixed)
-    "sparse_5view"               # 5-view (0,1,2,3,4) + sparse 3
-    "sparse_4view"               # 4-view (0,1,2,3) + sparse 3
-    "sparse_3view"               # 3-view diagonal (0,2,4) + sparse 3
-    "sparse_2view"               # 2-view opposite (0,3) + sparse 3
-    # Other
-    "monocular_keypoint"
+    # Group 3: View ablation (22 keypoints fixed)
+    "views_6"                    # 6-view + 22 keypoints
+    "views_5"                    # 5-view + 22 keypoints
+    "views_4"                    # 4-view + 22 keypoints
+    "views_3_diagonal"           # 3-view (0,2,4) + 22 keypoints
+    "views_3_consecutive"        # 3-view (0,1,2) + 22 keypoints
+    "views_2_opposite"           # 2-view (0,3) + 22 keypoints
+    "views_1_single"             # 1-view + 22 keypoints (monocular)
+    # Group 4: View ablation (sparse 3 keypoints fixed)
+    "sparse_5view"               # 5-view + sparse 3
+    "sparse_4view"               # 4-view + sparse 3
+    "sparse_3view"               # 3-view + sparse 3
+    "sparse_2view"               # 2-view + sparse 3
+    # Utility
     "quick_test"
 )
 
@@ -97,14 +107,14 @@ fi
 # Build command
 CMD="python fitter_articulation.py experiment=$EXPERIMENT"
 
-# Debug mode: override with minimal settings
+# Debug mode: use debug frames config
 # Note: Frame count affects temporal coverage, NOT reconstruction quality
 #       Each frame is fitted independently, so fewer frames = faster test
 if [[ "$DEBUG_MODE" == "true" ]]; then
     echo "================================================"
-    echo "DEBUG MODE: Quick test with 2 frames"
+    echo "DEBUG MODE: Quick test with 5 frames"
     echo "================================================"
-    CMD="$CMD fitter.end_frame=2"
+    CMD="$CMD frames=debug"
     CMD="$CMD optim.solve_step0_iters=5"
     CMD="$CMD optim.solve_step1_iters=20"
     CMD="$CMD optim.solve_step2_iters=10"

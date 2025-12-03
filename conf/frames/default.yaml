@@ -1,0 +1,10 @@
+# @package _global_
+# Default frame settings (production mode)
+# Total available: 18000 frames
+# This config processes 100 frames for ablation studies
+
+fitter:
+  start_frame: 0
+  end_frame: 100
+  interval: 1
+  # Result: 100 frames (frame 0-99)

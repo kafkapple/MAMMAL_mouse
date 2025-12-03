@@ -20,9 +20,6 @@ fitter:
   render_cameras: [0, 1, 2, 3, 4, 5]
   use_keypoints: false  # Disable keypoint loss
   keypoint_num: 22
-  start_frame: 0
-  end_frame: 5    # Full: 100 frames, minimized for quick iteration
-  interval: 1
   with_render: true
 
 # More iterations needed without keypoint guidance

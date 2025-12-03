@@ -20,10 +20,8 @@ fitter:
   render_cameras: [0, 1, 2, 3, 4, 5]
   use_keypoints: true
   keypoint_num: 22  # Full 22 keypoints
-  start_frame: 0
-  end_frame: 5    # Full: 100 frames, minimized for quick iteration
-  interval: 1
   with_render: true
+  # Frame settings inherited from /frames config
 
 # Original MAMMAL paper optimization settings
 optim:

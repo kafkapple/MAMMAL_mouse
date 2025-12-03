@@ -11,7 +11,4 @@ data:
 fitter:
   render_cameras: [0, 1, 2, 3, 4, 5]
   use_keypoints: true
-  start_frame: 0
-  end_frame: 5    # Full: 100 frames, minimized for quick iteration0    # Dataset has 18000 frames total
-  interval: 10       # Process every 10th frame (100 samples)
   with_render: true

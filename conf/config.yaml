@@ -5,6 +5,7 @@ defaults:
   - dataset: shank3  # Options: markerless, shank3, custom
   - preprocess: opencv  # Options: opencv, sam (future)
   - optim: fast  # Options: fast, accurate
+  - frames: default  # Options: default (100), debug (5), full (1000)
   - experiment: null  # Optional: quick_test, full_run, etc.
   - override hydra/job_logging: default
   - override hydra/hydra_logging: default

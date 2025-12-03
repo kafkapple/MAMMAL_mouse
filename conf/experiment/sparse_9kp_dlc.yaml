@@ -28,9 +28,6 @@ fitter:
   #   Tail: 5: tail_root, 6: tail_middle
   #   Paws: 8: L_paw, 12: R_paw
   sparse_keypoint_indices: [0, 1, 2, 3, 4, 5, 6, 8, 12]
-  start_frame: 0
-  end_frame: 100
-  interval: 1
   with_render: true
 
 optim:

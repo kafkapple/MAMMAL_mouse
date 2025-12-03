@@ -1,0 +1,9 @@
+# @package _global_
+# Full dataset frame settings
+# Processes entire video (18000 frames) with sampling
+
+fitter:
+  start_frame: 0
+  end_frame: 18000
+  interval: 18
+  # Result: 1000 frames (sampled every 18 frames)

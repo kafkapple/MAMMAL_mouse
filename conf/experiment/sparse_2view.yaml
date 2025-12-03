@@ -19,9 +19,6 @@ fitter:
   #   idx 5: Tail root
   #   idx 3: Neck
   sparse_keypoint_indices: [2, 5, 3]
-  start_frame: 0
-  end_frame: 5    # Full: 100 frames, minimized for quick iteration
-  interval: 1
   with_render: true
 
 optim:

@@ -1,0 +1,9 @@
+# @package _global_
+# Debug frame settings (quick iteration)
+# For testing pipeline and configs
+
+fitter:
+  start_frame: 0
+  end_frame: 5
+  interval: 1
+  # Result: 5 frames (frame 0-4)

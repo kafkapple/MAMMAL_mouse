@@ -34,6 +34,7 @@ videoio==0.2.0
 # Utilities
 tqdm==4.66.1
 ipython==8.18.1
+einops>=0.7.0  # Tensor rearrangement operations
 
 # Logging and monitoring
 tensorboard==2.13.0
