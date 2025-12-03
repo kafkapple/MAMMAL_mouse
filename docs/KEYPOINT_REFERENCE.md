@@ -1,167 +1,158 @@
 # MAMMAL Mouse 22 Keypoint Reference
 
-**Source**: `mouse_model/keypoint22_mapper.json`
+**Last Updated**: 2025-12-03
 
 ---
 
-## Full Keypoint Mapping Table
+## GT vs Model Definition 불일치
 
-| Index | Type | Source IDs | Joint/Vertex Names | Semantic Label |
-|-------|------|------------|-------------------|----------------|
-| 0 | V | [12274, 12225] | Vertex IDs | **Nose** |
-| 1 | V | [4966, 5011] | Vertex IDs | **Left ear** |
-| 2 | V | [13492, 13337, ...] | Vertex IDs (9 vertices) | **Right ear** |
-| 3 | J | [64, 65] | neck_stretch, neck_stretch_end | **Neck (body center)** |
-| 4 | V | [9043] | Vertex ID | **Body vertex** |
-| 5 | J | [48, 51] | lumbar_vertebrae_0, tail_0 | **Tail base** |
-| 6 | J | [54, 55] | tail_3, tail_4 | **Tail mid** |
-| 7 | J | [61] | tail_9_end | **Tail tip** |
-| 8 | J | [79] | fore_paw_digit_2b_l | **Left forepaw digit** |
-| 9 | J | [74] | fore_paw_l | **Left forepaw** |
-| 10 | J | [73] | ulna_l | **Left ulna (forearm)** |
-| 11 | J | [70] | humerus_l | **Left humerus (upper arm)** |
-| 12 | J | [104] | fore_paw_digit_2b_r | **Right forepaw digit** |
-| 13 | J | [99] | fore_paw_r | **Right forepaw** |
-| 14 | J | [98] | ulna_r | **Right ulna (forearm)** |
-| 15 | J | [95] | humerus_r | **Right humerus (upper arm)** |
-| 16 | J | [15] | hind_paw_digit_3c_l | **Left hindpaw digit** |
-| 17 | J | [5] | hind_paw_l | **Left hindpaw** |
-| 18 | J | [4] | tibia_l | **Left tibia (lower leg)** |
-| 19 | J | [38] | hind_paw_digit_3c_r | **Right hindpaw digit** |
-| 20 | J | [28] | hind_paw_r | **Right hindpaw** |
-| 21 | J | [27] | tibia_r | **Right tibia (lower leg)** |
+**중요**: GT annotation (`mouse_22_defs.py`)과 Model definition (`keypoint22_mapper.json`)의 Head keypoint 순서가 다릅니다.
 
-**Legend**:
-- `V` = Vertex (mesh vertex position average)
-- `J` = Joint (skeleton joint position)
+| Index | GT Annotation (mouse_22_defs.py) | Model Definition (keypoint22_mapper.json) |
+|-------|----------------------------------|-------------------------------------------|
+| **0** | **left_ear_tip** | nose vertex |
+| **1** | **right_ear_tip** | left_ear vertex |
+| **2** | **nose** | right_ear vertex |
+| 3-21 | 동일 | 동일 |
+
+**실제 데이터 사용 시**: GT annotation 기준 (mouse_22_defs.py)을 따릅니다.
 
 ---
 
-## Keypoint Categories
+## GT Keypoint Definition (mouse_22_defs.py 기준)
+
+이것이 **실제 GT annotation 데이터**의 정의입니다.
 
 ### Head (idx 0-2)
-| Index | Label | Description |
-|-------|-------|-------------|
-| 0 | Nose | Front tip of snout |
-| 1 | Left ear | Left ear position |
-| 2 | Right ear | Right ear position |
+| Index | GT Label | Description |
+|-------|----------|-------------|
+| 0 | **L_ear** | 왼쪽 귀 끝 (left_ear_tip) |
+| 1 | **R_ear** | 오른쪽 귀 끝 (right_ear_tip) |
+| 2 | **nose** | 코 (nose) |
 
-### Body Center (idx 3-5)
-| Index | Label | Description |
-|-------|-------|-------------|
-| 3 | Neck | Neck/body center junction |
-| 4 | Body | Central body vertex |
-| 5 | Tail base | Where tail meets body (lumbar + tail_0) |
+### Body (idx 3-4)
+| Index | GT Label | Description |
+|-------|----------|-------------|
+| 3 | neck | 목 |
+| 4 | body_middle | 몸통 중앙 |
 
 ### Tail (idx 5-7)
-| Index | Label | Description |
-|-------|-------|-------------|
-| 5 | Tail base | Tail root |
-| 6 | Tail mid | Middle of tail |
-| 7 | Tail tip | End of tail |
+| Index | GT Label | Description |
+|-------|----------|-------------|
+| 5 | tail_root | 꼬리 기저부 |
+| 6 | tail_middle | 꼬리 중간 |
+| 7 | tail_end | 꼬리 끝 |
 
-### Front Limbs - Left (idx 8-11)
-| Index | Label | Description |
-|-------|-------|-------------|
-| 8 | Forepaw digit L | Left front paw digit |
-| 9 | Forepaw L | Left front paw |
-| 10 | Ulna L | Left forearm |
-| 11 | Humerus L | Left upper arm |
+### Left Front Limb (idx 8-11)
+| Index | GT Label | Description |
+|-------|----------|-------------|
+| 8 | left_paw | 왼쪽 앞발 |
+| 9 | left_paw_end | 왼쪽 앞발 끝 |
+| 10 | left_elbow | 왼쪽 팔꿈치 |
+| 11 | left_shoulder | 왼쪽 어깨 |
 
-### Front Limbs - Right (idx 12-15)
-| Index | Label | Description |
-|-------|-------|-------------|
-| 12 | Forepaw digit R | Right front paw digit |
-| 13 | Forepaw R | Right front paw |
-| 14 | Ulna R | Right forearm |
-| 15 | Humerus R | Right upper arm |
+### Right Front Limb (idx 12-15)
+| Index | GT Label | Description |
+|-------|----------|-------------|
+| 12 | right_paw | 오른쪽 앞발 |
+| 13 | right_paw_end | 오른쪽 앞발 끝 |
+| 14 | right_elbow | 오른쪽 팔꿈치 |
+| 15 | right_shoulder | 오른쪽 어깨 |
 
-### Hind Limbs - Left (idx 16-18)
-| Index | Label | Description |
-|-------|-------|-------------|
-| 16 | Hindpaw digit L | Left hind paw digit |
-| 17 | Hindpaw L | Left hind paw |
-| 18 | Tibia L | Left lower leg (shin) |
+### Left Hind Limb (idx 16-18)
+| Index | GT Label | Description |
+|-------|----------|-------------|
+| 16 | left_foot | 왼쪽 뒷발 |
+| 17 | left_knee | 왼쪽 무릎 |
+| 18 | left_hip | 왼쪽 엉덩이 |
 
-### Hind Limbs - Right (idx 19-21)
-| Index | Label | Description |
-|-------|-------|-------------|
-| 19 | Hindpaw digit R | Right hind paw digit |
-| 20 | Hindpaw R | Right hind paw |
-| 21 | Tibia R | Right lower leg (shin) |
+### Right Hind Limb (idx 19-21)
+| Index | GT Label | Description |
+|-------|----------|-------------|
+| 19 | right_foot | 오른쪽 뒷발 |
+| 20 | right_knee | 오른쪽 무릎 |
+| 21 | right_hip | 오른쪽 엉덩이 |
 
 ---
 
-## Recommended Sparse Keypoint Configurations
+## Part-Aware Color Coding
 
-### Minimal (3 keypoints) - Default Sparse Mode
-```yaml
-sparse_keypoint_indices: [0, 5, 3]
+시각화에서 신체 부위별 색상 구분 (index 범위 기반):
 
-keypoint_weights:
-  default: 0.0
-  idx_0: 5.0   # Nose (head anchor)
-  idx_5: 3.0   # Tail base (rear anchor)
-  idx_3: 5.0   # Neck (body center)
+| Body Part | Index Range | Color |
+|-----------|-------------|-------|
+| Head | 0, 1, 2 | Yellow |
+| Body | 3, 4 | Magenta |
+| Tail | 5, 6, 7 | Orange |
+| Left Front Limb | 8, 9, 10, 11 | Blue |
+| Right Front Limb | 12, 13, 14, 15 | Green |
+| Left Hind Limb | 16, 17, 18 | Cyan |
+| Right Hind Limb | 19, 20, 21 | Red |
+
+---
+
+## Skeleton Topology (Bone Connections)
+
 ```
-
-**Rationale**: These 3 points span head-to-tail along the body axis, providing global pose constraint.
-
-### Medium (5 keypoints) - Better Limb Coverage
-```yaml
-sparse_keypoint_indices: [0, 3, 5, 9, 13]
-
-keypoint_weights:
-  default: 0.0
-  idx_0: 5.0   # Nose
-  idx_3: 5.0   # Neck
-  idx_5: 3.0   # Tail base
-  idx_9: 3.0   # Left forepaw
-  idx_13: 3.0  # Right forepaw
-```
-
-### Extended (8 keypoints) - Full Body Coverage
-```yaml
-sparse_keypoint_indices: [0, 3, 5, 7, 9, 13, 17, 20]
-
-keypoint_weights:
-  default: 0.0
-  idx_0: 5.0   # Nose
-  idx_3: 5.0   # Neck
-  idx_5: 3.0   # Tail base
-  idx_7: 2.0   # Tail tip
-  idx_9: 3.0   # Left forepaw
-  idx_13: 3.0  # Right forepaw
-  idx_17: 3.0  # Left hindpaw
-  idx_20: 3.0  # Right hindpaw
+# mouse_22_defs.py - mouse_22_bones
+Head:       [0,2], [1,2]           # ears → nose
+Spine:      [2,3], [3,4], [4,5]    # nose → neck → body → tail_root
+Tail:       [5,6], [6,7]           # tail_root → tail_mid → tail_end
+L Front:    [8,9], [9,10], [10,11], [11,3]   # paw → elbow → shoulder → neck
+R Front:    [12,13], [13,14], [14,15], [15,3]
+L Hind:     [16,17], [17,18], [18,5]         # foot → knee → hip → tail_root
+R Hind:     [19,20], [20,21], [21,5]
 ```
 
 ---
 
-## Important Notes
+## Sparse Keypoint Configurations
 
-### ⚠️ Common Mistakes to Avoid
-
-**WRONG** (old incorrect indices):
+### Minimal (3 keypoints) - Default
 ```yaml
-# DO NOT USE - These are leg joints, not body landmarks!
-sparse_keypoint_indices: [0, 18, 21]  # 18=tibia_l, 21=tibia_r
+sparse_keypoint_indices: [2, 5, 3]  # nose(GT idx 2), tail_root, neck
+
+keypoint_weights:
+  default: 0.0
+  idx_2: 5.0   # Nose (GT index)
+  idx_5: 3.0   # Tail root
+  idx_3: 5.0   # Neck
 ```
 
-**CORRECT** (proper body landmarks):
+**Note**: GT에서 nose는 index 2입니다 (index 0이 아님!)
+
+### Medium (5 keypoints)
 ```yaml
-sparse_keypoint_indices: [0, 5, 3]  # nose, tail_base, neck
+sparse_keypoint_indices: [2, 3, 5, 9, 13]
+
+keypoint_weights:
+  default: 0.0
+  idx_2: 5.0   # Nose
+  idx_3: 5.0   # Neck
+  idx_5: 3.0   # Tail root
+  idx_9: 3.0   # Left paw end
+  idx_13: 3.0  # Right paw end
 ```
 
-### Keypoint Weight Guidelines
+---
 
-- **High weight (5.0)**: Critical anchor points (nose, neck)
-- **Medium weight (3.0)**: Secondary anchors (tail base, paws)
-- **Low weight (1.0-2.0)**: Fine detail points (digits, tail tip)
-- **Zero weight (0.0)**: Unused in sparse mode
+## 파일 참조
 
-### Visualization Colors (in fitting_keypoints_compare.png)
+| 파일 | 설명 |
+|------|------|
+| `mouse_22_defs.py` | GT annotation 정의 (keypoint_names, bones) |
+| `mouse_model/keypoint22_mapper.json` | Model vertex/joint 매핑 |
+| `data/*/keypoints2d_undist/result_view_*.pkl` | GT 2D keypoints 데이터 |
+| `scripts/visualize_gt_keypoints_hires.py` | GT 시각화 스크립트 |
 
-- **Red circles**: Ground Truth (GT) keypoints
-- **Green circles**: Predicted keypoints
-- Overlap indicates good fitting quality
+---
+
+## 시각화 결과
+
+고해상도 GT keypoint 시각화:
+```
+results/keypoint_visualization_hires/
+├── view_0_gt_hires.png ~ view_5_gt_hires.png  # 개별 뷰
+├── all_views_grid_frame0.png                   # 6개 뷰 그리드
+└── keypoint_legend_hires.png                   # 색상 범례
+```

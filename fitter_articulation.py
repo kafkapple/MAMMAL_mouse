@@ -757,7 +757,7 @@ class MouseFitter():
             loss_prev = loss
             if self.cfg.fitter.with_render:
                 imgs = self.imgs.copy()
-                self.render(params, imgs, 0, self.result_folder + "/render/debug/fitting_{}_global_iter_{:05d}.png".format(self.id, i), self.cam_dict)
+                self.render(params, imgs, 0, self.result_folder + "/render/debug/step_0_frame_{:06d}_iter_{:05d}.png".format(self.id, i), self.cam_dict, step_name='Step0')
         iter_pbar.close()
 
         params["chest_deformer"].requires_grad_(True)
@@ -799,17 +799,19 @@ class MouseFitter():
             loss_prev = loss
             if self.id == 0 and self.cfg.fitter.with_render:
                 imgs = self.imgs.copy()
-                self.render(params, imgs, 0, self.result_folder + "/render/debug/fitting_{}_debug_iter_{:05d}.png".format(self.id, i), self.cam_dict)
+                self.render(params, imgs, 0, self.result_folder + "/render/debug/step_1_frame_{:06d}_iter_{:05d}.png".format(self.id, i), self.cam_dict, step_name='Step1')
         iter_pbar.close()
 
         if self.cfg.fitter.with_render:
             imgs = self.imgs.copy()
-            self.render(params, imgs, 0, self.result_folder + "/render/fitting_{}.png".format(self.id), self.cam_dict)
-            if getattr(self.cfg.fitter, 'use_keypoints', True):
-                # Pass target_2d for GT vs Predicted comparison visualization
-                target_2d = target.get('target_2d', None)
-                self.draw_keypoints_compare(params, imgs, 0, self.result_folder + "/fitting_keypoints_{}.png".format(self.id), self.cam_dict, target_2d)
-        with open(self.result_folder + "/params/param{}.pkl".format(self.id), 'wb') as f:
+            # Pass target_2d for keypoint overlay
+            target_2d = target.get('target_2d', None) if getattr(self.cfg.fitter, 'use_keypoints', True) else None
+            self.render(params, imgs, 0, self.result_folder + "/render/step_1_frame_{:06d}.png".format(self.id), self.cam_dict,
+                       show_keypoints=True, step_name='Step1', target_2d=target_2d)
+            if getattr(self.cfg.fitter, 'use_keypoints', True) and target_2d is not None:
+                # Save keypoint comparison to render/ subfolder
+                self.draw_keypoints_compare(params, imgs, 0, self.result_folder + "/render/keypoints/step_1_frame_{:06d}_keypoints.png".format(self.id), self.cam_dict, target_2d)
+        with open(self.result_folder + "/params/step_1_frame_{:06d}.pkl".format(self.id), 'wb') as f:
             pickle.dump(params,f)
         params["chest_deformer"].requires_grad_(True)
         return params
@@ -848,8 +850,9 @@ class MouseFitter():
 
         if self.cfg.fitter.with_render:
             imgs = self.imgs.copy()
-            self.render(params, imgs, 0, self.result_folder+"/render/fitting_{}_sil.png".format(self.id), self.cam_dict)
-        with open(self.result_folder + "/params/param{}_sil.pkl".format(self.id), 'wb') as f:
+            self.render(params, imgs, 0, self.result_folder+"/render/step_2_frame_{:06d}.png".format(self.id), self.cam_dict,
+                       show_keypoints=True, step_name='Step2')
+        with open(self.result_folder + "/params/step_2_frame_{:06d}.pkl".format(self.id), 'wb') as f:
             pickle.dump(params,f)
         self.result = params
 
@@ -860,7 +863,7 @@ class MouseFitter():
         )
         vertices = V[0].detach().cpu().numpy()
         faces = self.bodymodel.faces_vert_np
-        obj_filename = os.path.join(self.result_folder, "obj/mesh_{:06d}.obj".format(self.id))
+        obj_filename = os.path.join(self.result_folder, "obj/step_2_frame_{:06d}.obj".format(self.id))
         with open(obj_filename, 'w') as fp:
             for v in vertices:
                 fp.write('v %f %f %f\n' % (v[0], v[1], v[2]))
@@ -868,7 +871,8 @@ class MouseFitter():
                 fp.write('f %d %d %d\n' % (f[0], f[1], f[2]))
 
         return params 
-    def render(self, result, imgs, batch_id, filename, cams_dict):
+    def render(self, result, imgs, batch_id, filename, cams_dict,
+               show_keypoints=False, step_name=None, target_2d=None):
         """
         Render mesh overlay on images for all available views.
 
@@ -878,11 +882,21 @@ class MouseFitter():
             batch_id: batch index
             filename: output filename
             cams_dict: list of camera dicts (indexed by position in views_to_use)
+            show_keypoints: if True, overlay keypoints with part-aware colors
+            step_name: if provided, add step description text to image
+            target_2d: GT 2D keypoints tensor for comparison overlay
         """
         V,J = self.bodymodel.forward(result["thetas"], result["bone_lengths"],
             result["rotation"], result["trans"] / 1000, result["scale"] / 1000, result["chest_deformer"])
         vertices = V[batch_id].detach().cpu().numpy()
         faces = self.bodymodel.faces_vert_np
+
+        # Get keypoints if needed
+        keypoints_2d = None
+        if show_keypoints:
+            keypoints = self.bodymodel.forward_keypoints22()
+            joints_3d = keypoints[batch_id].detach().cpu().numpy()
+
         scene = pyrender.Scene()
         light_node = scene.add(pyrender.PointLight(color=np.ones(3), intensity=0.2))
         scene.add(pyrender.Mesh.from_trimesh(trimesh.Trimesh(
@@ -920,12 +934,199 @@ class MouseFitter():
 
             background_mask = color[:, :, :] == 255
             color[background_mask] = img_i[background_mask]
+
+            # Overlay keypoints if requested
+            if show_keypoints:
+                # Project 3D keypoints to 2D
+                T_flat = cam_param['T'] / 1000
+                if len(T_flat.shape) > 1:
+                    T_flat = T_flat.squeeze()
+                data2d = (joints_3d @ cam_param['R'] + T_flat) @ cam_param['K']
+                data2d = data2d[:, 0:2] / data2d[:, 2:]
+
+                # Get sparse indices if in sparse mode
+                sparse_indices = getattr(self.cfg.fitter, 'sparse_keypoint_indices', None)
+                if sparse_indices:
+                    indices_to_draw = list(sparse_indices)
+                else:
+                    indices_to_draw = list(range(22))
+
+                # Draw predicted keypoints with part-aware colors (small circles)
+                for idx in indices_to_draw:
+                    if idx >= data2d.shape[0]:
+                        continue
+                    x, y = data2d[idx, 0], data2d[idx, 1]
+                    if math.isnan(x) or math.isnan(y) or (x == 0 and y == 0):
+                        continue
+                    p = (int(x), int(y))
+                    part_color = self.get_keypoint_color(idx)
+                    cv2.circle(color, p, 5, part_color, -1)
+                    cv2.circle(color, p, 5, (255, 255, 255), 1)  # White outline
+
+                # Draw GT keypoints if available (larger circles with X marker)
+                if target_2d is not None:
+                    gt_data = target_2d[batch_id, view_idx].detach().cpu().numpy()
+                    gt_xy = gt_data[:, :2]
+                    gt_conf = gt_data[:, 2]
+                    for idx in indices_to_draw:
+                        if idx >= gt_xy.shape[0] or gt_conf[idx] < 0.25:
+                            continue
+                        x, y = gt_xy[idx, 0], gt_xy[idx, 1]
+                        if math.isnan(x) or math.isnan(y) or (x == 0 and y == 0):
+                            continue
+                        p = (int(x), int(y))
+                        part_color = self.get_keypoint_color(idx)
+                        # Draw X marker for GT
+                        cv2.drawMarker(color, p, part_color, cv2.MARKER_CROSS, 12, 2)
+
             color_maps.append(color)
+
         output = pack_images(color_maps)
+
+        # Add step description if provided
+        if step_name:
+            output = self._add_step_label(output, step_name)
+
         if filename is not None:
             cv2.imwrite(filename, output)
         return output
-        
+
+    def _add_step_label(self, img, step_name):
+        """Add step description label to the top of the image."""
+        step_descriptions = {
+            'Step0': 'Step 0: Global Positioning (trans, rotation, scale only)',
+            'Step1': 'Step 1: Articulation Fitting (joint angles, bone lengths)',
+            'Step2': 'Step 2: Silhouette Refinement (mask loss enabled)',
+        }
+        text = step_descriptions.get(step_name, step_name)
+
+        # Add header bar
+        h, w = img.shape[:2]
+        header_h = 40
+        new_img = np.zeros((h + header_h, w, 3), dtype=np.uint8)
+        new_img[:header_h, :] = (40, 40, 40)  # Dark gray header
+        new_img[header_h:, :] = img
+
+        # Draw text
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        cv2.putText(new_img, text, (10, 28), font, 0.7, (255, 255, 255), 2)
+
+        return new_img
+
+    def create_step_summary(self, frame_id):
+        """
+        Create a summary image showing all 3 fitting steps side by side.
+        Reads existing step images and combines them into a single comparison.
+        """
+        step_files = [
+            (f"{self.result_folder}/render/debug/step_0_frame_{frame_id:06d}_iter_00000.png", "Step0"),
+            (f"{self.result_folder}/render/step_1_frame_{frame_id:06d}.png", "Step1"),
+            (f"{self.result_folder}/render/step_2_frame_{frame_id:06d}.png", "Step2"),
+        ]
+
+        images = []
+        for filepath, step_name in step_files:
+            if os.path.exists(filepath):
+                img = cv2.imread(filepath)
+                if img is not None:
+                    images.append((img, step_name))
+
+        if len(images) < 2:
+            return None
+
+        # Get max dimensions
+        max_h = max(img.shape[0] for img, _ in images)
+        max_w = max(img.shape[1] for img, _ in images)
+
+        # Create combined image with step labels
+        header_h = 50
+        gap = 10
+        total_w = sum(img.shape[1] for img, _ in images) + gap * (len(images) - 1)
+        combined = np.zeros((max_h + header_h, total_w, 3), dtype=np.uint8)
+        combined[:header_h, :] = (30, 30, 30)
+
+        step_descriptions = {
+            'Step0': 'Step 0: Global Positioning\n(trans, rotation, scale)',
+            'Step1': 'Step 1: Articulation\n(joint angles, bones)',
+            'Step2': 'Step 2: Silhouette\n(mask refinement)',
+        }
+
+        x_offset = 0
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        for img, step_name in images:
+            h, w = img.shape[:2]
+            # Place image
+            combined[header_h:header_h+h, x_offset:x_offset+w] = img
+
+            # Add step label
+            desc = step_descriptions.get(step_name, step_name)
+            lines = desc.split('\n')
+            for i, line in enumerate(lines):
+                cv2.putText(combined, line, (x_offset + 10, 20 + i*18),
+                           font, 0.5, (255, 255, 255), 1)
+
+            x_offset += w + gap
+
+        # Save summary
+        summary_path = f"{self.result_folder}/render/step_summary_frame_{frame_id:06d}.png"
+        cv2.imwrite(summary_path, combined)
+        return summary_path
+
+    # GT Keypoint labels (22 keypoints) - Based on mouse_22_defs.py
+    # NOTE: GT annotation uses different order for head keypoints!
+    # GT: 0=L_ear, 1=R_ear, 2=nose (from mouse_22_defs.py)
+    # Model: 0=nose, 1=L_ear, 2=R_ear (from keypoint22_mapper.json)
+    GT_KEYPOINT_LABELS = {
+        0: 'L_ear', 1: 'R_ear', 2: 'nose',  # GT order!
+        3: 'neck', 4: 'body',
+        5: 'tail_root', 6: 'tail_mid', 7: 'tail_end',
+        8: 'L_paw', 9: 'L_paw_end', 10: 'L_elbow', 11: 'L_shoulder',
+        12: 'R_paw', 13: 'R_paw_end', 14: 'R_elbow', 15: 'R_shoulder',
+        16: 'L_foot', 17: 'L_knee', 18: 'L_hip',
+        19: 'R_foot', 20: 'R_knee', 21: 'R_hip'
+    }
+
+    # Model keypoint labels (for predicted keypoints)
+    MODEL_KEYPOINT_LABELS = {
+        0: 'nose', 1: 'L_ear', 2: 'R_ear',  # Model order!
+        3: 'neck', 4: 'body',
+        5: 'tail_base', 6: 'tail_mid', 7: 'tail_tip',
+        8: 'L_fp_dig', 9: 'L_fpaw', 10: 'L_ulna', 11: 'L_humer',
+        12: 'R_fp_dig', 13: 'R_fpaw', 14: 'R_ulna', 15: 'R_humer',
+        16: 'L_hp_dig', 17: 'L_hpaw', 18: 'L_tibia',
+        19: 'R_hp_dig', 20: 'R_hpaw', 21: 'R_tibia'
+    }
+
+    # Default to GT labels for visualization
+    KEYPOINT_LABELS = GT_KEYPOINT_LABELS
+
+    # Part-aware color scheme for keypoints (BGR format for OpenCV)
+    # Consistent color coding across all visualizations
+    KEYPOINT_COLORS = {
+        'head': (0, 255, 255),       # Yellow - indices 0, 1, 2
+        'body': (255, 0, 255),       # Magenta - indices 3, 4
+        'tail': (0, 165, 255),       # Orange - indices 5, 6, 7
+        'L_front': (255, 0, 0),      # Blue - indices 8, 9, 10, 11
+        'R_front': (0, 255, 0),      # Green - indices 12, 13, 14, 15
+        'L_hind': (255, 255, 0),     # Cyan - indices 16, 17, 18
+        'R_hind': (0, 0, 255),       # Red - indices 19, 20, 21
+    }
+
+    # Index to body part mapping
+    KEYPOINT_PART_MAP = {
+        0: 'head', 1: 'head', 2: 'head',
+        3: 'body', 4: 'body',
+        5: 'tail', 6: 'tail', 7: 'tail',
+        8: 'L_front', 9: 'L_front', 10: 'L_front', 11: 'L_front',
+        12: 'R_front', 13: 'R_front', 14: 'R_front', 15: 'R_front',
+        16: 'L_hind', 17: 'L_hind', 18: 'L_hind',
+        19: 'R_hind', 20: 'R_hind', 21: 'R_hind',
+    }
+
+    def get_keypoint_color(self, idx):
+        """Get color for keypoint index based on body part."""
+        part = self.KEYPOINT_PART_MAP.get(idx, 'body')
+        return self.KEYPOINT_COLORS.get(part, (255, 255, 255))
 
     def draw_keypoints_compare(self, result, imgs, batch_id, filename, cams_dict, target_2d=None):
         """
@@ -935,7 +1136,7 @@ class MouseFitter():
         Saves three images:
         1. {filename} - Predicted keypoints only (backward compatible)
         2. {filename}_gt.png - GT keypoints only
-        3. {filename}_compare.png - Side-by-side GT vs Predicted
+        3. {filename}_compare.png - Side-by-side GT vs Predicted with legend and labels
 
         Args:
             result: body model parameters
@@ -953,6 +1154,8 @@ class MouseFitter():
 
         # Get sparse indices if in sparse mode
         sparse_indices = getattr(self.cfg.fitter, 'sparse_keypoint_indices', None)
+        if sparse_indices:
+            sparse_indices = list(sparse_indices)  # Ensure it's a list
 
         pred_images = []
         gt_images = []
@@ -971,43 +1174,53 @@ class MouseFitter():
 
             # GT keypoints (from target_2d if available)
             data2d_gt = None
+            gt_conf = None
             if target_2d is not None:
                 gt_data = target_2d[batch_id, view_idx].detach().cpu().numpy()  # [22, 3]
                 data2d_gt = gt_data[:, :2]  # [22, 2] - xy only
                 gt_conf = gt_data[:, 2]  # confidence
 
-            # Filter to sparse indices if applicable
+            # Determine which indices to draw
             if sparse_indices:
-                data2d_pred_filtered = np.zeros_like(data2d_pred)
-                for idx in sparse_indices:
-                    data2d_pred_filtered[idx] = data2d_pred[idx]
-
-                if data2d_gt is not None:
-                    data2d_gt_filtered = np.zeros_like(data2d_gt)
-                    for idx in sparse_indices:
-                        if gt_conf[idx] > 0.25:  # Only show confident GT points
-                            data2d_gt_filtered[idx] = data2d_gt[idx]
-                else:
-                    data2d_gt_filtered = None
+                indices_to_draw = sparse_indices
             else:
-                data2d_pred_filtered = data2d_pred
-                data2d_gt_filtered = data2d_gt
+                indices_to_draw = list(range(22))
 
-            # Draw predicted keypoints (green circles)
+            # Draw predicted keypoints (green circles with labels)
             img_pred = myimages[view_idx].copy()
-            img_pred = draw_keypoints(img_pred, data2d_pred_filtered, [], is_draw_bone=False)
+            img_pred = self._draw_keypoints_with_labels(
+                img_pred, data2d_pred, indices_to_draw,
+                color=(0, 255, 0), radius=7, show_labels=True
+            )
             pred_images.append(img_pred)
 
-            # Draw GT keypoints (red circles) if available
-            if data2d_gt_filtered is not None:
+            # Draw GT keypoints (red circles with labels) if available
+            if data2d_gt is not None:
                 img_gt = myimages[view_idx].copy()
-                img_gt = self._draw_keypoints_color(img_gt, data2d_gt_filtered, color=(0, 0, 255))  # Red for GT
+                # Only draw GT points that have confidence > 0.25
+                valid_gt_indices = [idx for idx in indices_to_draw if gt_conf[idx] > 0.25]
+                img_gt = self._draw_keypoints_with_labels(
+                    img_gt, data2d_gt, valid_gt_indices,
+                    color=(0, 0, 255), radius=7, show_labels=True,
+                    confidence=gt_conf  # Include confidence values
+                )
                 gt_images.append(img_gt)
 
-                # Draw comparison (GT=red, Pred=green on same image)
+                # Draw comparison (GT=red, Pred=green on same image) with legend
                 img_compare = myimages[view_idx].copy()
-                img_compare = self._draw_keypoints_color(img_compare, data2d_gt_filtered, color=(0, 0, 255), radius=7)  # Red GT
-                img_compare = self._draw_keypoints_color(img_compare, data2d_pred_filtered, color=(0, 255, 0), radius=5)  # Green Pred
+                # Draw GT first (red, larger) with confidence
+                img_compare = self._draw_keypoints_with_labels(
+                    img_compare, data2d_gt, valid_gt_indices,
+                    color=(0, 0, 255), radius=9, show_labels=True, label_prefix="GT:",
+                    confidence=gt_conf  # Include confidence values
+                )
+                # Draw Pred on top (green, smaller)
+                img_compare = self._draw_keypoints_with_labels(
+                    img_compare, data2d_pred, indices_to_draw,
+                    color=(0, 255, 0), radius=5, show_labels=False
+                )
+                # Add legend to comparison image
+                img_compare = self._add_legend(img_compare, sparse_indices)
                 compare_images.append(img_compare)
 
         # Save predicted keypoints image (backward compatible)
@@ -1026,8 +1239,109 @@ class MouseFitter():
             compare_outputimg = pack_images(compare_images)
             cv2.imwrite(f"{base_name}_compare.png", compare_outputimg)
 
+    def _draw_keypoints_with_labels(self, img, proj, indices, color=(0, 255, 0), radius=9,
+                                      show_labels=True, label_prefix="", confidence=None):
+        """
+        Draw keypoints with index:label text annotations and optional confidence values.
+
+        Args:
+            img: Image to draw on
+            proj: Projected 2D keypoints [N, 2]
+            indices: List of keypoint indices to draw
+            color: BGR color tuple
+            radius: Circle radius
+            show_labels: Whether to show text labels
+            label_prefix: Prefix for labels (e.g., "GT:")
+            confidence: Optional confidence array [N] for each keypoint
+        """
+        for idx in indices:
+            if idx >= proj.shape[0]:
+                continue
+            x, y = proj[idx, 0], proj[idx, 1]
+            if math.isnan(x) or math.isnan(y) or (x == 0 and y == 0):
+                continue
+
+            p = (int(x), int(y))
+            cv2.circle(img, p, radius, color, -1)
+
+            if show_labels:
+                label = self.KEYPOINT_LABELS.get(idx, str(idx))
+                # Include confidence if available
+                if confidence is not None and idx < len(confidence):
+                    conf_val = confidence[idx]
+                    text = f"{label_prefix}{idx}:{label}({conf_val:.2f})"
+                else:
+                    text = f"{label_prefix}{idx}:{label}"
+
+                # Draw text with background for visibility
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                font_scale = 0.4
+                thickness = 1
+                (text_w, text_h), baseline = cv2.getTextSize(text, font, font_scale, thickness)
+
+                # Position text above the point
+                text_x = int(x) + 10
+                text_y = int(y) - 10
+
+                # Draw background rectangle
+                cv2.rectangle(img,
+                    (text_x - 2, text_y - text_h - 2),
+                    (text_x + text_w + 2, text_y + 2),
+                    (0, 0, 0), -1)
+
+                # Draw text
+                cv2.putText(img, text, (text_x, text_y), font, font_scale, color, thickness)
+
+        return img
+
+    def _add_legend(self, img, sparse_indices=None):
+        """
+        Add a legend to the image explaining colors and sparse keypoints.
+
+        Args:
+            img: Image to add legend to
+            sparse_indices: List of sparse keypoint indices (or None for all 22)
+        """
+        h, w = img.shape[:2]
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 0.5
+        thickness = 1
+
+        # Legend box position (top-left)
+        legend_x = 10
+        legend_y = 20
+        line_height = 20
+
+        # Draw semi-transparent background
+        legend_h = 80 if sparse_indices else 60
+        overlay = img.copy()
+        cv2.rectangle(overlay, (5, 5), (220, legend_h), (40, 40, 40), -1)
+        cv2.addWeighted(overlay, 0.7, img, 0.3, 0, img)
+
+        # Draw legend items
+        # Red = GT
+        cv2.circle(img, (legend_x, legend_y), 6, (0, 0, 255), -1)
+        cv2.putText(img, "RED = Ground Truth (GT)", (legend_x + 15, legend_y + 5),
+                    font, font_scale, (255, 255, 255), thickness)
+
+        # Green = Predicted
+        legend_y += line_height
+        cv2.circle(img, (legend_x, legend_y), 6, (0, 255, 0), -1)
+        cv2.putText(img, "GREEN = Predicted", (legend_x + 15, legend_y + 5),
+                    font, font_scale, (255, 255, 255), thickness)
+
+        # Sparse mode info
+        if sparse_indices:
+            legend_y += line_height
+            sparse_names = [f"{i}:{self.KEYPOINT_LABELS.get(i, '?')}" for i in sparse_indices]
+            sparse_text = f"Sparse: {', '.join(sparse_names)}"
+            cv2.putText(img, sparse_text, (legend_x, legend_y + 5),
+                        font, font_scale, (255, 255, 0), thickness)
+
+        return img
+
     def _draw_keypoints_color(self, img, proj, color=(0, 255, 0), radius=9):
-        """Draw keypoints with specified color."""
+        """Draw keypoints with specified color (legacy method for backward compatibility)."""
         for k in range(proj.shape[0]):
             if math.isnan(proj[k,0]) or (proj[k,0] == 0 and proj[k,1] == 0):
                 continue
@@ -1127,7 +1441,7 @@ def optim_single(cfg: DictConfig):
     fitter.result_folder = hydra.utils.to_absolute_path(dynamic_result_folder)
     print(f"Results will be saved to: {fitter.result_folder}")
     os.makedirs(fitter.result_folder, exist_ok=True)
-    subfolders = ["params", "render", "render/debug/", "obj"]
+    subfolders = ["params", "render", "render/debug/", "render/keypoints/", "obj"]
     for subfolder in subfolders:
         os.makedirs(os.path.join(fitter.result_folder, subfolder), exist_ok=True)
 
@@ -1165,7 +1479,7 @@ def optim_single(cfg: DictConfig):
 
         if index == start:
             if cfg.fitter.resume:
-                with open(os.path.join(fitter.result_folder, "params/param{}_sil.pkl".format(index-1)), 'rb') as f:
+                with open(os.path.join(fitter.result_folder, "params/step_2_frame_{:06d}.pkl".format(index-1)), 'rb') as f:
                     init_params = pickle.load(f)
                 fitter.set_previous_frame(init_params)
                 params = init_params
@@ -1188,6 +1502,9 @@ def optim_single(cfg: DictConfig):
             params = fitter.solve_step0(params=params, target=target, max_iters=step0_iters, pbar=pbar)
             params = fitter.solve_step1(params=params, target=target, max_iters=step1_iters, pbar=pbar)
             params = fitter.solve_step2(params=params, target=target, max_iters=step2_iters, pbar=pbar)
+            # Create step-by-step summary for first frame (has all 3 steps)
+            if cfg.fitter.with_render:
+                fitter.create_step_summary(index)
         else:
             params = fitter.solve_step1(params=params, target=target, max_iters=step1_iters, pbar=pbar)
             params = fitter.solve_step2(params=params, target=target, max_iters=step2_iters, pbar=pbar)

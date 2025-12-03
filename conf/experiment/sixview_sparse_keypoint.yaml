@@ -20,11 +20,11 @@ fitter:
   render_cameras: [0, 1, 2, 3, 4, 5]
   use_keypoints: true
   keypoint_num: 22
-  # Sparse keypoint indices (from keypoint22_mapper.json):
-  #   idx 0: Nose (Vertices [12274, 12225])
-  #   idx 5: Tail base (lumbar_vertebrae_0 + tail_0)
-  #   idx 3: Neck/Body center (neck_stretch)
-  sparse_keypoint_indices: [0, 5, 3]
+  # Sparse keypoint indices (GT annotation 기준 - mouse_22_defs.py):
+  #   idx 2: Nose (GT에서 nose는 index 2)
+  #   idx 5: Tail root
+  #   idx 3: Neck
+  sparse_keypoint_indices: [2, 5, 3]
   start_frame: 0
   end_frame: 5    # Full: 100 frames, minimized for quick iteration
   interval: 1
@@ -54,7 +54,7 @@ loss_weights:
 # Keypoint weights - only sparse points have weight
 keypoint_weights:
   default: 0.0         # Zero weight for unused keypoints
-  idx_0: 5.0           # Nose - high weight
+  idx_2: 5.0           # Nose (GT index 2) - high weight
   idx_5: 3.0           # Tail base (lumbar + tail_0)
   idx_3: 5.0           # Neck/Body center - high weight
   tail_step2: 10.0

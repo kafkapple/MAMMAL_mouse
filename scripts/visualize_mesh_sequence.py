@@ -2,6 +2,12 @@
 """
 Visualize mesh sequence from fitting results.
 
+This script can:
+1. Reconstruct 3D mesh from PKL parameters using BodyModel
+2. Load mesh directly from OBJ files (standalone)
+3. Render from arbitrary viewpoints (azimuth, elevation)
+4. Export as video file
+
 Usage:
     python scripts/visualize_mesh_sequence.py <results_folder> [--output video.mp4]
 
@@ -9,8 +15,14 @@ Examples:
     # Interactive 3D viewer (matplotlib)
     python scripts/visualize_mesh_sequence.py results/fitting/markerless_mouse_1_nerf_v024_20251202_130053
 
-    # Save as video
-    python scripts/visualize_mesh_sequence.py results/fitting/xxx --output mesh_sequence.mp4
+    # Save as video from custom viewpoint
+    python scripts/visualize_mesh_sequence.py results/fitting/xxx --output mesh_sequence.mp4 --azimuth 45
+
+    # Use OBJ files directly (no BodyModel needed)
+    python scripts/visualize_mesh_sequence.py results/fitting/xxx --use-obj --output mesh.mp4
+
+    # Rotating 360° view
+    python scripts/visualize_mesh_sequence.py results/fitting/xxx --rotating --output rotating.mp4
 
     # Save individual frames
     python scripts/visualize_mesh_sequence.py results/fitting/xxx --output-frames frames/
@@ -82,11 +94,12 @@ def find_pkl_files(results_folder):
     """Find all parameter pkl files in results folder."""
     results_path = Path(results_folder)
 
-    # Try different patterns
+    # Try different patterns (new naming convention first)
     patterns = [
-        'params/param*_sil.pkl',  # Multi-view fitting (step2 results)
-        'params/param*.pkl',       # Multi-view fitting
-        '*_params.pkl',            # Monocular fitting
+        'params/step_2_frame_*.pkl',  # New naming: step_2_frame_000000.pkl
+        'params/param*_sil.pkl',       # Old naming: param0_sil.pkl
+        'params/param*.pkl',           # Old naming: param0.pkl
+        '*_params.pkl',                # Monocular fitting
     ]
 
     pkl_files = []
@@ -97,6 +110,47 @@ def find_pkl_files(results_folder):
             break
 
     return pkl_files
+
+
+def find_obj_files(results_folder):
+    """Find all OBJ mesh files in results folder."""
+    results_path = Path(results_folder)
+
+    # Try different patterns
+    patterns = [
+        'obj/step_2_frame_*.obj',  # New naming
+        'obj/mesh_*.obj',          # Old naming
+        '*.obj',
+    ]
+
+    obj_files = []
+    for pattern in patterns:
+        files = sorted(results_path.glob(pattern))
+        if files:
+            obj_files = files
+            break
+
+    return obj_files
+
+
+def load_mesh_from_obj(obj_path):
+    """Load mesh from OBJ file (standalone, no BodyModel needed)."""
+    vertices = []
+    faces = []
+
+    with open(obj_path, 'r') as f:
+        for line in f:
+            parts = line.strip().split()
+            if not parts:
+                continue
+            if parts[0] == 'v':
+                vertices.append([float(parts[1]), float(parts[2]), float(parts[3])])
+            elif parts[0] == 'f':
+                # OBJ faces are 1-indexed
+                face = [int(p.split('/')[0]) - 1 for p in parts[1:4]]
+                faces.append(face)
+
+    return np.array(vertices), np.array(faces)
 
 
 def visualize_mesh_matplotlib(mesh_data, ax=None, show_keypoints=True):
@@ -153,6 +207,71 @@ def visualize_mesh_matplotlib(mesh_data, ax=None, show_keypoints=True):
     return ax
 
 
+def render_mesh_pyrender(vertices, faces, azimuth=0, elevation=30, distance=400,
+                         img_size=(800, 800), color=(0.8, 0.6, 0.4)):
+    """Render mesh using pyrender from specified viewpoint."""
+    try:
+        import pyrender
+        import trimesh
+        from pyrender.constants import RenderFlags
+    except ImportError:
+        return None
+
+    # Create mesh
+    mesh = trimesh.Trimesh(vertices=vertices, faces=faces,
+                           vertex_colors=np.tile(color, (len(vertices), 1)))
+
+    # Create scene
+    scene = pyrender.Scene(bg_color=[1.0, 1.0, 1.0, 1.0])
+    scene.add(pyrender.Mesh.from_trimesh(mesh))
+
+    # Add light
+    light = pyrender.DirectionalLight(color=np.ones(3), intensity=3.0)
+    scene.add(light)
+
+    # Camera pose from azimuth/elevation
+    center = vertices.mean(axis=0)
+
+    # Convert angles to radians
+    az_rad = np.radians(azimuth)
+    el_rad = np.radians(elevation)
+
+    # Camera position in spherical coordinates
+    cam_x = center[0] + distance * np.cos(el_rad) * np.sin(az_rad)
+    cam_y = center[1] + distance * np.sin(el_rad)
+    cam_z = center[2] + distance * np.cos(el_rad) * np.cos(az_rad)
+    cam_pos = np.array([cam_x, cam_y, cam_z])
+
+    # Look-at matrix
+    forward = center - cam_pos
+    forward = forward / np.linalg.norm(forward)
+    right = np.cross(forward, np.array([0, 1, 0]))
+    if np.linalg.norm(right) < 1e-6:
+        right = np.array([1, 0, 0])
+    right = right / np.linalg.norm(right)
+    up = np.cross(right, forward)
+
+    camera_pose = np.eye(4)
+    camera_pose[:3, 0] = right
+    camera_pose[:3, 1] = up
+    camera_pose[:3, 2] = -forward
+    camera_pose[:3, 3] = cam_pos
+
+    # Add camera
+    camera = pyrender.PerspectiveCamera(yfov=np.pi / 4.0)
+    scene.add(camera, pose=camera_pose)
+
+    # Render
+    try:
+        renderer = pyrender.OffscreenRenderer(img_size[0], img_size[1])
+        color_img, _ = renderer.render(scene, flags=RenderFlags.SHADOWS_DIRECTIONAL)
+        renderer.delete()
+        return color_img
+    except Exception as e:
+        print(f"Pyrender error: {e}")
+        return None
+
+
 def main():
     parser = argparse.ArgumentParser(description='Visualize mesh sequence from fitting results')
     parser.add_argument('results_folder', type=str, help='Path to results folder')
@@ -160,71 +279,119 @@ def main():
     parser.add_argument('--output-frames', type=str, default=None, help='Output frames folder')
     parser.add_argument('--device', type=str, default='cuda', help='Device (cuda/cpu)')
     parser.add_argument('--interactive', action='store_true', help='Interactive mode (step through frames)')
+    parser.add_argument('--use-obj', action='store_true', help='Use OBJ files instead of PKL (no BodyModel needed)')
+    parser.add_argument('--azimuth', type=float, default=45, help='Camera azimuth angle (degrees)')
+    parser.add_argument('--elevation', type=float, default=30, help='Camera elevation angle (degrees)')
+    parser.add_argument('--distance', type=float, default=400, help='Camera distance from mesh center')
+    parser.add_argument('--rotating', action='store_true', help='Create 360° rotating view')
+    parser.add_argument('--fps', type=int, default=30, help='Output video FPS')
+    parser.add_argument('--use-pyrender', action='store_true', help='Use pyrender instead of matplotlib')
     args = parser.parse_args()
 
-    # Find pkl files
-    pkl_files = find_pkl_files(args.results_folder)
+    # Find mesh files
+    if args.use_obj:
+        mesh_files = find_obj_files(args.results_folder)
+        file_type = "OBJ"
+    else:
+        mesh_files = find_pkl_files(args.results_folder)
+        file_type = "PKL"
 
-    if not pkl_files:
-        print(f"No parameter files found in {args.results_folder}")
-        print("Looking for: params/param*.pkl or *_params.pkl")
+    if not mesh_files:
+        print(f"No {file_type} files found in {args.results_folder}")
+        if args.use_obj:
+            print("Looking for: obj/step_2_frame_*.obj or obj/mesh_*.obj")
+        else:
+            print("Looking for: params/step_2_frame_*.pkl or params/param*.pkl")
         return
 
-    print(f"Found {len(pkl_files)} parameter files")
-    for f in pkl_files[:5]:
+    print(f"Found {len(mesh_files)} {file_type} files")
+    for f in mesh_files[:5]:
         print(f"  {f.name}")
-    if len(pkl_files) > 5:
-        print(f"  ... and {len(pkl_files) - 5} more")
+    if len(mesh_files) > 5:
+        print(f"  ... and {len(mesh_files) - 5} more")
 
-    # Initialize MAMMAL model (once)
-    print("\nLoading MAMMAL model...")
-    model = ArticulationTorch()
-    model.init_params(batch_size=1)
-    model.to(args.device)
-    print(f"Model loaded: {model.vertexnum} vertices, {model.jointnum} joints")
+    # Initialize BodyModel only if using PKL files
+    model = None
+    if not args.use_obj:
+        print("\nLoading BodyModel...")
+        from bodymodel_th import BodyModelTorch
+        model = BodyModelTorch(device=args.device)
+        print(f"Model loaded: {model.vertexnum} vertices")
 
-    # Generate meshes
-    import matplotlib.pyplot as plt
-    from mpl_toolkits.mplot3d import Axes3D
-
-    fig = plt.figure(figsize=(12, 10))
-    ax = fig.add_subplot(111, projection='3d')
+    # Setup matplotlib if needed
+    if not args.use_pyrender:
+        import matplotlib.pyplot as plt
+        from mpl_toolkits.mplot3d import Axes3D
+        fig = plt.figure(figsize=(12, 10))
+        ax = fig.add_subplot(111, projection='3d')
 
     if args.output_frames:
         output_frames_path = Path(args.output_frames)
         output_frames_path.mkdir(parents=True, exist_ok=True)
 
     frames_for_video = []
+    total_frames = len(mesh_files)
 
-    for i, pkl_path in enumerate(pkl_files):
-        print(f"\rProcessing frame {i+1}/{len(pkl_files)}: {pkl_path.name}", end='')
+    for i, mesh_file in enumerate(mesh_files):
+        print(f"\rProcessing frame {i+1}/{total_frames}: {mesh_file.name}", end='')
 
-        # Load and convert parameters
-        params = load_params_from_pkl(pkl_path)
-        params_tensors = params_to_tensors(params, args.device)
+        # Load mesh
+        if args.use_obj:
+            vertices, faces = load_mesh_from_obj(mesh_file)
+            keypoints = None
+        else:
+            params = load_params_from_pkl(mesh_file)
+            params_tensors = params_to_tensors(params, args.device)
+            mesh_data = generate_mesh_from_params(model, params_tensors)
+            vertices = mesh_data['vertices']
+            faces = mesh_data['faces']
+            keypoints = mesh_data['keypoints']
 
-        # Generate mesh
-        mesh_data = generate_mesh_from_params(model, params_tensors)
+        # Calculate azimuth for rotating view
+        if args.rotating:
+            azimuth = (args.azimuth + i * (360 / total_frames)) % 360
+        else:
+            azimuth = args.azimuth
 
-        # Visualize
-        ax = visualize_mesh_matplotlib(mesh_data, ax=ax)
-        ax.set_title(f'Frame {i+1}/{len(pkl_files)}: {pkl_path.stem}')
+        # Render
+        if args.use_pyrender:
+            frame = render_mesh_pyrender(vertices, faces,
+                                         azimuth=azimuth,
+                                         elevation=args.elevation,
+                                         distance=args.distance)
+            if frame is None:
+                print("\nPyrender failed, falling back to matplotlib")
+                args.use_pyrender = False
+                fig = plt.figure(figsize=(12, 10))
+                ax = fig.add_subplot(111, projection='3d')
 
-        if args.output_frames:
-            frame_path = output_frames_path / f'frame_{i:05d}.png'
-            plt.savefig(frame_path, dpi=100, bbox_inches='tight')
+        if not args.use_pyrender:
+            mesh_data_vis = {'vertices': vertices, 'faces': faces,
+                            'keypoints': keypoints if keypoints is not None else np.zeros((22, 3))}
+            ax = visualize_mesh_matplotlib(mesh_data_vis, ax=ax, show_keypoints=keypoints is not None)
+            ax.view_init(elev=args.elevation, azim=azimuth)
+            ax.set_title(f'Frame {i+1}/{total_frames}: {mesh_file.stem}')
 
-        if args.output:
             # Save frame for video
             fig.canvas.draw()
             frame = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
             frame = frame.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-            frames_for_video.append(frame)
 
-        if args.interactive:
-            plt.pause(0.5)
-        elif not args.output and not args.output_frames:
-            plt.pause(0.1)
+        # Add frame info text
+        import cv2
+        frame_with_info = frame.copy()
+        text = f"Frame {i:06d}/{total_frames}"
+        cv2.putText(frame_with_info, text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX,
+                   0.7, (0, 0, 0), 2)
+
+        frames_for_video.append(frame_with_info)
+
+        if args.output_frames:
+            frame_path = output_frames_path / f'frame_{i:06d}.png'
+            cv2.imwrite(str(frame_path), cv2.cvtColor(frame_with_info, cv2.COLOR_RGB2BGR))
+
+        if args.interactive and not args.use_pyrender:
+            plt.pause(0.3)
 
     print("\n")
 
@@ -234,13 +401,13 @@ def main():
         import cv2
         h, w = frames_for_video[0].shape[:2]
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter(args.output, fourcc, 10, (w, h))
+        out = cv2.VideoWriter(args.output, fourcc, args.fps, (w, h))
         for frame in frames_for_video:
             out.write(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
         out.release()
-        print(f"Video saved: {args.output}")
+        print(f"Video saved: {args.output} ({total_frames} frames, {args.fps} fps)")
 
-    if not args.output and not args.output_frames:
+    if not args.output and not args.output_frames and not args.use_pyrender:
         plt.show()
 
     print("Done!")
