@@ -596,8 +596,12 @@ class MouseFitter():
         params["thetas"].requires_grad_(False)
         params["bone_lengths"].requires_grad_(False)
 
-        for i in range(max_iters):
+        # Iteration progress bar (nested under frame progress)
+        iter_pbar = tqdm(range(max_iters), desc="  Step0", leave=False,
+                         bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}')
+        for i in iter_pbar:
             loss = optimizer.step(closure).item()
+            iter_pbar.set_postfix(loss=f"{loss:.1f}", **{k: f"{v:.1f}" for k, v in self.losses.items() if k in ['2d', 'mask']})
             if pbar:
                 pbar.set_postfix(step="S0", iter=f"{i+1}/{max_iters}", loss=f"{loss:.1f}")
             if abs(loss-loss_prev) < tolerate:
@@ -606,6 +610,7 @@ class MouseFitter():
             if self.cfg.fitter.with_render:
                 imgs = self.imgs.copy()
                 self.render(params, imgs, 0, self.result_folder + "/render/debug/fitting_{}_global_iter_{:05d}.png".format(self.id, i), self.cam_dict)
+        iter_pbar.close()
 
         params["chest_deformer"].requires_grad_(True)
         params["thetas"].requires_grad_(True)
@@ -628,8 +633,12 @@ class MouseFitter():
         self.term_weights["stretch"] = 0
         params["chest_deformer"].requires_grad_(False)
 
-        for i in range(max_iters):
+        # Iteration progress bar
+        iter_pbar = tqdm(range(max_iters), desc="  Step1", leave=False,
+                         bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}')
+        for i in iter_pbar:
             loss = optimizer.step(closure).item()
+            iter_pbar.set_postfix(loss=f"{loss:.1f}", **{k: f"{v:.1f}" for k, v in self.losses.items() if k in ['2d', 'mask']})
             if pbar:
                 pbar.set_postfix(step="S1", iter=f"{i+1}/{max_iters}", loss=f"{loss:.1f}")
             if abs(loss-loss_prev) < tolerate:
@@ -638,6 +647,7 @@ class MouseFitter():
             if self.id == 0 and self.cfg.fitter.with_render:
                 imgs = self.imgs.copy()
                 self.render(params, imgs, 0, self.result_folder + "/render/debug/fitting_{}_debug_iter_{:05d}.png".format(self.id, i), self.cam_dict)
+        iter_pbar.close()
 
         if self.cfg.fitter.with_render:
             imgs = self.imgs.copy()
@@ -663,13 +673,18 @@ class MouseFitter():
         loss_prev = float('inf')
         optimizer.zero_grad()
 
-        for i in range(max_iters):
+        # Iteration progress bar
+        iter_pbar = tqdm(range(max_iters), desc="  Step2", leave=False,
+                         bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}')
+        for i in iter_pbar:
             loss = optimizer.step(closure).item()
+            iter_pbar.set_postfix(loss=f"{loss:.1f}", **{k: f"{v:.1f}" for k, v in self.losses.items() if k in ['2d', 'mask']})
             if pbar:
                 pbar.set_postfix(step="S2", iter=f"{i+1}/{max_iters}", loss=f"{loss:.1f}")
             if abs(loss-loss_prev) < tolerate:
                 break
             loss_prev = loss
+        iter_pbar.close()
 
         if self.cfg.fitter.with_render:
             imgs = self.imgs.copy()
