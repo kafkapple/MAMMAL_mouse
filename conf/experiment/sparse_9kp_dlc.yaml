@@ -1,0 +1,70 @@
+# @package _global_
+# Experiment: DeepLabCut-style 9 keypoints (balanced pose estimation)
+# Reference: DeepLabCut mouse model (https://github.com/DeepLabCut/DeepLabCut)
+#
+# Keypoints: nose, L/R ears, neck, body, tail_root, tail_mid, L/R front paws
+# Good balance between annotation effort and pose accuracy.
+#
+# Usage:
+#   Debug:  ./run_experiment.sh sparse_9kp_dlc --debug
+#   Full:   ./run_experiment.sh sparse_9kp_dlc
+
+defaults:
+  - override /dataset: markerless
+
+experiment_name: sparse_9kp_dlc
+experiment_description: "6-view with 9 DeepLabCut-style keypoints"
+
+data:
+  views_to_use: [0, 1, 2, 3, 4, 5]
+
+fitter:
+  render_cameras: [0, 1, 2, 3, 4, 5]
+  use_keypoints: true
+  keypoint_num: 22
+  # DeepLabCut-style keypoints (GT annotation indices):
+  #   Head: 0: L_ear, 1: R_ear, 2: nose
+  #   Body: 3: neck, 4: body_middle
+  #   Tail: 5: tail_root, 6: tail_middle
+  #   Paws: 8: L_paw, 12: R_paw
+  sparse_keypoint_indices: [0, 1, 2, 3, 4, 5, 6, 8, 12]
+  start_frame: 0
+  end_frame: 100
+  interval: 1
+  with_render: true
+
+optim:
+  solve_step0_iters: 12
+  solve_step1_iters: 100
+  solve_step2_iters: 35
+
+loss_weights:
+  theta: 3.5
+  "3d": 2.5
+  "2d": 0.35
+  bone: 0.6
+  scale: 0.6
+  chest_deformer: 0.1
+  stretch: 1.0
+  temp: 0.28
+  temp_d: 0.22
+  mask_step0: 0.0
+  mask_step1: 200.0
+  mask_step2: 3000.0
+
+keypoint_weights:
+  default: 0.0
+  # Head - highest priority
+  idx_0: 4.0    # L_ear
+  idx_1: 4.0    # R_ear
+  idx_2: 5.0    # Nose
+  # Body
+  idx_3: 5.0    # Neck
+  idx_4: 3.0    # Body middle
+  # Tail
+  idx_5: 3.0    # Tail root
+  idx_6: 2.0    # Tail middle
+  # Front paws
+  idx_8: 2.5    # L_paw
+  idx_12: 2.5   # R_paw
+  tail_step2: 8.0

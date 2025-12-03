@@ -1,0 +1,64 @@
+# @package _global_
+# Experiment: MARS-style 7 keypoints (top-view behavior analysis)
+# Reference: MARS/CalMS21 dataset - Caltech (https://neuroethology.github.io/MARS/)
+#
+# Keypoints: nose, L/R ears, neck, tail_base, L/R hips
+# This matches the standard used in social behavior analysis papers.
+#
+# Usage:
+#   Debug:  ./run_experiment.sh sparse_7kp_mars --debug
+#   Full:   ./run_experiment.sh sparse_7kp_mars
+
+defaults:
+  - override /dataset: markerless
+
+experiment_name: sparse_7kp_mars
+experiment_description: "6-view with 7 MARS-style keypoints (nose, ears, neck, tail, hips)"
+
+data:
+  views_to_use: [0, 1, 2, 3, 4, 5]
+
+fitter:
+  render_cameras: [0, 1, 2, 3, 4, 5]
+  use_keypoints: true
+  keypoint_num: 22
+  # MARS-style keypoints (GT annotation indices):
+  #   0: L_ear, 1: R_ear, 2: nose, 3: neck, 5: tail_root, 18: L_hip, 21: R_hip
+  sparse_keypoint_indices: [0, 1, 2, 3, 5, 18, 21]
+  start_frame: 0
+  end_frame: 100
+  interval: 1
+  with_render: true
+
+optim:
+  solve_step0_iters: 12
+  solve_step1_iters: 120
+  solve_step2_iters: 40
+
+loss_weights:
+  theta: 4.0
+  "3d": 2.5
+  "2d": 0.4
+  bone: 0.8
+  scale: 0.8
+  chest_deformer: 0.1
+  stretch: 1.0
+  temp: 0.3
+  temp_d: 0.25
+  mask_step0: 0.0
+  mask_step1: 300.0
+  mask_step2: 3000.0
+
+keypoint_weights:
+  default: 0.0
+  # Head - highest priority
+  idx_0: 4.0    # L_ear
+  idx_1: 4.0    # R_ear
+  idx_2: 5.0    # Nose
+  # Body center
+  idx_3: 5.0    # Neck
+  # Tail & Hips - for body orientation
+  idx_5: 3.0    # Tail root
+  idx_18: 2.0   # L_hip
+  idx_21: 2.0   # R_hip
+  tail_step2: 8.0

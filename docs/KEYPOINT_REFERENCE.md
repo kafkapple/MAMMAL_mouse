@@ -108,30 +108,67 @@ R Hind:     [19,20], [20,21], [21,5]
 
 ## Sparse Keypoint Configurations
 
-### Minimal (3 keypoints) - Default
-```yaml
-sparse_keypoint_indices: [2, 5, 3]  # nose(GT idx 2), tail_root, neck
+### Dataset References
 
-keypoint_weights:
-  default: 0.0
-  idx_2: 5.0   # Nose (GT index)
-  idx_5: 3.0   # Tail root
-  idx_3: 5.0   # Neck
+| Dataset | Points | Reference |
+|---------|--------|-----------|
+| [MARS/CalMS21](https://neuroethology.github.io/MARS/) | 7 | Caltech, top-view behavior |
+| [DeepLabCut](https://github.com/DeepLabCut/DeepLabCut) | 12 | General mouse pose |
+| [DANNCE](https://github.com/spoonsso/dannce) | 18-22 | 3D markerless tracking |
+
+---
+
+### 3 Keypoints (Minimal) - `sixview_sparse_keypoint`
+```yaml
+sparse_keypoint_indices: [2, 3, 5]  # nose, neck, tail_root
 ```
+- 최소한의 annotation으로 기본 pose 추정
+- 머리 방향 정보 부족
 
-**Note**: GT에서 nose는 index 2입니다 (index 0이 아님!)
-
-### Medium (5 keypoints)
+### 5 Keypoints (Minimal+) - `sparse_5kp_minimal`
 ```yaml
-sparse_keypoint_indices: [2, 3, 5, 9, 13]
+sparse_keypoint_indices: [0, 1, 2, 3, 5]  # L_ear, R_ear, nose, neck, tail_root
+```
+- **양쪽 귀 추가** → 머리 방향/회전 추정 가능
+- MARS dataset의 핵심 subset
 
-keypoint_weights:
-  default: 0.0
-  idx_2: 5.0   # Nose
-  idx_3: 5.0   # Neck
-  idx_5: 3.0   # Tail root
-  idx_9: 3.0   # Left paw end
-  idx_13: 3.0  # Right paw end
+### 7 Keypoints (MARS-style) - `sparse_7kp_mars`
+```yaml
+sparse_keypoint_indices: [0, 1, 2, 3, 5, 18, 21]  # ears, nose, neck, tail, hips
+```
+- [MARS/CalMS21](https://neuroethology.github.io/MARS/) 표준과 호환
+- Social behavior 분석에 최적화
+- Hip 포인트로 body orientation 보강
+
+### 9 Keypoints (DeepLabCut-style) - `sparse_9kp_dlc`
+```yaml
+sparse_keypoint_indices: [0, 1, 2, 3, 4, 5, 6, 8, 12]
+# L_ear, R_ear, nose, neck, body, tail_root, tail_mid, L_paw, R_paw
+```
+- [DeepLabCut](https://github.com/DeepLabCut/DeepLabCut) 표준과 유사
+- 균형잡힌 정확도 vs annotation 비용
+- 앞발 포함으로 locomotion 분석 가능
+
+### 22 Keypoints (Full) - `baseline_6view_keypoint`
+```yaml
+# All keypoints with default weights
+use_keypoints: true
+# No sparse_keypoint_indices (use all)
+```
+- 전체 skeleton reconstruction
+- 최고 정확도, 높은 annotation 비용
+
+---
+
+### Keypoint 수 vs 예상 정확도
+
+```
+Keypoints:   3      5      7       9      22
+            ┌──────┬──────┬───────┬──────┬──────┐
+Accuracy:   │ Low  │ Med- │ Med   │ Med+ │ High │
+            └──────┴──────┴───────┴──────┴──────┘
+Annotation: │ 1x   │ 1.7x │ 2.3x  │ 3x   │ 7x   │
+            └──────┴──────┴───────┴──────┴──────┘
 ```
 
 ---

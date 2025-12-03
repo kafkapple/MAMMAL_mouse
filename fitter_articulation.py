@@ -697,22 +697,27 @@ class MouseFitter():
                         continue
                     loss_mask += self.mask_loss_func(mask, target_mask) 
 
+            def safe_round(val, decimals=2):
+                """Safely round a value, handling NaN/Inf."""
+                v = float(val.detach().cpu().numpy()) if hasattr(val, 'detach') else float(val)
+                if np.isnan(v) or np.isinf(v):
+                    return 0.0
+                return round(v, decimals)
+
             self.losses.update({
-                "theta": round(float(loss_theta.detach().cpu().numpy()), 2),
-                "2d": round(float(loss_2d.detach().cpu().numpy()), 2), 
-                "bone": round(float(loss_bone_length.detach().cpu().numpy()), 2), 
-                "scale" : round(float(loss_scale.detach().cpu().numpy()), 2),
-                "mask": round(float(loss_mask.detach().cpu().numpy()), 2),
-                "chest_d": round(float(loss_chest_deformer.detach().cpu().numpy()), ), 
-                "stretch": round(float(loss_stretch_to_constraints.detach().cpu().numpy()), 2)
+                "theta": safe_round(loss_theta),
+                "2d": safe_round(loss_2d),
+                "bone": safe_round(loss_bone_length),
+                "scale": safe_round(loss_scale),
+                "mask": safe_round(loss_mask),
+                "chest_d": safe_round(loss_chest_deformer),
+                "stretch": safe_round(loss_stretch_to_constraints)
             })
-            if loss_temp > 0: 
-                self.losses.update(
-                    {
-                        "temp": round(float(loss_temp.detach().cpu().numpy()), 2), 
-                        "temp_d": round(float(loss_deformer_temp.detach().cpu().numpy()), 2)
-                    }
-                )
+            if loss_temp > 0:
+                self.losses.update({
+                    "temp": safe_round(loss_temp),
+                    "temp_d": safe_round(loss_deformer_temp)
+                })
 
             loss_v = loss_2d * self.term_weights["2d"] \
                 + loss_theta * self.term_weights["theta"] \
