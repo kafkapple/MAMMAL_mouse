@@ -609,7 +609,7 @@ class MouseFitter():
             loss_prev = loss
             if self.cfg.fitter.with_render:
                 imgs = self.imgs.copy()
-                self.render(params, imgs, self.cfg.fitter.render_cameras, 0, self.result_folder + "/render/debug/fitting_{}_global_iter_{:05d}.png".format(self.id, i), self.cam_dict)
+                self.render(params, imgs, 0, self.result_folder + "/render/debug/fitting_{}_global_iter_{:05d}.png".format(self.id, i), self.cam_dict)
         params["chest_deformer"].requires_grad_(True)
         params["thetas"].requires_grad_(True)
         params["bone_lengths"].requires_grad_(True)
@@ -645,15 +645,15 @@ class MouseFitter():
             loss_prev = loss 
             if self.id == 0 and self.cfg.fitter.with_render: 
                 imgs = self.imgs.copy() 
-                self.render(params, imgs, self.cfg.fitter.render_cameras, 0, self.result_folder + "/render/debug/fitting_{}_debug_iter_{:05d}.png".format(self.id, i), self.cam_dict)
+                self.render(params, imgs, 0, self.result_folder + "/render/debug/fitting_{}_debug_iter_{:05d}.png".format(self.id, i), self.cam_dict)
                 
 
         if self.cfg.fitter.with_render:
             imgs = self.imgs.copy()
-            self.render(params, imgs, self.cfg.fitter.render_cameras, 0, self.result_folder + "/render/fitting_{}.png".format(self.id), self.cam_dict)
+            self.render(params, imgs, 0, self.result_folder + "/render/fitting_{}.png".format(self.id), self.cam_dict)
             # Only draw keypoints visualization if keypoints are enabled
             if getattr(self.cfg.fitter, 'use_keypoints', True):
-                self.draw_keypoints_compare(params, imgs, self.cfg.fitter.render_cameras, 0, self.result_folder + "/fitting_keypoints_{}.png".format(self.id), self.cam_dict)
+                self.draw_keypoints_compare(params, imgs, 0, self.result_folder + "/fitting_keypoints_{}.png".format(self.id), self.cam_dict)
         with open(self.result_folder + "/params/param{}.pkl".format(self.id), 'wb') as f:
             pickle.dump(params,f)
         params["chest_deformer"].requires_grad_(True)
@@ -687,7 +687,7 @@ class MouseFitter():
             loss_prev = loss 
         if self.cfg.fitter.with_render: 
             imgs = self.imgs.copy() 
-            self.render(params, imgs, self.cfg.fitter.render_cameras, 0, self.result_folder+"/render/fitting_{}_sil.png".format(self.id), self.cam_dict)
+            self.render(params, imgs, 0, self.result_folder+"/render/fitting_{}_sil.png".format(self.id), self.cam_dict)
             # self.draw_keypoints_compare(params, imgs, self.cfg.fitter.render_cameras, 0, self.result_folder + "/fitting_keypoints_{}_sil.png".format(self.id), self.cam_dict)
         with open(self.result_folder + "/params/param{}_sil.pkl".format(self.id), 'wb') as f: 
             pickle.dump(params,f) 
@@ -708,14 +708,13 @@ class MouseFitter():
                 fp.write('f %d %d %d\n' % (f[0], f[1], f[2]))
 
         return params 
-    def render(self, result, imgs, views, batch_id, filename, cams_dict):
+    def render(self, result, imgs, batch_id, filename, cams_dict):
         """
-        Render mesh overlay on images.
+        Render mesh overlay on images for all available views.
 
         Args:
             result: body model parameters
-            imgs: list of images (indexed by position in views_to_use, NOT original camera ID)
-            views: list of view indices to render (these are positions, not original camera IDs)
+            imgs: list of images (indexed by position in views_to_use)
             batch_id: batch index
             filename: output filename
             cams_dict: list of camera dicts (indexed by position in views_to_use)
@@ -729,8 +728,9 @@ class MouseFitter():
         scene.add(pyrender.Mesh.from_trimesh(trimesh.Trimesh(
             vertices=vertices, faces=faces, vertex_colors=np.array([0.8, 0.6, 0.4]))))
         color_maps = []
-        # views are now position indices (0, 1, 2, ...) matching imgs and cams_dict order
-        for view_idx in range(len(views)):
+        # Iterate over all available views (position indices)
+        num_views = len(imgs)
+        for view_idx in range(num_views):
             cam_param = cams_dict[view_idx]
             K, R, T = cam_param['K'].T, cam_param['R'].T, cam_param['T'] / 1000
             # Fix T shape: ensure it's (3, 1) for matrix multiplication
@@ -751,7 +751,7 @@ class MouseFitter():
             light_node._matrix = camera_pose
             color, _ = self.renderer.render(scene, flags=RenderFlags.SHADOWS_DIRECTIONAL)
             scene.remove_node(cam_node)
-            img_i = imgs[view_idx]  # Use position index
+            img_i = imgs[view_idx]
             color = copy.deepcopy(color)
 
             # Resize rendered image to match input image size
@@ -767,14 +767,13 @@ class MouseFitter():
         return output
         
 
-    def draw_keypoints_compare(self, result, imgs, views, batch_id, filename, cams_dict):
+    def draw_keypoints_compare(self, result, imgs, batch_id, filename, cams_dict):
         """
-        Draw keypoints comparison visualization.
+        Draw keypoints comparison visualization for all available views.
 
         Args:
             result: body model parameters
             imgs: list of images (indexed by position in views_to_use)
-            views: list of view indices (positions, not original camera IDs)
             batch_id: batch index
             filename: output filename
             cams_dict: list of camera dicts (indexed by position in views_to_use)
@@ -785,8 +784,9 @@ class MouseFitter():
         keypoints = self.bodymodel.forward_keypoints22()
         joints = keypoints[batch_id].detach().cpu().numpy()
         all_drawn_images = []
-        # Use position indices to access imgs and cams_dict
-        for view_idx in range(len(views)):
+        # Iterate over all available views
+        num_views = len(imgs)
+        for view_idx in range(num_views):
             cam = cams_dict[view_idx]
             # Fix T shape for numpy broadcasting
             T = cam["T"] / 1000
