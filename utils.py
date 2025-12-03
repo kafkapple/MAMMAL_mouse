@@ -42,21 +42,23 @@ joint_color_index = [
 ]
 
 
-## pack a list of images into one image. 
-def pack_images(imgs): 
-    N = len(imgs) 
-    h,w = imgs[0].shape[0:2] 
-    N_r = int(np.floor(np.sqrt(N))) 
-    N_c = N // N_r 
-    if N_c * N_r < N: 
-        N_c += 1 
-    H = N_r * h 
+## pack a list of images into one image.
+def pack_images(imgs):
+    N = len(imgs)
+    h,w = imgs[0].shape[0:2]
+    N_r = int(np.floor(np.sqrt(N)))
+    N_c = N // N_r
+    if N_c * N_r < N:
+        N_c += 1
+    H = N_r * h
     W = N_c * w
     output = np.zeros([H,W,3], np.uint8)
-    for r in range(N_r): 
-        for c in range(N_c): 
-            k = r * N_c + c 
-            output[r*h:(r+1)*h, c*w:(c+1)*w,:] = imgs[k] 
+    for r in range(N_r):
+        for c in range(N_c):
+            k = r * N_c + c
+            if k >= N:  # Skip empty grid cells
+                break
+            output[r*h:(r+1)*h, c*w:(c+1)*w,:] = imgs[k]
     return output 
 
 def rodrigues_batch(axis):
