@@ -114,53 +114,59 @@ def create_animation_trimesh(
         scene.add(fill_light, pose=fill_pose)
 
         # Camera setup based on type
-        # Mouse mesh: X-axis is body length, Y is height, Z is width
-        # Default "side" view shows the full body profile
+        # Mouse mesh coordinate system:
+        #   X-axis: body length (head to tail) - longest
+        #   Y-axis: body width (left to right) - shortest
+        #   Z-axis: body height (belly to back) - "up" direction
+        # So camera up vector should be Z-axis [0, 0, 1]
         if camera_type == "orbit":
             angle = (frame_idx / len(obj_files)) * 2 * np.pi
             cam_x = center[0] + camera_distance * np.sin(angle)
-            cam_y = center[1] + camera_distance * 0.5
-            cam_z = center[2] + camera_distance * np.cos(angle)
+            cam_y = center[1] + camera_distance * np.cos(angle)
+            cam_z = center[2] + camera_distance * 0.3
         elif camera_type == "front":
             # View from +X direction (looking at mouse face)
             cam_x = center[0] + camera_distance
-            cam_y = center[1] + camera_distance * 0.3
-            cam_z = center[2]
+            cam_y = center[1]
+            cam_z = center[2] + camera_distance * 0.2
         elif camera_type == "back":
             # View from -X direction (looking at mouse tail)
             cam_x = center[0] - camera_distance
-            cam_y = center[1] + camera_distance * 0.3
-            cam_z = center[2]
+            cam_y = center[1]
+            cam_z = center[2] + camera_distance * 0.2
         elif camera_type == "side":
-            # View from +Z direction (side profile, default recommended)
-            cam_x = center[0]
-            cam_y = center[1] + camera_distance * 0.3
-            cam_z = center[2] + camera_distance
-        elif camera_type == "top":
-            # View from +Y direction (bird's eye view)
+            # View from +Y direction (side profile, default recommended)
             cam_x = center[0]
             cam_y = center[1] + camera_distance
-            cam_z = center[2] + camera_distance * 0.1
+            cam_z = center[2] + camera_distance * 0.2
+        elif camera_type == "top":
+            # View from +Z direction (bird's eye view)
+            cam_x = center[0]
+            cam_y = center[1] + camera_distance * 0.1
+            cam_z = center[2] + camera_distance
         elif camera_type == "diagonal":
             # 45-degree diagonal view (good for 3D perception)
-            cam_x = center[0] + camera_distance * 0.7
-            cam_y = center[1] + camera_distance * 0.5
-            cam_z = center[2] + camera_distance * 0.7
+            cam_x = center[0] + camera_distance * 0.5
+            cam_y = center[1] + camera_distance * 0.7
+            cam_z = center[2] + camera_distance * 0.5
         else:
             # Default: side view
             cam_x = center[0]
-            cam_y = center[1] + camera_distance * 0.3
-            cam_z = center[2] + camera_distance
+            cam_y = center[1] + camera_distance
+            cam_z = center[2] + camera_distance * 0.2
 
         # Create camera
         camera = pyrender.PerspectiveCamera(yfov=np.pi / 4.0)
 
         # Camera pose (look at center)
+        # Up vector is Z-axis for this mesh coordinate system
         cam_pos = np.array([cam_x, cam_y, cam_z])
         forward = center - cam_pos
         forward = forward / np.linalg.norm(forward)
 
-        right = np.cross(forward, np.array([0, 1, 0]))
+        # Use Z-axis as up (mouse mesh convention)
+        world_up = np.array([0, 0, 1])
+        right = np.cross(forward, world_up)
         if np.linalg.norm(right) < 1e-6:
             right = np.array([1, 0, 0])
         right = right / np.linalg.norm(right)
@@ -199,6 +205,151 @@ def create_animation_trimesh(
 
     out.release()
     print(f"Video saved: {output_path}")
+
+    return output_path
+
+
+def create_animation_grid(
+    obj_files: List[str],
+    output_path: str,
+    fps: int = 30,
+    resolution: Tuple[int, int] = (1920, 1080),
+    show_wireframe: bool = False,
+    background_color: Tuple[int, int, int] = (255, 255, 255),
+) -> str:
+    """
+    Create grid animation with multiple camera views (2x2 layout).
+    Views: front, side, top, diagonal
+    """
+    import trimesh
+    import pyrender
+    from pyrender.constants import RenderFlags
+    import cv2
+    from tqdm import tqdm
+
+    os.environ.setdefault('PYOPENGL_PLATFORM', 'egl')
+
+    # Grid layout: 2x2
+    grid_views = ['front', 'side', 'top', 'diagonal']
+    view_labels = ['Front', 'Side', 'Top', 'Diagonal']
+
+    # Each cell size
+    cell_width = resolution[0] // 2
+    cell_height = resolution[1] // 2
+
+    # Load first mesh to get bounds
+    first_mesh = trimesh.load(obj_files[0])
+    center = first_mesh.centroid
+    scale = first_mesh.extents.max()
+    camera_distance = scale * 2.5
+
+    print(f"Rendering {len(obj_files)} frames (2x2 grid: {grid_views})...")
+
+    frames = []
+
+    for frame_idx, obj_file in enumerate(tqdm(obj_files)):
+        mesh = trimesh.load(obj_file)
+
+        grid_frame = np.zeros((resolution[1], resolution[0], 3), dtype=np.uint8)
+
+        for view_idx, (view_type, view_label) in enumerate(zip(grid_views, view_labels)):
+            # Calculate grid position
+            row = view_idx // 2
+            col = view_idx % 2
+            x_offset = col * cell_width
+            y_offset = row * cell_height
+
+            # Create scene
+            mesh_pyrender = pyrender.Mesh.from_trimesh(mesh, smooth=True)
+            scene = pyrender.Scene(bg_color=np.array(background_color) / 255.0)
+            scene.add(mesh_pyrender)
+
+            # Add lights
+            light = pyrender.DirectionalLight(color=[1.0, 1.0, 1.0], intensity=3.0)
+            scene.add(light, pose=np.eye(4))
+            fill_light = pyrender.DirectionalLight(color=[0.7, 0.7, 0.8], intensity=1.5)
+            fill_pose = np.eye(4)
+            fill_pose[:3, :3] = trimesh.transformations.rotation_matrix(np.pi/3, [0, 1, 0])[:3, :3]
+            scene.add(fill_light, pose=fill_pose)
+
+            # Camera position based on view type
+            if view_type == "front":
+                cam_x = center[0] + camera_distance
+                cam_y = center[1]
+                cam_z = center[2] + camera_distance * 0.2
+            elif view_type == "side":
+                cam_x = center[0]
+                cam_y = center[1] + camera_distance
+                cam_z = center[2] + camera_distance * 0.2
+            elif view_type == "top":
+                cam_x = center[0]
+                cam_y = center[1] + camera_distance * 0.1
+                cam_z = center[2] + camera_distance
+            elif view_type == "diagonal":
+                cam_x = center[0] + camera_distance * 0.5
+                cam_y = center[1] + camera_distance * 0.7
+                cam_z = center[2] + camera_distance * 0.5
+            else:
+                cam_x = center[0]
+                cam_y = center[1] + camera_distance
+                cam_z = center[2] + camera_distance * 0.2
+
+            # Camera setup
+            camera = pyrender.PerspectiveCamera(yfov=np.pi / 4.0)
+            cam_pos = np.array([cam_x, cam_y, cam_z])
+            forward = center - cam_pos
+            forward = forward / np.linalg.norm(forward)
+
+            world_up = np.array([0, 0, 1])
+            right = np.cross(forward, world_up)
+            if np.linalg.norm(right) < 1e-6:
+                right = np.array([1, 0, 0])
+            right = right / np.linalg.norm(right)
+            up = np.cross(right, forward)
+            up = up / np.linalg.norm(up)
+
+            cam_pose = np.eye(4)
+            cam_pose[:3, 0] = right
+            cam_pose[:3, 1] = up
+            cam_pose[:3, 2] = -forward
+            cam_pose[:3, 3] = cam_pos
+            scene.add(camera, pose=cam_pose)
+
+            # Render
+            renderer = pyrender.OffscreenRenderer(cell_width, cell_height)
+            flags = RenderFlags.SHADOWS_DIRECTIONAL
+            if show_wireframe:
+                flags |= RenderFlags.ALL_WIREFRAME
+            color, _ = renderer.render(scene, flags=flags)
+            renderer.delete()
+
+            # Add label to cell
+            color_bgr = cv2.cvtColor(color, cv2.COLOR_RGB2BGR)
+            cv2.putText(color_bgr, view_label, (10, 25),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (50, 50, 50), 2)
+            color = cv2.cvtColor(color_bgr, cv2.COLOR_BGR2RGB)
+
+            # Place in grid
+            grid_frame[y_offset:y_offset+cell_height, x_offset:x_offset+cell_width] = color
+
+        # Add frame number at bottom center
+        grid_frame_bgr = cv2.cvtColor(grid_frame, cv2.COLOR_RGB2BGR)
+        cv2.putText(grid_frame_bgr, f"Frame {frame_idx:04d}",
+                   (resolution[0]//2 - 60, resolution[1] - 15),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 100, 100), 1)
+
+        frames.append(grid_frame_bgr)
+
+    # Write video
+    print(f"Writing video to {output_path}...")
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(output_path, fourcc, fps, resolution)
+
+    for frame in frames:
+        out.write(frame)
+
+    out.release()
+    print(f"Grid video saved: {output_path}")
 
     return output_path
 
@@ -253,37 +404,39 @@ def create_animation_pyvista(
                         specular=0.5, specular_power=15)
 
         # Camera position (same as trimesh backend)
+        # Mouse mesh: X=body length, Y=width, Z=height (up)
         if camera_type == "orbit":
             angle = (frame_idx / len(obj_files)) * 2 * np.pi
             cam_x = center[0] + camera_distance * np.sin(angle)
-            cam_y = center[1] + camera_distance * 0.5
-            cam_z = center[2] + camera_distance * np.cos(angle)
+            cam_y = center[1] + camera_distance * np.cos(angle)
+            cam_z = center[2] + camera_distance * 0.3
         elif camera_type == "front":
             cam_x = center[0] + camera_distance
-            cam_y = center[1] + camera_distance * 0.3
-            cam_z = center[2]
+            cam_y = center[1]
+            cam_z = center[2] + camera_distance * 0.2
         elif camera_type == "back":
             cam_x = center[0] - camera_distance
-            cam_y = center[1] + camera_distance * 0.3
-            cam_z = center[2]
+            cam_y = center[1]
+            cam_z = center[2] + camera_distance * 0.2
         elif camera_type == "side":
             cam_x = center[0]
-            cam_y = center[1] + camera_distance * 0.3
-            cam_z = center[2] + camera_distance
+            cam_y = center[1] + camera_distance
+            cam_z = center[2] + camera_distance * 0.2
         elif camera_type == "top":
             cam_x = center[0]
-            cam_y = center[1] + camera_distance
-            cam_z = center[2] + camera_distance * 0.1
+            cam_y = center[1] + camera_distance * 0.1
+            cam_z = center[2] + camera_distance
         elif camera_type == "diagonal":
-            cam_x = center[0] + camera_distance * 0.7
-            cam_y = center[1] + camera_distance * 0.5
-            cam_z = center[2] + camera_distance * 0.7
+            cam_x = center[0] + camera_distance * 0.5
+            cam_y = center[1] + camera_distance * 0.7
+            cam_z = center[2] + camera_distance * 0.5
         else:
             cam_x = center[0]
-            cam_y = center[1] + camera_distance * 0.3
-            cam_z = center[2] + camera_distance
+            cam_y = center[1] + camera_distance
+            cam_z = center[2] + camera_distance * 0.2
 
-        plotter.camera_position = [(cam_x, cam_y, cam_z), center, (0, 1, 0)]
+        # Up vector is Z-axis for mouse mesh
+        plotter.camera_position = [(cam_x, cam_y, cam_z), center, (0, 0, 1)]
 
         # Add frame info
         plotter.add_text(f"Frame {frame_idx:04d}", position='upper_left', font_size=12)
@@ -436,9 +589,9 @@ def main():
                        help="Video frame rate (default: 30)")
     parser.add_argument("--resolution", type=int, nargs=2, default=[1280, 720],
                        help="Video resolution (default: 1280 720)")
-    parser.add_argument("--camera", type=str, default="side",
-                       choices=["side", "front", "back", "top", "diagonal", "orbit"],
-                       help="Camera type (default: side - shows full body profile)")
+    parser.add_argument("--camera", type=str, default="grid",
+                       choices=["grid", "side", "front", "back", "top", "diagonal", "orbit"],
+                       help="Camera type (default: grid - 2x2 multi-view layout)")
     parser.add_argument("--backend", type=str, default="trimesh",
                        choices=["trimesh", "pyvista"],
                        help="Rendering backend (default: trimesh)")
@@ -475,11 +628,15 @@ def main():
 
     print(f"Found {len(obj_files)} mesh files")
 
-    # Set output path
+    # Create videos subdirectory
+    videos_dir = result_dir / "videos"
+    videos_dir.mkdir(exist_ok=True)
+
+    # Set output path with camera type postfix
     if args.output_video:
         output_path = args.output_video
     else:
-        output_path = str(result_dir / "animation.mp4")
+        output_path = str(videos_dir / f"animation_{args.camera}.mp4")
 
     # Export params if requested
     if args.export_params and params_dir.exists():
@@ -495,7 +652,16 @@ def main():
             resolution=(args.resolution[0], args.resolution[1] // 2),
         )
 
-    if args.backend == "pyvista":
+    if args.camera == "grid":
+        # Grid mode: 2x2 multi-view layout
+        create_animation_grid(
+            obj_files=obj_files,
+            output_path=output_path,
+            fps=args.fps,
+            resolution=tuple(args.resolution),
+            show_wireframe=args.wireframe,
+        )
+    elif args.backend == "pyvista":
         create_animation_pyvista(
             obj_files=obj_files,
             output_path=output_path,

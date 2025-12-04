@@ -656,9 +656,17 @@ class MouseFitter():
 
     def gen_closure(self, optimizer, body_param, target):
         def closure():
-            optimizer.zero_grad() 
+            optimizer.zero_grad()
+
+            # Forward pass with gradient checkpointing consideration
             V,J = self.bodymodel.forward(body_param["thetas"], body_param["bone_lengths"], \
                 body_param["rotation"], body_param["trans"], body_param["scale"], body_param["chest_deformer"])
+
+            # Early NaN/Inf check to prevent CUDA kernel failures
+            if torch.isnan(V).any() or torch.isinf(V).any():
+                print(f"Warning: NaN/Inf detected in vertices, resetting gradients")
+                optimizer.zero_grad()
+                return torch.tensor(float('inf'), device=self.device, requires_grad=True)
 
             keypoints = self.bodymodel.forward_keypoints22() 
             # loss_3d = self.calc_3d_loss(keypoints, target["target_3d"])
@@ -729,8 +737,20 @@ class MouseFitter():
                 + loss_temp * self.term_weights["temp"] \
                 + loss_deformer_temp * self.term_weights["temp_d"]
 
-            loss_v.backward() 
-            return loss_v 
+            # Check for NaN/Inf in total loss before backward
+            if torch.isnan(loss_v) or torch.isinf(loss_v):
+                print(f"Warning: NaN/Inf in total loss, skipping backward")
+                optimizer.zero_grad()
+                return torch.tensor(float('inf'), device=self.device, requires_grad=True)
+
+            loss_v.backward()
+
+            # Clean up intermediate tensors to prevent memory accumulation
+            del V, J, keypoints, mesh, V_reduced
+            del loss_2d, loss_theta, loss_bone_length, loss_scale, loss_mask
+            del loss_chest_deformer, loss_stretch_to_constraints
+
+            return loss_v
         return closure
 
     def solve_step0(self, params, target, max_iters, pbar=None):
@@ -804,25 +824,57 @@ class MouseFitter():
         # Iteration progress bar
         iter_pbar = tqdm(range(max_iters), desc="  Step1", leave=False,
                          bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}')
+        consecutive_failures = 0
+        max_consecutive_failures = 3
+
         for i in iter_pbar:
-            loss = optimizer.step(closure).item()
-            # Show all loss components in progress bar
-            loss_str = {k: f"{v:.1f}" for k, v in self.losses.items()}
-            iter_pbar.set_postfix(total=f"{loss:.1f}", **loss_str)
-            if pbar:
-                pbar.set_postfix(step="S1", iter=f"{i+1}/{max_iters}", loss=f"{loss:.1f}")
-            # Log detailed parameters every 10 iterations
-            if i % 10 == 0:
-                self._log_iteration("Step1", i, loss, params)
-            if abs(loss-loss_prev) < tolerate:
-                break
-            loss_prev = loss
-            if self.id == 0 and self.cfg.fitter.with_render:
-                imgs = self.imgs.copy()
-                # Render to memory and add to grid collector instead of saving individual files
-                render_img = self.render(params, imgs, 0, None, self.cam_dict, step_name='Step1', return_image=True)
-                if render_img is not None:
-                    self.debug_collector.add_image('step1', i, render_img)
+            try:
+                loss = optimizer.step(closure).item()
+
+                # Check for invalid loss
+                if np.isnan(loss) or np.isinf(loss):
+                    consecutive_failures += 1
+                    print(f"\nWarning: Invalid loss at iter {i}, attempt {consecutive_failures}/{max_consecutive_failures}")
+                    if consecutive_failures >= max_consecutive_failures:
+                        print(f"Too many failures, stopping Step1 early at iter {i}")
+                        break
+                    torch.cuda.empty_cache()
+                    optimizer.zero_grad()
+                    continue
+
+                consecutive_failures = 0  # Reset on success
+
+                # Show all loss components in progress bar
+                loss_str = {k: f"{v:.1f}" for k, v in self.losses.items()}
+                iter_pbar.set_postfix(total=f"{loss:.1f}", **loss_str)
+                if pbar:
+                    pbar.set_postfix(step="S1", iter=f"{i+1}/{max_iters}", loss=f"{loss:.1f}")
+                # Log detailed parameters every 10 iterations
+                if i % 10 == 0:
+                    self._log_iteration("Step1", i, loss, params)
+                if abs(loss-loss_prev) < tolerate:
+                    break
+                loss_prev = loss
+                if self.id == 0 and self.cfg.fitter.with_render:
+                    imgs = self.imgs.copy()
+                    # Render to memory and add to grid collector instead of saving individual files
+                    render_img = self.render(params, imgs, 0, None, self.cam_dict, step_name='Step1', return_image=True)
+                    if render_img is not None:
+                        self.debug_collector.add_image('step1', i, render_img)
+
+            except RuntimeError as e:
+                if "CUDA" in str(e):
+                    print(f"\nCUDA error at iter {i}: {e}")
+                    print("Attempting recovery...")
+                    torch.cuda.empty_cache()
+                    torch.cuda.synchronize()
+                    consecutive_failures += 1
+                    if consecutive_failures >= max_consecutive_failures:
+                        print("Recovery failed, stopping Step1")
+                        break
+                else:
+                    raise e
+
         iter_pbar.close()
 
         # Save Step1 debug images as compressed grid
@@ -861,19 +913,52 @@ class MouseFitter():
         # Iteration progress bar
         iter_pbar = tqdm(range(max_iters), desc="  Step2", leave=False,
                          bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}')
+        consecutive_failures = 0
+        max_consecutive_failures = 3
+
         for i in iter_pbar:
-            loss = optimizer.step(closure).item()
-            # Show all loss components in progress bar
-            loss_str = {k: f"{v:.1f}" for k, v in self.losses.items()}
-            iter_pbar.set_postfix(total=f"{loss:.1f}", **loss_str)
-            if pbar:
-                pbar.set_postfix(step="S2", iter=f"{i+1}/{max_iters}", loss=f"{loss:.1f}")
-            # Log detailed parameters every 10 iterations
-            if i % 10 == 0:
-                self._log_iteration("Step2", i, loss, params)
-            if abs(loss-loss_prev) < tolerate:
-                break
-            loss_prev = loss
+            try:
+                loss = optimizer.step(closure).item()
+
+                # Check for invalid loss
+                if np.isnan(loss) or np.isinf(loss):
+                    consecutive_failures += 1
+                    print(f"\nWarning: Invalid loss at iter {i}, attempt {consecutive_failures}/{max_consecutive_failures}")
+                    if consecutive_failures >= max_consecutive_failures:
+                        print(f"Too many failures, stopping Step2 early at iter {i}")
+                        break
+                    # Clear CUDA cache and try again
+                    torch.cuda.empty_cache()
+                    optimizer.zero_grad()
+                    continue
+
+                consecutive_failures = 0  # Reset on success
+
+                # Show all loss components in progress bar
+                loss_str = {k: f"{v:.1f}" for k, v in self.losses.items()}
+                iter_pbar.set_postfix(total=f"{loss:.1f}", **loss_str)
+                if pbar:
+                    pbar.set_postfix(step="S2", iter=f"{i+1}/{max_iters}", loss=f"{loss:.1f}")
+                # Log detailed parameters every 10 iterations
+                if i % 10 == 0:
+                    self._log_iteration("Step2", i, loss, params)
+                if abs(loss-loss_prev) < tolerate:
+                    break
+                loss_prev = loss
+
+            except RuntimeError as e:
+                if "CUDA" in str(e):
+                    print(f"\nCUDA error at iter {i}: {e}")
+                    print("Attempting recovery...")
+                    torch.cuda.empty_cache()
+                    torch.cuda.synchronize()
+                    consecutive_failures += 1
+                    if consecutive_failures >= max_consecutive_failures:
+                        print("Recovery failed, stopping Step2")
+                        break
+                else:
+                    raise e
+
         iter_pbar.close()
 
         if self.cfg.fitter.with_render:
@@ -1537,6 +1622,18 @@ def optim_single(cfg: DictConfig):
         else:
             params = fitter.solve_step1(params=params, target=target, max_iters=step1_iters, pbar=pbar)
             params = fitter.solve_step2(params=params, target=target, max_iters=step2_iters, pbar=pbar)
+
+        # Memory cleanup after each frame to prevent accumulation
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+        # Periodic garbage collection (every 10 frames)
+        if (index - start + 1) % 10 == 0:
+            import gc
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+                torch.cuda.empty_cache()
         fitter.set_previous_frame(params)
 
     # Print total elapsed time
