@@ -47,11 +47,18 @@ except ImportError:
 
 # Optuna (alternative optimizer)
 from .optuna_optimizer import (
-    OptunaUVOptimizer,
-    MultiObjectiveUVOptimizer,
-    OptunaConfig,
     QUALITATIVE_CRITERIA,
+    OptimizationConfig as OptunaConfig,
 )
+
+# Lazy import for Optuna classes (only when optuna is available)
+def _get_optuna_optimizer():
+    from .optuna_optimizer import OptunaUVOptimizer
+    return OptunaUVOptimizer
+
+def _get_multi_objective_optimizer():
+    from .optuna_optimizer import MultiObjectiveUVMapObjective as MultiObjectiveUVOptimizer
+    return MultiObjectiveUVOptimizer
 
 __all__ = [
     # Core
@@ -82,10 +89,10 @@ __all__ = [
     'DEFAULT_SWEEP_PARAMS',
     'WANDB_AVAILABLE',
     # Optuna Optimization (alternative)
-    'OptunaUVOptimizer',
-    'MultiObjectiveUVOptimizer',
     'OptunaConfig',
     'QUALITATIVE_CRITERIA',
+    # Helper function
+    'optimize_uvmap',
 ]
 
 
@@ -119,12 +126,13 @@ def optimize_uvmap(
             **kwargs,
         )
     elif method == "optuna":
+        from .optuna_optimizer import OptunaUVOptimizer
         config = OptunaConfig(
             n_trials=n_trials,
             output_dir=output_dir,
             **kwargs,
         )
-        optimizer = OptunaUVOptimizer(config)
-        return optimizer.optimize(fitting_result_dir, output_dir)
+        optimizer = OptunaUVOptimizer(fitting_result_dir, config)
+        return optimizer.optimize()
     else:
         raise ValueError(f"Unknown method: {method}. Use 'wandb' or 'optuna'.")

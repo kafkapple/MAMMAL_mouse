@@ -22,13 +22,22 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Check wandb availability
-try:
-    import wandb
-    WANDB_AVAILABLE = True
-except ImportError:
-    WANDB_AVAILABLE = False
-    logger.warning("wandb not installed. Install with: pip install wandb")
+# Check wandb availability (lazy import)
+WANDB_AVAILABLE = False
+wandb = None
+
+def _check_wandb():
+    """Check and import wandb if available."""
+    global WANDB_AVAILABLE, wandb
+    if wandb is not None:
+        return WANDB_AVAILABLE
+    try:
+        import wandb as _wandb
+        wandb = _wandb
+        WANDB_AVAILABLE = True
+    except ImportError:
+        WANDB_AVAILABLE = False
+    return WANDB_AVAILABLE
 
 
 @dataclass
@@ -105,7 +114,7 @@ class WandBSweepOptimizer:
             config: Sweep configuration
             param_space: Parameter search space (uses default if None)
         """
-        if not WANDB_AVAILABLE:
+        if not _check_wandb():
             raise ImportError("wandb is required. Install with: pip install wandb")
 
         self.config = config
@@ -420,6 +429,15 @@ def run_wandb_sweep(
 # CLI support
 if __name__ == '__main__':
     import argparse
+    import sys
+
+    # Check wandb first
+    if not _check_wandb():
+        print("ERROR: wandb not installed.")
+        print("Install with: pip install wandb")
+        print("\nAlternative: Use Optuna optimizer instead:")
+        print("  python -m uvmap.optuna_optimizer --result_dir <path>")
+        sys.exit(1)
 
     parser = argparse.ArgumentParser(description='WandB Sweep UV Map Optimization')
     parser.add_argument('--result_dir', type=str, required=True,

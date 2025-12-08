@@ -10,27 +10,34 @@ References:
 - Image Quality Metrics: https://pmc.ncbi.nlm.nih.gov/articles/PMC7817470/
 """
 
+from __future__ import annotations
+
 import os
 import json
-import torch
-import numpy as np
-from typing import Dict, List, Tuple, Optional, Callable
+import logging
+from typing import Dict, List, Tuple, Optional, Callable, Any, TYPE_CHECKING
 from dataclasses import dataclass, asdict
 from datetime import datetime
 
-try:
-    import optuna
-    from optuna.trial import Trial
-    from optuna.visualization import (
-        plot_optimization_history,
-        plot_param_importances,
-        plot_pareto_front,
-        plot_slice,
-    )
-    OPTUNA_AVAILABLE = True
-except ImportError:
-    OPTUNA_AVAILABLE = False
-    print("Warning: Optuna not installed. Run: pip install optuna")
+logger = logging.getLogger(__name__)
+
+# Lazy imports for optional dependencies
+OPTUNA_AVAILABLE = False
+optuna = None
+
+def _check_optuna():
+    """Check and import optuna if available."""
+    global OPTUNA_AVAILABLE, optuna
+    if optuna is not None:
+        return OPTUNA_AVAILABLE
+    try:
+        import optuna as _optuna
+        optuna = _optuna
+        OPTUNA_AVAILABLE = True
+    except ImportError:
+        OPTUNA_AVAILABLE = False
+        logger.warning("Optuna not installed. Run: pip install optuna")
+    return OPTUNA_AVAILABLE
 
 
 @dataclass
@@ -137,7 +144,7 @@ class UVMapObjective:
             self._evaluator = UVMapEvaluator(self.device)
         return self._evaluator
 
-    def sample_params(self, trial: Trial) -> Dict:
+    def sample_params(self, trial: Any) -> Dict:
         """
         Sample hyperparameters from search space.
 
@@ -269,7 +276,7 @@ class UVMapObjective:
 
         return score
 
-    def __call__(self, trial: Trial) -> float:
+    def __call__(self, trial: Any) -> float:
         """
         Optuna objective function (single-objective).
         """
@@ -293,7 +300,7 @@ class MultiObjectiveUVMapObjective(UVMapObjective):
     3. Seam quality (minimize -> maximize negative)
     """
 
-    def __call__(self, trial: Trial) -> Tuple[float, float, float]:
+    def __call__(self, trial: Any) -> Tuple[float, float, float]:
         """
         Optuna objective function (multi-objective).
 
@@ -330,7 +337,7 @@ class OptunaUVOptimizer:
         config: Optional[OptimizationConfig] = None,
         device: str = "cuda",
     ):
-        if not OPTUNA_AVAILABLE:
+        if not _check_optuna():
             raise ImportError("Optuna required. Install with: pip install optuna")
 
         self.result_dir = result_dir
@@ -457,6 +464,13 @@ class OptunaUVOptimizer:
 
         # Generate visualizations
         try:
+            from optuna.visualization import (
+                plot_optimization_history,
+                plot_param_importances,
+                plot_pareto_front,
+                plot_slice,
+            )
+
             # Optimization history
             fig = plot_optimization_history(self.study)
             fig.write_html(os.path.join(report_dir, "optimization_history.html"))
