@@ -254,19 +254,34 @@ class WandBSweepOptimizer:
             score = self._compute_score(metrics)
 
             # Log all metrics
-            wandb.log({
+            log_dict = {
                 'coverage': metrics['coverage'],
                 'mean_confidence': metrics['mean_confidence'],
                 'seam_discontinuity': metrics['seam_discontinuity'],
                 'runtime_seconds': runtime,
                 'score': score,
-            })
+            }
 
-            # Log texture image if available
+            # Log visualization images
             if 'texture_path' in metrics and os.path.exists(metrics['texture_path']):
-                wandb.log({
-                    'texture': wandb.Image(metrics['texture_path']),
-                })
+                log_dict['uv_texture'] = wandb.Image(
+                    metrics['texture_path'],
+                    caption=f"UV Texture (cov={metrics['coverage']:.1f}%)"
+                )
+
+            if 'confidence_path' in metrics and os.path.exists(metrics['confidence_path']):
+                log_dict['confidence_map'] = wandb.Image(
+                    metrics['confidence_path'],
+                    caption=f"Confidence (mean={metrics['mean_confidence']:.3f})"
+                )
+
+            if 'uv_mask_path' in metrics and os.path.exists(metrics['uv_mask_path']):
+                log_dict['uv_mask'] = wandb.Image(
+                    metrics['uv_mask_path'],
+                    caption="UV Mask"
+                )
+
+            wandb.log(log_dict)
 
             logger.info(f"Trial complete: score={score:.4f}, coverage={metrics['coverage']:.1f}%")
 
@@ -338,6 +353,8 @@ class WandBSweepOptimizer:
             'mean_confidence': conf_stats['mean'],
             'seam_discontinuity': seam_disc,
             'texture_path': os.path.join(pipeline_config.output_dir, 'texture_final.png'),
+            'confidence_path': os.path.join(pipeline_config.output_dir, 'confidence.png'),
+            'uv_mask_path': os.path.join(pipeline_config.output_dir, 'uv_mask.png'),
         }
 
         return metrics
