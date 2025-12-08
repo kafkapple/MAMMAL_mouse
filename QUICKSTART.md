@@ -118,4 +118,72 @@ results/fitting/{dataset}_{views}_{keypoints}_{timestamp}/
 ```
 
 ---
+
+## UV Map Generation
+
+### Prerequisites
+```bash
+pip install optuna  # For hyperparameter optimization
+# Optional: pip install wandb (for dashboard visualization)
+```
+
+### Quick Run (using baseline fitting result)
+```bash
+# Run UV map pipeline
+python -m uvmap.uv_pipeline \
+    --result_dir results/fitting/markerless_mouse_1_nerf_v012345_kp22_20251206_165254 \
+    --uv_size 512
+
+# With photometric optimization
+python -m uvmap.uv_pipeline \
+    --result_dir results/fitting/markerless_mouse_1_nerf_v012345_kp22_20251206_165254 \
+    --uv_size 512 \
+    --optimize
+```
+
+### Hyperparameter Optimization
+
+#### Optuna (recommended, no extra dependencies)
+```bash
+python -m uvmap.optuna_optimizer \
+    --result_dir results/fitting/markerless_mouse_1_nerf_v012345_kp22_20251206_165254 \
+    --n_trials 30 \
+    --output_dir results/uvmap_optuna
+```
+
+#### WandB Sweep (dashboard visualization)
+```bash
+pip install wandb
+python -m uvmap.wandb_sweep \
+    --result_dir results/fitting/markerless_mouse_1_nerf_v012345_kp22_20251206_165254 \
+    --count 30 \
+    --project uvmap-optimization
+```
+
+### Ablation Study (grid search)
+```bash
+python -m uvmap.experiment_runner \
+    --result_dir results/fitting/markerless_mouse_1_nerf_v012345_kp22_20251206_165254 \
+    --output_dir results/uvmap_ablation \
+    --quick  # Fast test with fewer combinations
+```
+
+### UV Map Output
+```
+results/uvmap/
+├── texture_final.png      # Final UV texture map
+├── confidence.png         # Per-pixel confidence
+├── uv_mask.png           # Valid UV regions
+└── texture.pt            # Tensor for downstream use
+```
+
+### Available Fitting Results (Baseline)
+| Experiment | Path |
+|------------|------|
+| 6-view, 22kp | `markerless_mouse_1_nerf_v012345_kp22_20251206_165254` |
+| 6-view, 9kp  | `markerless_mouse_1_nerf_v012345_sparse9_20251207_081918` |
+| 6-view, 7kp  | `markerless_mouse_1_nerf_v012345_sparse7_20251207_172028` |
+| 6-view, 5kp  | `markerless_mouse_1_nerf_v012345_sparse5_20251208_134918` |
+
+---
 **Details**: [docs/guides/experiments.md](docs/guides/experiments.md) | [docs/guides/output.md](docs/guides/output.md)
