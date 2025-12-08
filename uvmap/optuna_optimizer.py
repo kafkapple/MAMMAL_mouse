@@ -55,8 +55,9 @@ class OptimizationConfig:
     # Parameter search space
     param_space: Dict = None
 
-    # Evaluation settings
-    max_frames: int = 20  # Limit frames for faster evaluation
+    # Evaluation settings (frame sampling for faster HPO)
+    max_frames: int = 20  # Limit frames (0 = all frames)
+    frame_sampling: str = "uniform"  # 'uniform', 'random', 'keyframes'
 
     # Output
     output_dir: str = "optuna_results"
@@ -206,7 +207,15 @@ class UVMapObjective:
             # Run pipeline
             pipeline = UVMapPipeline(pipeline_config, device=self.device)
             pipeline.setup()
-            pipeline.frames = pipeline.frames[:self.config.max_frames]
+
+            # Apply frame sampling for faster evaluation
+            max_frames = self.config.max_frames
+            if max_frames > 0 and len(pipeline.frames) > max_frames:
+                pipeline.frames = self._sample_frames(
+                    pipeline.frames,
+                    max_frames,
+                    self.config.frame_sampling,
+                )
 
             # Set fusion method
             if hasattr(pipeline.texture_sampler, 'fusion_method'):
@@ -288,6 +297,54 @@ class UVMapObjective:
             trial.set_user_attr(name, value)
 
         return self.compute_single_objective(metrics)
+
+    def _sample_frames(
+        self,
+        frames: List[int],
+        max_frames: int,
+        method: str = "uniform",
+    ) -> List[int]:
+        """
+        Sample frames for faster evaluation.
+
+        Args:
+            frames: List of all frame indices
+            max_frames: Maximum number of frames to use
+            method: Sampling method
+                - 'uniform': Evenly spaced (default, best coverage)
+                - 'random': Random sampling
+                - 'keyframes': First, middle, last + uniform fill
+
+        Returns:
+            sampled_frames: Subset of frame indices
+        """
+        import numpy as np
+
+        n_total = len(frames)
+        if n_total <= max_frames:
+            return frames
+
+        if method == "uniform":
+            indices = np.linspace(0, n_total - 1, max_frames, dtype=int)
+            return [frames[i] for i in indices]
+
+        elif method == "random":
+            np.random.seed(42)
+            indices = np.sort(np.random.choice(n_total, max_frames, replace=False))
+            return [frames[i] for i in indices]
+
+        elif method == "keyframes":
+            keyframe_indices = [0, n_total // 2, n_total - 1]
+            remaining = max_frames - len(keyframe_indices)
+            if remaining > 0:
+                fill_indices = np.linspace(0, n_total - 1, remaining + 2, dtype=int)[1:-1]
+                all_indices = sorted(set(keyframe_indices) | set(fill_indices.tolist()))
+            else:
+                all_indices = keyframe_indices[:max_frames]
+            return [frames[i] for i in all_indices]
+
+        else:
+            return self._sample_frames(frames, max_frames, "uniform")
 
 
 class MultiObjectiveUVMapObjective(UVMapObjective):

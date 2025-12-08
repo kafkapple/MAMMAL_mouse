@@ -56,6 +56,10 @@ class WandBSweepConfig:
     # Run settings
     count: int = 30  # Number of runs
 
+    # Frame sampling for faster evaluation
+    max_frames: int = 20  # Limit frames (0 = all frames)
+    frame_sampling: str = "uniform"  # 'uniform', 'random', 'keyframes'
+
     # Objective weights (for composite score)
     w_coverage: float = 0.4
     w_psnr: float = 0.3
@@ -309,10 +313,14 @@ class WandBSweepOptimizer:
         pipeline = UVMapPipeline(pipeline_config)
         pipeline.setup()
 
-        # Limit frames for faster evaluation
-        max_frames = params.get('max_frames', 30)
-        if max_frames > 0:
-            pipeline.frames = pipeline.frames[:max_frames]
+        # Apply frame sampling based on config
+        max_frames = self.config.max_frames
+        if max_frames > 0 and len(pipeline.frames) > max_frames:
+            pipeline.frames = self._sample_frames(
+                pipeline.frames,
+                max_frames,
+                self.config.frame_sampling,
+            )
 
         texture = pipeline.run()
 
@@ -334,6 +342,57 @@ class WandBSweepOptimizer:
 
         return metrics
 
+    def _sample_frames(
+        self,
+        frames: List[int],
+        max_frames: int,
+        method: str = "uniform",
+    ) -> List[int]:
+        """
+        Sample frames for faster evaluation.
+
+        Args:
+            frames: List of all frame indices
+            max_frames: Maximum number of frames to use
+            method: Sampling method
+                - 'uniform': Evenly spaced (default, best coverage)
+                - 'random': Random sampling (good for diversity)
+                - 'keyframes': First, middle, last + uniform (motion aware)
+
+        Returns:
+            sampled_frames: Subset of frame indices
+        """
+        n_total = len(frames)
+        if n_total <= max_frames:
+            return frames
+
+        if method == "uniform":
+            # Evenly spaced sampling
+            indices = np.linspace(0, n_total - 1, max_frames, dtype=int)
+            return [frames[i] for i in indices]
+
+        elif method == "random":
+            # Random sampling (deterministic with seed for reproducibility)
+            np.random.seed(42)
+            indices = np.sort(np.random.choice(n_total, max_frames, replace=False))
+            return [frames[i] for i in indices]
+
+        elif method == "keyframes":
+            # First, middle, last + uniform fill
+            keyframe_indices = [0, n_total // 2, n_total - 1]
+            remaining = max_frames - len(keyframe_indices)
+            if remaining > 0:
+                # Fill uniformly between keyframes
+                fill_indices = np.linspace(0, n_total - 1, remaining + 2, dtype=int)[1:-1]
+                all_indices = sorted(set(keyframe_indices) | set(fill_indices.tolist()))
+            else:
+                all_indices = keyframe_indices[:max_frames]
+            return [frames[i] for i in all_indices]
+
+        else:
+            logger.warning(f"Unknown sampling method '{method}', using uniform")
+            return self._sample_frames(frames, max_frames, "uniform")
+
     def _compute_score(
         self,
         metrics: Dict[str, float],
@@ -346,14 +405,23 @@ class WandBSweepOptimizer:
         coverage_score = metrics['coverage'] / 100.0  # Normalize to [0, 1]
         confidence_score = metrics['mean_confidence']  # Already [0, 1]
 
-        # Invert seam (lower is better)
-        seam_score = max(0, 1.0 - metrics['seam_discontinuity'] * 10)
+        # Invert seam (lower is better) with NaN check
+        seam_val = metrics['seam_discontinuity']
+        if np.isnan(seam_val):
+            logger.warning(f"seam_discontinuity is NaN, using 0.0")
+            seam_val = 0.0
+        seam_score = max(0, 1.0 - seam_val * 10)
 
         score = (
             self.config.w_coverage * coverage_score +
             self.config.w_psnr * confidence_score +
             self.config.w_seam * seam_score
         )
+
+        # Final NaN check
+        if np.isnan(score):
+            logger.warning(f"Score is NaN! metrics={metrics}")
+            return 0.0
 
         return score
 
@@ -450,6 +518,13 @@ if __name__ == '__main__':
                        help='Number of trials')
     parser.add_argument('--sweep_id', type=str, default=None,
                        help='Existing sweep ID (to join as agent)')
+    parser.add_argument('--max_frames', type=int, default=20,
+                       help='Max frames for evaluation (0=all, default=20 for fast search)')
+    parser.add_argument('--frame_sampling', type=str, default='uniform',
+                       choices=['uniform', 'random', 'keyframes'],
+                       help='Frame sampling method')
+    parser.add_argument('--create_only', action='store_true',
+                       help='Only create sweep (no agent). Use with other servers via --sweep_id')
 
     args = parser.parse_args()
 
@@ -457,13 +532,27 @@ if __name__ == '__main__':
         project=args.project,
         output_dir=args.output_dir,
         count=args.count,
+        max_frames=args.max_frames,
+        frame_sampling=args.frame_sampling,
     )
 
     optimizer = WandBSweepOptimizer(config)
 
-    if args.sweep_id:
+    if args.create_only:
+        # Only create sweep, don't run agent
+        sweep_id = optimizer.create_sweep()
+        print(f"\n{'='*60}")
+        print(f"Sweep created: {sweep_id}")
+        print(f"Dashboard: https://wandb.ai/{config.entity or 'YOUR_ENTITY'}/{config.project}/sweeps/{sweep_id}")
+        print(f"\nTo run agents on other servers:")
+        print(f"  python -m uvmap.wandb_sweep \\")
+        print(f"      --result_dir {args.result_dir} \\")
+        print(f"      --sweep_id {sweep_id} \\")
+        print(f"      --count 10")
+        print(f"{'='*60}")
+    elif args.sweep_id:
         # Join existing sweep as agent
-        optimizer.run_agent(args.sweep_id, args.result_dir)
+        optimizer.run_agent(args.sweep_id, args.result_dir, count=args.count)
     else:
         # Create and run new sweep
         best_params = optimizer.run_sweep(args.result_dir)

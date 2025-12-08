@@ -261,7 +261,11 @@ class UVMapEvaluator:
             threshold = torch.quantile(grad_mag.flatten(), 0.95)
             seam_proxy = (grad_mag > threshold).float()
 
-            discontinuity = grad_mag[seam_proxy > 0.5].mean().item()
+            masked_grad = grad_mag[seam_proxy > 0.5]
+            if masked_grad.numel() == 0:
+                discontinuity = 0.0
+            else:
+                discontinuity = masked_grad.mean().item()
         else:
             # Use provided seam mask
             seam = seam_mask[:-1, :-1]
