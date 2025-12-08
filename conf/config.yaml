@@ -35,6 +35,13 @@ fitter:
   render_cameras: [0]
   use_keypoints: true  # Set to false to disable keypoint loss (silhouette only)
 
+  # Post-fitting visualization settings (auto-generated after fitting)
+  generate_visualizations: true  # Generate videos/report after fitting
+  create_videos: true            # Create mesh, keypoint, overlay videos
+  create_report: true            # Create HTML report
+  create_summary: true           # Create summary frame image
+  video_fps: 30                  # Video frame rate
+
 # Silhouette-only mode settings (only used when use_keypoints=false)
 silhouette:
   # Iteration multiplier for silhouette-only mode (1.0 = same as keypoint mode)

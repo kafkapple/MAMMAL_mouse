@@ -19,7 +19,10 @@ conda activate mammal_stable
 
 ### Keypoint Ablation (6-view fixed)
 ```bash
-./run_experiment.sh baseline_6view_keypoint        # 22 keypoints
+./run_experiment.sh baseline_6view_keypoint        # 22 keypoints (full)
+./run_experiment.sh sparse_9kp_dlc                 # 9 keypoints (DeepLabCut style)
+./run_experiment.sh sparse_7kp_mars                # 7 keypoints (MARS style)
+./run_experiment.sh sparse_5kp_minimal             # 5 keypoints (nose, ears, neck, tail)
 ./run_experiment.sh sixview_sparse_keypoint        # 3 keypoints (nose, neck, tail)
 ./run_experiment.sh sixview_no_keypoint            # 0 keypoints (silhouette only)
 ```
@@ -59,9 +62,32 @@ conda activate mammal_stable
 ```
 
 ## Batch Run All Ablations
+
+### Keypoint Ablation (6-view, 22→9→7→5→3→0 keypoints)
+```bash
+cd /home/joon/dev/MAMMAL_mouse && \
+./run_experiment.sh baseline_6view_keypoint && \
+./run_experiment.sh sparse_9kp_dlc && \
+./run_experiment.sh sparse_7kp_mars && \
+./run_experiment.sh sparse_5kp_minimal && \
+./run_experiment.sh sixview_sparse_keypoint && \
+./run_experiment.sh sixview_no_keypoint
+```
+
+### Viewpoint Ablation (sparse 3 keypoints)
+```bash
+cd /home/joon/dev/MAMMAL_mouse && \
+./run_experiment.sh sixview_sparse_keypoint && \
+./run_experiment.sh sparse_5view && \
+./run_experiment.sh sparse_4view && \
+./run_experiment.sh sparse_3view && \
+./run_experiment.sh sparse_2view
+```
+
+### Loop Style (alternative)
 ```bash
 # Keypoint ablation
-for exp in baseline_6view_keypoint sixview_sparse_keypoint sixview_no_keypoint; do
+for exp in baseline_6view_keypoint sparse_9kp_dlc sparse_7kp_mars sparse_5kp_minimal sixview_sparse_keypoint sixview_no_keypoint; do
     ./run_experiment.sh $exp
 done
 

@@ -1645,7 +1645,26 @@ def optim_single(cfg: DictConfig):
 
     # Save loss history and generate plots
     fitter.save_loss_history(os.path.join(fitter.result_folder, 'loss_history.json'))
-    fitter.plot_loss_history(fitter.result_folder) 
+    fitter.plot_loss_history(fitter.result_folder)
+
+    # Generate post-fitting visualizations (videos, HTML report, summary)
+    generate_vis = getattr(cfg.fitter, 'generate_visualizations', True)
+    if generate_vis and cfg.fitter.with_render:
+        try:
+            from scripts.mesh_animation import generate_post_fitting_outputs
+            print("\nGenerating post-fitting visualizations...")
+            vis_outputs = generate_post_fitting_outputs(
+                result_dir=fitter.result_folder,
+                fps=getattr(cfg.fitter, 'video_fps', 30),
+                create_videos=getattr(cfg.fitter, 'create_videos', True),
+                create_report=getattr(cfg.fitter, 'create_report', True),
+                create_summary=getattr(cfg.fitter, 'create_summary', True),
+            )
+            print(f"\nVisualization outputs: {list(vis_outputs.keys())}")
+        except Exception as e:
+            print(f"\nWarning: Failed to generate visualizations: {e}")
+            print("You can generate them manually with:")
+            print(f"  python scripts/mesh_animation.py --result_dir {fitter.result_folder}")
 
 if __name__ == "__main__":
     # Convert argparse-style args to Hydra format for CLI consistency
