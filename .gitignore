@@ -7,6 +7,10 @@ data/
 data.zip
 checkpoints/
 
+models/
+outputs/
+wandb/
+wandb_sweep_results/
 # ----- All Results (consolidated) -----
 results/
 

@@ -83,6 +83,7 @@ class WandBSweepConfig:
     log_rendered_mesh: bool = True
     render_views: List[str] = field(default_factory=lambda: ['front', 'side', 'diagonal'])
     render_image_size: Tuple[int, int] = (512, 512)
+    render_distance_factor: float = 2.5  # Camera distance as multiple of mesh scale (smaller = closer)
     log_orbit_video: bool = False  # Slower, but more informative
     orbit_frames: int = 30  # Frames for orbit video (if enabled)
 
@@ -709,7 +710,7 @@ class WandBSweepOptimizer:
         cam_gen = CameraPathGenerator(center, scale)
 
         # Render fixed views
-        fixed_poses = cam_gen.fixed_views(views=self.config.render_views, distance_factor=12.5)
+        fixed_poses = cam_gen.fixed_views(views=self.config.render_views, distance_factor=self.config.render_distance_factor)
 
         for pose in fixed_poses:
             try:
@@ -730,7 +731,7 @@ class WandBSweepOptimizer:
                 orbit_poses = cam_gen.orbit_360(
                     n_frames=self.config.orbit_frames,
                     elevation=30.0,
-                    distance_factor=12.5,
+                    distance_factor=self.config.render_distance_factor,
                 )
 
                 video_path = os.path.join(run_dir, 'render_orbit.mp4')
