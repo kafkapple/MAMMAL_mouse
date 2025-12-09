@@ -451,8 +451,8 @@ class UVMapPipeline:
         colors_uv = self.uv_renderer._map_vertex_attr_to_uv(vertex_colors)
         texture = self.uv_renderer._render_vertex_colors(colors_uv)
 
-        # Save as image
-        img = (texture.permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)
+        # Save as image - detach to handle gradient tensors
+        img = (texture.detach().permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)
         img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         path = os.path.join(self.config.output_dir, f'texture_frame_{frame_idx:06d}.png')
         cv2.imwrite(path, img)
@@ -463,15 +463,15 @@ class UVMapPipeline:
         confidence: torch.Tensor,
     ) -> None:
         """Save final results."""
-        # Texture image (PNG)
-        img = (texture_map.permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)
+        # Texture image (PNG) - detach to handle gradient tensors
+        img = (texture_map.detach().permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)
         img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         texture_path = os.path.join(self.config.output_dir, 'texture_final.png')
         cv2.imwrite(texture_path, img)
         print(f"  Texture saved: {texture_path}")
 
-        # Confidence map
-        conf_img = (confidence.cpu().numpy() * 255).astype(np.uint8)
+        # Confidence map - detach to handle gradient tensors
+        conf_img = (confidence.detach().cpu().numpy() * 255).astype(np.uint8)
         conf_path = os.path.join(self.config.output_dir, 'confidence.png')
         cv2.imwrite(conf_path, conf_img)
 
