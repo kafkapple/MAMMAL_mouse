@@ -65,6 +65,19 @@ class WandBSweepConfig:
     w_psnr: float = 0.3
     w_seam: float = 0.3  # Lower seam discontinuity is better
 
+    # ===== Search Space Optimization (v2) =====
+    # uv_size 고정 옵션: Resolution Bias 제거
+    # - True: uv_size=512로 고정 (권장, 탐색 효율화)
+    # - False: [256, 512, 1024] 중 탐색
+    fix_uv_size: bool = True
+    fixed_uv_size: int = 512  # fix_uv_size=True일 때 사용할 해상도
+
+    # 2-Stage Optimization 전략
+    # - stage_a: do_optimization=False, 구조 파라미터만 최적화 (빠른 탐색)
+    # - stage_b: do_optimization=True, 미세 조정 파라미터 최적화
+    # - full: 모든 파라미터 동시 최적화 (기존 방식)
+    optimization_stage: str = "full"  # 'stage_a', 'stage_b', 'full'
+
     # Output
     output_dir: str = "wandb_sweep_results"
 
@@ -96,6 +109,107 @@ DEFAULT_SWEEP_PARAMS = {
 }
 
 
+def get_sweep_params_for_stage(
+    stage: str,
+    fix_uv_size: bool = True,
+    fixed_uv_size: int = 512,
+    stage_a_best_config: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """
+    2-Stage Optimization을 위한 파라미터 공간 생성.
+
+    Stage 전략:
+    - stage_a (Structure): Sampling, Fusion, Visibility 관련 파라미터만 최적화 (빠른 탐색)
+    - stage_b (Refinement): Stage A Best Config 기반, 미세 조정 파라미터만 최적화
+    - full: 모든 파라미터 동시 최적화 (기존 방식)
+
+    왜 2-Stage가 필요한가?
+    - 서로 다른 성격의 파라미터를 분리하여 탐색 효율성 ↑
+    - Stage A에서 구조적 최적점을 찾고, Stage B에서 품질 미세 조정
+    - 총 탐색 비용: Stage A(20회) + Stage B(20회) < Full(50회) 동등 수준
+
+    Args:
+        stage: 'stage_a', 'stage_b', 'full'
+        fix_uv_size: True면 uv_size 고정 (Resolution Bias 제거)
+        fixed_uv_size: 고정할 uv_size 값
+        stage_a_best_config: Stage B 실행 시 Stage A의 Best Config
+
+    Returns:
+        params: WandB Sweep parameter space
+    """
+    if stage == "stage_a":
+        # ===== Stage A: Structure Optimization =====
+        # - do_optimization=False (빠른 평가)
+        # - Sampling, Fusion, Visibility 파라미터만 탐색
+        params = {
+            'visibility_threshold': {
+                'distribution': 'uniform',
+                'min': 0.1,
+                'max': 0.7,
+            },
+            'fusion_method': {
+                'values': ['average', 'visibility_weighted', 'max_visibility'],
+            },
+            # do_optimization 고정 (False)
+            'do_optimization': {
+                'value': False,
+            },
+        }
+
+    elif stage == "stage_b":
+        # ===== Stage B: Refinement Optimization =====
+        # - Stage A의 Best Config 고정
+        # - Photometric optimization 관련 파라미터만 탐색
+        if stage_a_best_config is None:
+            logger.warning("stage_b requires stage_a_best_config, using defaults")
+            stage_a_best_config = {
+                'visibility_threshold': 0.3,
+                'fusion_method': 'visibility_weighted',
+            }
+
+        params = {
+            # Stage A에서 찾은 값 고정
+            'visibility_threshold': {
+                'value': stage_a_best_config.get('visibility_threshold', 0.3),
+            },
+            'fusion_method': {
+                'value': stage_a_best_config.get('fusion_method', 'visibility_weighted'),
+            },
+            # Refinement 파라미터 탐색
+            'do_optimization': {
+                'value': True,  # 항상 True
+            },
+            'opt_iters': {
+                'values': [30, 50, 100, 150],
+            },
+            'w_tv': {
+                'distribution': 'log_uniform_values',
+                'min': 1e-5,
+                'max': 1e-2,
+            },
+            'opt_lr': {
+                'distribution': 'log_uniform_values',
+                'min': 1e-4,
+                'max': 1e-2,
+            },
+        }
+
+    else:  # "full"
+        # ===== Full: 기존 방식 (모든 파라미터 동시 탐색) =====
+        params = DEFAULT_SWEEP_PARAMS.copy()
+
+    # ===== uv_size 처리 =====
+    if fix_uv_size:
+        # Resolution Bias 제거: uv_size 고정
+        params['uv_size'] = {'value': fixed_uv_size}
+        logger.info(f"uv_size fixed to {fixed_uv_size} (Resolution Bias 제거)")
+    elif 'uv_size' not in params:
+        # Stage A/B에서 uv_size가 없으면 추가
+        params['uv_size'] = {'value': fixed_uv_size}
+
+    return params
+
+
 class WandBSweepOptimizer:
     """
     WandB Sweep-based hyperparameter optimizer for UV mapping.
@@ -112,17 +226,32 @@ class WandBSweepOptimizer:
         self,
         config: WandBSweepConfig,
         param_space: Optional[Dict[str, Any]] = None,
+        stage_a_best_config: Optional[Dict[str, Any]] = None,
     ):
         """
         Args:
             config: Sweep configuration
             param_space: Parameter search space (uses default if None)
+            stage_a_best_config: Stage A best config (for stage_b)
         """
         if not _check_wandb():
             raise ImportError("wandb is required. Install with: pip install wandb")
 
         self.config = config
-        self.param_space = param_space or DEFAULT_SWEEP_PARAMS.copy()
+        self.stage_a_best_config = stage_a_best_config
+
+        # ===== 파라미터 공간 자동 선택 (v2) =====
+        # optimization_stage에 따라 적절한 파라미터 공간 사용
+        if param_space is not None:
+            self.param_space = param_space
+        else:
+            self.param_space = get_sweep_params_for_stage(
+                stage=config.optimization_stage,
+                fix_uv_size=config.fix_uv_size,
+                fixed_uv_size=config.fixed_uv_size,
+                stage_a_best_config=stage_a_best_config,
+            )
+            logger.info(f"Using {config.optimization_stage} stage params: {list(self.param_space.keys())}")
 
         os.makedirs(config.output_dir, exist_ok=True)
 
@@ -415,25 +544,56 @@ class WandBSweepOptimizer:
         metrics: Dict[str, float],
     ) -> float:
         """
-        Compute composite optimization score.
+        Compute composite optimization score (v2 - Exponential Decay).
 
         Higher is better.
+
+        개선사항 (v2):
+        1. Seam Score: Hard Clipping → Exponential Decay
+           - 기존: max(0, 1 - seam * 10) → seam > 0.1이면 Dead Zone
+           - 개선: exp(-k * seam) → 연속적인 기울기로 Optimizer 신호 유지
+
+        2. Coverage Gating: 최소 커버리지 미달 시 페널티
+           - Coverage < 80%이면 전체 점수 * 0.1
+           - UV 공간 활용도가 낮으면 다른 지표가 좋아도 탈락
         """
         coverage_score = metrics['coverage'] / 100.0  # Normalize to [0, 1]
         confidence_score = metrics['mean_confidence']  # Already [0, 1]
 
-        # Invert seam (lower is better) with NaN check
+        # ===== Seam Score: Exponential Decay (v2) =====
+        # 기존 Hard Clipping의 문제점:
+        #   seam > 0.1 → 무조건 0점 → Gradient Vanishing과 유사한 학습 정체
+        #
+        # 개선된 Exponential Decay:
+        #   Score = exp(-k * seam), k=15 (민감도 상수)
+        #   - seam=0.0 → score=1.0 (완벽)
+        #   - seam=0.05 → score≈0.47 (양호)
+        #   - seam=0.1 → score≈0.22 (주의 필요)
+        #   - seam=0.2 → score≈0.05 (나쁨, but 기울기 존재)
         seam_val = metrics['seam_discontinuity']
         if np.isnan(seam_val):
             logger.warning(f"seam_discontinuity is NaN, using 0.0")
             seam_val = 0.0
-        seam_score = max(0, 1.0 - seam_val * 10)
 
+        seam_sensitivity = 15.0  # k: 민감도 상수 (값이 클수록 seam에 민감)
+        seam_score = np.exp(-seam_sensitivity * seam_val)
+
+        # ===== 가중 합산 =====
         score = (
             self.config.w_coverage * coverage_score +
             self.config.w_psnr * confidence_score +
             self.config.w_seam * seam_score
         )
+
+        # ===== Coverage Gating (v2) =====
+        # 커버리지가 최소 기준(80%) 미달 시 전체 점수에 페널티
+        # 목적: UV 공간 활용도가 낮은 결과는 다른 지표가 좋아도 탈락
+        coverage_threshold = 80.0  # 최소 커버리지 기준 (%)
+        coverage_penalty = 0.1     # 페널티 계수
+
+        if metrics['coverage'] < coverage_threshold:
+            logger.info(f"Coverage Gating: {metrics['coverage']:.1f}% < {coverage_threshold}% → score *= {coverage_penalty}")
+            score *= coverage_penalty
 
         # Final NaN check
         if np.isnan(score):
@@ -524,7 +684,28 @@ if __name__ == '__main__':
         print("  python -m uvmap.optuna_optimizer --result_dir <path>")
         sys.exit(1)
 
-    parser = argparse.ArgumentParser(description='WandB Sweep UV Map Optimization')
+    parser = argparse.ArgumentParser(
+        description='WandB Sweep UV Map Optimization (v2)',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # 기본 실행 (권장: uv_size 고정, full stage)
+  python -m uvmap.wandb_sweep --result_dir results/fitting/xxx --count 30
+
+  # 2-Stage Optimization
+  # Stage A: 구조 파라미터 최적화 (빠른 탐색)
+  python -m uvmap.wandb_sweep --result_dir results/fitting/xxx \\
+      --stage stage_a --count 20
+
+  # Stage B: Stage A 결과 기반 미세 조정
+  python -m uvmap.wandb_sweep --result_dir results/fitting/xxx \\
+      --stage stage_b --stage_a_config wandb_sweep_results/best_config.json --count 20
+
+  # uv_size 탐색 포함 (기존 방식)
+  python -m uvmap.wandb_sweep --result_dir results/fitting/xxx \\
+      --no_fix_uv_size --count 50
+        """)
+
     parser.add_argument('--result_dir', type=str, required=True,
                        help='Fitting result directory')
     parser.add_argument('--output_dir', type=str, default='wandb_sweep_results',
@@ -543,7 +724,26 @@ if __name__ == '__main__':
     parser.add_argument('--create_only', action='store_true',
                        help='Only create sweep (no agent). Use with other servers via --sweep_id')
 
+    # ===== v2 새로운 옵션들 =====
+    parser.add_argument('--stage', type=str, default='full',
+                       choices=['stage_a', 'stage_b', 'full'],
+                       help='Optimization stage (stage_a: structure, stage_b: refinement, full: all)')
+    parser.add_argument('--no_fix_uv_size', action='store_true',
+                       help='Do NOT fix uv_size (search over [256,512,1024]). Default: fixed to 512')
+    parser.add_argument('--uv_size', type=int, default=512,
+                       help='Fixed uv_size value (default: 512)')
+    parser.add_argument('--stage_a_config', type=str, default=None,
+                       help='Path to stage_a best_config.json (for stage_b)')
+
     args = parser.parse_args()
+
+    # Stage B 설정 로드
+    stage_a_best_config = None
+    if args.stage == 'stage_b' and args.stage_a_config:
+        with open(args.stage_a_config) as f:
+            stage_a_info = json.load(f)
+            stage_a_best_config = stage_a_info.get('best_params', {})
+            print(f"Loaded Stage A config: {stage_a_best_config}")
 
     config = WandBSweepConfig(
         project=args.project,
@@ -551,9 +751,21 @@ if __name__ == '__main__':
         count=args.count,
         max_frames=args.max_frames,
         frame_sampling=args.frame_sampling,
+        # v2 옵션
+        fix_uv_size=not args.no_fix_uv_size,
+        fixed_uv_size=args.uv_size,
+        optimization_stage=args.stage,
     )
 
-    optimizer = WandBSweepOptimizer(config)
+    optimizer = WandBSweepOptimizer(config, stage_a_best_config=stage_a_best_config)
+
+    # 실행 모드 출력
+    print(f"\n{'='*60}")
+    print(f"UV Map HPO v2 - {args.stage.upper()} Stage")
+    print(f"{'='*60}")
+    print(f"uv_size: {'fixed=' + str(args.uv_size) if not args.no_fix_uv_size else 'search [256,512,1024]'}")
+    print(f"Parameters: {list(optimizer.param_space.keys())}")
+    print(f"{'='*60}\n")
 
     if args.create_only:
         # Only create sweep, don't run agent
@@ -574,3 +786,14 @@ if __name__ == '__main__':
         # Create and run new sweep
         best_params = optimizer.run_sweep(args.result_dir)
         print(f"\nBest parameters: {best_params}")
+
+        # 다음 단계 가이드 출력
+        if args.stage == 'stage_a':
+            print(f"\n{'='*60}")
+            print("Stage A 완료! 다음 단계:")
+            print(f"  python -m uvmap.wandb_sweep \\")
+            print(f"      --result_dir {args.result_dir} \\")
+            print(f"      --stage stage_b \\")
+            print(f"      --stage_a_config {args.output_dir}/best_config.json \\")
+            print(f"      --count 20")
+            print(f"{'='*60}")
