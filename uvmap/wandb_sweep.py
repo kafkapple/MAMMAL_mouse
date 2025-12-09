@@ -17,7 +17,7 @@ import time
 import torch
 import numpy as np
 from dataclasses import dataclass, field, asdict
-from typing import Dict, List, Any, Optional, Callable
+from typing import Dict, List, Any, Optional, Callable, Tuple
 import logging
 
 logger = logging.getLogger(__name__)
@@ -77,6 +77,14 @@ class WandBSweepConfig:
     # - stage_b: do_optimization=True, 미세 조정 파라미터 최적화
     # - full: 모든 파라미터 동시 최적화 (기존 방식)
     optimization_stage: str = "full"  # 'stage_a', 'stage_b', 'full'
+
+    # ===== Visualization Logging =====
+    # Enable 3D mesh rendering visualization in wandb
+    log_rendered_mesh: bool = True
+    render_views: List[str] = field(default_factory=lambda: ['front', 'side', 'diagonal'])
+    render_image_size: Tuple[int, int] = (512, 512)
+    log_orbit_video: bool = False  # Slower, but more informative
+    orbit_frames: int = 30  # Frames for orbit video (if enabled)
 
     # Output
     output_dir: str = "wandb_sweep_results"
@@ -410,6 +418,32 @@ class WandBSweepOptimizer:
                     caption="UV Mask"
                 )
 
+            # ===== Log 3D Rendered Mesh Visualization =====
+            if self.config.log_rendered_mesh and 'texture_path' in metrics:
+                try:
+                    render_outputs = self._render_mesh_visualization(
+                        fitting_result_dir,
+                        metrics['texture_path'],
+                    )
+
+                    # Log rendered images
+                    for view_name, img_path in render_outputs.get('images', {}).items():
+                        if os.path.exists(img_path):
+                            log_dict[f'render_{view_name}'] = wandb.Image(
+                                img_path,
+                                caption=f"Rendered {view_name} view"
+                            )
+
+                    # Log orbit video (if enabled)
+                    if 'orbit_video' in render_outputs and os.path.exists(render_outputs['orbit_video']):
+                        log_dict['render_orbit'] = wandb.Video(
+                            render_outputs['orbit_video'],
+                            caption="360° orbit view"
+                        )
+
+                except Exception as e:
+                    logger.warning(f"Failed to render mesh visualization: {e}")
+
             wandb.log(log_dict)
 
             logger.info(f"Trial complete: score={score:.4f}, coverage={metrics['coverage']:.1f}%")
@@ -601,6 +635,117 @@ class WandBSweepOptimizer:
             return 0.0
 
         return score
+
+    def _render_mesh_visualization(
+        self,
+        fitting_result_dir: str,
+        texture_path: str,
+    ) -> Dict[str, Any]:
+        """
+        Render UV-textured mesh from multiple viewpoints.
+
+        Creates images and optional video for wandb logging.
+
+        Args:
+            fitting_result_dir: Path to fitting results
+            texture_path: Path to UV texture image
+
+        Returns:
+            outputs: Dictionary with 'images' and optionally 'orbit_video'
+        """
+        from visualization.textured_renderer import create_textured_renderer
+        from visualization.camera_paths import CameraPathGenerator, compute_mesh_bounds
+        from visualization.video_generator import VideoGenerator
+        import cv2
+        import pickle
+        import glob
+
+        outputs = {'images': {}}
+        run_dir = os.path.dirname(texture_path)
+
+        # Find first parameter file to get mesh
+        params_dir = os.path.join(fitting_result_dir, 'params')
+        params_files = sorted(glob.glob(os.path.join(params_dir, 'step_2_frame_*.pkl')))
+        if not params_files:
+            params_files = sorted(glob.glob(os.path.join(params_dir, 'step_1_frame_*.pkl')))
+        if not params_files:
+            logger.warning("No parameter files found for rendering")
+            return outputs
+
+        # Load body model and get vertices
+        from articulation_th import ArticulationTorch
+        body_model = ArticulationTorch()
+
+        with open(params_files[0], 'rb') as f:
+            params = pickle.load(f)
+
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        for k, v in params.items():
+            if not isinstance(v, torch.Tensor):
+                params[k] = torch.tensor(v, dtype=torch.float32, device=device)
+
+        V, J = body_model.forward(
+            params["thetas"], params["bone_lengths"],
+            params["rotation"], params["trans"] / 1000,
+            params["scale"] / 1000,
+            params.get("chest_deformer", torch.zeros(1, 1, device=device)),
+        )
+        vertices = V[0].detach().cpu().numpy()
+
+        # Setup renderer
+        try:
+            renderer = create_textured_renderer(
+                model_dir='mouse_model/mouse_txt',
+                texture_path=texture_path,
+                image_size=self.config.render_image_size,
+                backend='pyrender',
+            )
+        except Exception as e:
+            logger.warning(f"Failed to create renderer: {e}")
+            return outputs
+
+        # Setup cameras
+        center, scale = compute_mesh_bounds(vertices)
+        cam_gen = CameraPathGenerator(center, scale)
+
+        # Render fixed views
+        fixed_poses = cam_gen.fixed_views(views=self.config.render_views, distance_factor=12.5)
+
+        for pose in fixed_poses:
+            try:
+                cam_matrix = pose.to_pyrender_pose()
+                image = renderer.render_pyrender(vertices, cam_matrix)
+
+                # Save image
+                img_path = os.path.join(run_dir, f'render_{pose.name}.png')
+                cv2.imwrite(img_path, cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+                outputs['images'][pose.name] = img_path
+
+            except Exception as e:
+                logger.warning(f"Failed to render {pose.name}: {e}")
+
+        # Render orbit video (if enabled)
+        if self.config.log_orbit_video:
+            try:
+                orbit_poses = cam_gen.orbit_360(
+                    n_frames=self.config.orbit_frames,
+                    elevation=30.0,
+                    distance_factor=12.5,
+                )
+
+                video_path = os.path.join(run_dir, 'render_orbit.mp4')
+                with VideoGenerator(video_path, fps=15) as gen:
+                    for pose in orbit_poses:
+                        cam_matrix = pose.to_pyrender_pose()
+                        image = renderer.render_pyrender(vertices, cam_matrix)
+                        gen.add_frame(image)
+
+                outputs['orbit_video'] = video_path
+
+            except Exception as e:
+                logger.warning(f"Failed to render orbit video: {e}")
+
+        return outputs
 
     def _get_best_params(
         self,
