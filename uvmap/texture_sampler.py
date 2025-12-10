@@ -56,7 +56,8 @@ class TextureSampler(nn.Module):
             cam_dict = {
                 'K': torch.from_numpy(cam['K'].T).float().to(self.device),
                 'R': torch.from_numpy(cam['R'].T).float().to(self.device),
-                'T': torch.from_numpy(cam['T']).float().to(self.device).squeeze(),
+                # T is in mm, convert to m to match mesh coordinates (trans/1000, scale/1000)
+                'T': torch.from_numpy(cam['T'] / 1000.0).float().to(self.device).squeeze(),
             }
             self.cameras.append(cam_dict)
 
@@ -81,11 +82,13 @@ class TextureSampler(nn.Module):
         cam = self.cameras[view_idx]
         K, R, T = cam['K'], cam['R'], cam['T']
 
-        # World to camera: X_cam = R @ X_world + T
-        vertices_cam = vertices @ R.T + T
+        # World to camera: X_cam = X_world @ R + T
+        # Note: K, R are stored as original.T in set_cameras(), so use them directly
+        # (not .T again, which would double-transpose back to original)
+        vertices_cam = vertices @ R + T
 
-        # Camera to image: x = K @ X_cam
-        vertices_proj = vertices_cam @ K.T
+        # Camera to image: x = X_cam @ K
+        vertices_proj = vertices_cam @ K
 
         # Normalize by depth
         proj_2d = vertices_proj[:, :2] / (vertices_proj[:, 2:3] + 1e-8)

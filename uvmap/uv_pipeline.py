@@ -243,9 +243,10 @@ class UVMapPipeline:
         masks = []
 
         for view_id in self.views_to_use:
-            # Load RGB image from video
+            # Load RGB image from video (OpenCV loads BGR, convert to RGB)
             video_path = os.path.join(self.data_dir, 'videos_undist', f'{view_id}.mp4')
             img = self._load_video_frame(video_path, frame_idx)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # BGR -> RGB
             img_tensor = torch.from_numpy(img).permute(2, 0, 1).float().to(self.device) / 255.0
             images.append(img_tensor)
 
