@@ -192,11 +192,17 @@ class TexturedMeshRenderer:
         )
 
         # Apply texture using vertex colors (simpler than UV for trimesh)
-        vertex_colors = self.sample_vertex_colors()
-        mesh_trimesh.visual.vertex_colors = vertex_colors
+        vertex_colors = self.sample_vertex_colors()  # (N, 3) uint8
 
-        # Create pyrender mesh
-        mesh_pyrender = pyrender.Mesh.from_trimesh(mesh_trimesh, smooth=True)
+        # Convert to RGBA with full opacity for pyrender compatibility
+        vertex_colors_rgba = np.concatenate([
+            vertex_colors,
+            np.full((vertex_colors.shape[0], 1), 255, dtype=np.uint8)
+        ], axis=1)
+        mesh_trimesh.visual.vertex_colors = vertex_colors_rgba
+
+        # Create pyrender mesh (smooth=False to preserve vertex colors)
+        mesh_pyrender = pyrender.Mesh.from_trimesh(mesh_trimesh, smooth=False)
 
         # Create scene
         scene = pyrender.Scene(bg_color=np.array(background_color))
