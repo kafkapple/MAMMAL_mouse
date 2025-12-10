@@ -199,7 +199,8 @@ class WandBSweepConfig:
 
     # ===== Visualization Logging =====
     # Enable 3D mesh rendering visualization in wandb
-    log_rendered_mesh: bool = True
+    # Disabled by default - 6-view projection grid (log_projection_grid) is more informative
+    log_rendered_mesh: bool = False
     render_views: List[str] = field(default_factory=lambda: ['front', 'side', 'diagonal'])
     render_image_size: Tuple[int, int] = (512, 512)
     render_distance_factor: float = 2.5  # Camera distance as multiple of mesh scale (smaller = closer)
