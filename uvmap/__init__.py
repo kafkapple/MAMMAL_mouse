@@ -98,7 +98,7 @@ __all__ = [
 
 def optimize_uvmap(
     fitting_result_dir: str,
-    output_dir: str = "uvmap_optimization",
+    output_dir: str = "results/uvmap",
     method: str = "wandb",  # 'wandb' (default) or 'optuna'
     n_trials: int = 30,
     **kwargs,

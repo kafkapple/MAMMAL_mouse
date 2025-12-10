@@ -684,7 +684,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='UV Map Ablation Study')
     parser.add_argument('--result_dir', type=str, required=True,
                        help='Fitting result directory')
-    parser.add_argument('--output_dir', type=str, default='uvmap_experiments',
+    parser.add_argument('--output_dir', type=str, default='results/uvmap',
                        help='Output directory')
     parser.add_argument('--quick', action='store_true',
                        help='Quick test with fewer combinations')

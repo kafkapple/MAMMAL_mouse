@@ -6,16 +6,24 @@
 data/
 data.zip
 checkpoints/
-
 models/
-outputs/
-wandb/
-wandb_sweep_results/
-# ----- All Results (consolidated) -----
-results/
 
+# ----- All Results (consolidated under results/) -----
+results/
+# Structure:
+#   results/fitting/     - mesh fitting outputs
+#   results/sweep/       - wandb sweep results
+#   results/optuna/      - optuna optimization results
+#   results/uvmap/       - uvmap experiment results
+#   results/wandb/       - wandb logs
+#   results/logs/        - hydra logs
+
+# ----- Legacy folders (for backwards compatibility) -----
 outputs/                    # Legacy Hydra output (now uses results/logs/)
 mouse_fitting_result/       # Legacy fitting output (now uses results/fitting/)
+wandb/                      # Legacy wandb logs (now uses results/wandb/)
+wandb_sweep_results/        # Legacy sweep results (now uses results/sweep/)
+uvmap_experiments/          # Legacy uvmap results (now uses results/uvmap/)
 
 # ----- Duplicate folders (use mouse_model/ instead) -----
 assets/mouse_model/

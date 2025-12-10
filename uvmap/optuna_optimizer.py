@@ -60,7 +60,7 @@ class OptimizationConfig:
     frame_sampling: str = "uniform"  # 'uniform', 'random', 'keyframes'
 
     # Output
-    output_dir: str = "optuna_results"
+    output_dir: str = "results/optuna"
 
     def __post_init__(self):
         if self.param_space is None:
@@ -643,7 +643,7 @@ def run_optuna_optimization(
     result_dir: str,
     n_trials: int = 30,
     mode: str = "single",
-    output_dir: str = "optuna_uvmap",
+    output_dir: str = "results/optuna",
 ) -> Dict:
     """
     Convenience function to run Optuna optimization.
@@ -718,7 +718,7 @@ if __name__ == "__main__":
     parser.add_argument("--result_dir", type=str, required=True)
     parser.add_argument("--n_trials", type=int, default=30)
     parser.add_argument("--mode", choices=["single", "multi"], default="single")
-    parser.add_argument("--output_dir", type=str, default="optuna_uvmap")
+    parser.add_argument("--output_dir", type=str, default="results/optuna")
 
     args = parser.parse_args()
 

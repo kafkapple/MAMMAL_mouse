@@ -88,7 +88,7 @@ class WandBSweepConfig:
     orbit_frames: int = 30  # Frames for orbit video (if enabled)
 
     # Output
-    output_dir: str = "wandb_sweep_results"
+    output_dir: str = "results/sweep"
 
 
 # Default parameter search space
@@ -307,6 +307,11 @@ class WandBSweepOptimizer:
         Returns:
             best_params: Best found parameters
         """
+        # Set wandb log directory to results/wandb/
+        wandb_dir = os.path.join(os.path.dirname(self.config.output_dir), 'wandb')
+        os.makedirs(wandb_dir, exist_ok=True)
+        os.environ['WANDB_DIR'] = os.path.abspath(wandb_dir)
+
         # Create sweep if needed
         if sweep_id is None:
             sweep_id = self.create_sweep()
@@ -354,6 +359,11 @@ class WandBSweepOptimizer:
             fitting_result_dir: Path to fitting results
             count: Number of runs for this agent (None = unlimited)
         """
+        # Set wandb log directory to results/wandb/
+        wandb_dir = os.path.join(os.path.dirname(self.config.output_dir), 'wandb')
+        os.makedirs(wandb_dir, exist_ok=True)
+        os.environ['WANDB_DIR'] = os.path.abspath(wandb_dir)
+
         def train_fn():
             self._run_single_trial(fitting_result_dir)
 
@@ -789,7 +799,7 @@ class WandBSweepOptimizer:
 
 def run_wandb_sweep(
     fitting_result_dir: str,
-    output_dir: str = "wandb_sweep_results",
+    output_dir: str = "results/sweep",
     n_trials: int = 30,
     project: str = "uvmap-optimization",
 ) -> Dict[str, Any]:
@@ -845,7 +855,7 @@ Examples:
 
   # Stage B: Stage A 결과 기반 미세 조정
   python -m uvmap.wandb_sweep --result_dir results/fitting/xxx \\
-      --stage stage_b --stage_a_config wandb_sweep_results/best_config.json --count 20
+      --stage stage_b --stage_a_config results/sweep/best_config.json --count 20
 
   # uv_size 탐색 포함 (기존 방식)
   python -m uvmap.wandb_sweep --result_dir results/fitting/xxx \\
@@ -854,7 +864,7 @@ Examples:
 
     parser.add_argument('--result_dir', type=str, required=True,
                        help='Fitting result directory')
-    parser.add_argument('--output_dir', type=str, default='wandb_sweep_results',
+    parser.add_argument('--output_dir', type=str, default='results/sweep',
                        help='Output directory')
     parser.add_argument('--project', type=str, default='uvmap-optimization',
                        help='WandB project name')
