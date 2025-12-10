@@ -40,6 +40,123 @@ def _check_wandb():
     return WANDB_AVAILABLE
 
 
+# ===== Photometric Metrics Helper Functions =====
+# Based on 3DGS (SIGGRAPH 2023) and IQA literature
+
+def compute_psnr_masked(
+    rendered: np.ndarray,
+    target: np.ndarray,
+    mask: np.ndarray,
+) -> Tuple[float, float]:
+    """
+    Compute PSNR between rendered and target images in masked region.
+
+    Args:
+        rendered: [H, W, 3] Rendered RGB (0-255, uint8)
+        target: [H, W, 3] Original RGB (0-255, uint8)
+        mask: [H, W] Boolean mask for valid region
+
+    Returns:
+        psnr_score: [0, 1] normalized PSNR score
+        psnr_db: Raw PSNR value in dB
+    """
+    if mask.sum() < 100:  # Too few pixels
+        return 0.0, 0.0
+
+    # Convert to float
+    rendered_f = rendered.astype(np.float32)
+    target_f = target.astype(np.float32)
+
+    # Apply mask
+    rendered_masked = rendered_f[mask]
+    target_masked = target_f[mask]
+
+    # MSE calculation
+    mse = np.mean((rendered_masked - target_masked) ** 2)
+
+    if mse < 1e-10:
+        psnr_db = 100.0
+    else:
+        psnr_db = 10 * np.log10(255.0 ** 2 / mse)
+
+    # Normalize to [0, 1] (PSNR typically 15-40 dB for reasonable results)
+    psnr_min, psnr_max = 15.0, 40.0
+    psnr_score = np.clip((psnr_db - psnr_min) / (psnr_max - psnr_min), 0, 1)
+
+    return psnr_score, psnr_db
+
+
+def compute_ssim_masked(
+    rendered: np.ndarray,
+    target: np.ndarray,
+    mask: np.ndarray,
+) -> Tuple[float, float]:
+    """
+    Compute SSIM between rendered and target images.
+
+    Uses bounding box of mask for efficient computation.
+
+    Args:
+        rendered: [H, W, 3] Rendered RGB (0-255, uint8)
+        target: [H, W, 3] Original RGB (0-255, uint8)
+        mask: [H, W] Boolean mask for valid region
+
+    Returns:
+        ssim_score: [0, 1] structural similarity
+        ssim_raw: Raw SSIM value
+    """
+    try:
+        from skimage.metrics import structural_similarity as ssim
+    except ImportError:
+        logger.warning("skimage not available, returning 0 for SSIM")
+        return 0.0, 0.0
+
+    # Find bounding box of mask
+    y_indices, x_indices = np.where(mask)
+    if len(y_indices) < 10:
+        return 0.0, 0.0
+
+    y1, y2 = y_indices.min(), y_indices.max() + 1
+    x1, x2 = x_indices.min(), x_indices.max() + 1
+
+    # Ensure minimum size for SSIM (at least 7x7 for default window)
+    if (y2 - y1) < 7 or (x2 - x1) < 7:
+        return 0.0, 0.0
+
+    rendered_crop = rendered[y1:y2, x1:x2]
+    target_crop = target[y1:y2, x1:x2]
+
+    # SSIM calculation (channel_axis for RGB)
+    ssim_val = ssim(
+        target_crop,
+        rendered_crop,
+        channel_axis=2,
+        data_range=255,
+        win_size=min(7, min(rendered_crop.shape[0], rendered_crop.shape[1]) // 2 * 2 - 1)
+    )
+
+    return ssim_val, ssim_val
+
+
+def create_mesh_mask(
+    rendered: np.ndarray,
+    background_value: int = 255,
+) -> np.ndarray:
+    """
+    Create a mask for mesh region (non-background pixels).
+
+    Args:
+        rendered: [H, W, 3] Rendered image with white background
+        background_value: Background pixel value (255 for white)
+
+    Returns:
+        mask: [H, W] Boolean mask (True = mesh region)
+    """
+    # Check if pixel is not pure white (background)
+    is_background = np.all(rendered == background_value, axis=2)
+    return ~is_background
+
+
 @dataclass
 class WandBSweepConfig:
     """Configuration for WandB Sweep optimization."""
@@ -60,10 +177,12 @@ class WandBSweepConfig:
     max_frames: int = 20  # Limit frames (0 = all frames)
     frame_sampling: str = "uniform"  # 'uniform', 'random', 'keyframes'
 
-    # Objective weights (for composite score)
-    w_coverage: float = 0.4
-    w_psnr: float = 0.3
-    w_seam: float = 0.3  # Lower seam discontinuity is better
+    # Objective weights (for composite score v3)
+    # Based on 3DGS (SIGGRAPH 2023): L = (1-λ)×L1 + λ×D-SSIM, λ=0.2
+    w_photo: float = 0.50   # Photometric (PSNR-based) - primary quality metric
+    w_ssim: float = 0.15    # Structural similarity - perceptual quality
+    w_coverage: float = 0.20  # UV space coverage
+    w_seam: float = 0.15    # Seam discontinuity (lower is better)
 
     # ===== Search Space Optimization (v2) =====
     # uv_size 고정 옵션: Resolution Bias 제거
@@ -86,6 +205,11 @@ class WandBSweepConfig:
     render_distance_factor: float = 2.5  # Camera distance as multiple of mesh scale (smaller = closer)
     log_orbit_video: bool = False  # Slower, but more informative
     orbit_frames: int = 30  # Frames for orbit video (if enabled)
+
+    # ===== 6-View Projection Grid Settings =====
+    log_projection_grid: bool = True  # Enable 6-view comparison grid logging
+    projection_face_sampling: int = 1  # Render ALL faces for accurate visualization (1=full quality)
+    projection_max_width: int = 2560  # Max grid width (pixels)
 
     # Output
     output_dir: str = "results/sweep"
@@ -396,9 +520,18 @@ class WandBSweepOptimizer:
             # Run UV mapping with current params
             metrics = self._evaluate_config(fitting_result_dir, dict(config))
 
+            # ===== Compute photometric metrics (PSNR/SSIM) via 6-view projection =====
+            # Must be done BEFORE _compute_score() for score v3
+            projection_result = self._render_6view_projection_grid(metrics, frame_idx=0)
+
+            # Merge photometric metrics into metrics dict for score calculation
+            metrics['mean_psnr_score'] = projection_result.get('mean_psnr_score', 0.0)
+            metrics['mean_ssim_score'] = projection_result.get('mean_ssim_score', 0.0)
+            metrics['mean_psnr_db'] = projection_result.get('mean_psnr_db', 0.0)
+
             runtime = time.time() - start_time
 
-            # Compute composite score
+            # Compute composite score (v3 with photometric metrics)
             score = self._compute_score(metrics)
 
             # Log all metrics
@@ -406,6 +539,9 @@ class WandBSweepOptimizer:
                 'coverage': metrics['coverage'],
                 'mean_confidence': metrics['mean_confidence'],
                 'seam_discontinuity': metrics['seam_discontinuity'],
+                'mean_psnr_score': metrics['mean_psnr_score'],
+                'mean_ssim_score': metrics['mean_ssim_score'],
+                'mean_psnr_db': metrics['mean_psnr_db'],
                 'runtime_seconds': runtime,
                 'score': score,
             }
@@ -427,6 +563,14 @@ class WandBSweepOptimizer:
                 log_dict['uv_mask'] = wandb.Image(
                     metrics['uv_mask_path'],
                     caption="UV Mask"
+                )
+
+            # ===== Log 6-View Projection Grid (already computed above) =====
+            grid_path = projection_result.get('grid_path')
+            if grid_path and os.path.exists(grid_path):
+                log_dict['projection_6view'] = wandb.Image(
+                    grid_path,
+                    caption=f"6-View Projection (PSNR={metrics['mean_psnr_db']:.1f}dB, SSIM={metrics['mean_ssim_score']:.3f})"
                 )
 
             # ===== Log 3D Rendered Mesh Visualization =====
@@ -529,6 +673,12 @@ class WandBSweepOptimizer:
             'texture_path': os.path.join(pipeline_config.output_dir, 'texture_final.png'),
             'confidence_path': os.path.join(pipeline_config.output_dir, 'confidence.png'),
             'uv_mask_path': os.path.join(pipeline_config.output_dir, 'uv_mask.png'),
+            # Additional info for 6-view projection visualization
+            'output_dir': pipeline_config.output_dir,
+            'data_dir': pipeline.data_dir,
+            'views_to_use': pipeline.views_to_use,
+            'vertex_colors': vertex_colors,
+            'fitting_result_dir': fitting_result_dir,
         }
 
         return metrics
@@ -589,28 +739,40 @@ class WandBSweepOptimizer:
         metrics: Dict[str, float],
     ) -> float:
         """
-        Compute composite optimization score (v2 - Exponential Decay).
+        Compute composite optimization score (v3 - Photometric-Aware).
 
         Higher is better.
 
-        개선사항 (v2):
-        1. Seam Score: Hard Clipping → Exponential Decay
-           - 기존: max(0, 1 - seam * 10) → seam > 0.1이면 Dead Zone
-           - 개선: exp(-k * seam) → 연속적인 기울기로 Optimizer 신호 유지
+        개선사항 (v3):
+        1. Photometric Score 추가: PSNR 기반 Rendered vs Original 비교
+           - 3DGS (SIGGRAPH 2023) 기반: L = (1-λ)×L1 + λ×D-SSIM
+           - PSNR normalized to [0, 1] (15-40 dB range)
 
-        2. Coverage Gating: 최소 커버리지 미달 시 페널티
+        2. SSIM Score 추가: Structural similarity (human perception)
+           - skimage.metrics.structural_similarity 사용
+           - Bounding box crop으로 효율적 계산
+
+        3. Seam Score: Exponential Decay (v2에서 유지)
+           - exp(-k * seam) → 연속적인 기울기로 Optimizer 신호 유지
+
+        4. Coverage Gating: 최소 커버리지 미달 시 페널티
            - Coverage < 80%이면 전체 점수 * 0.1
-           - UV 공간 활용도가 낮으면 다른 지표가 좋아도 탈락
         """
         coverage_score = metrics['coverage'] / 100.0  # Normalize to [0, 1]
-        confidence_score = metrics['mean_confidence']  # Already [0, 1]
+
+        # ===== Photometric Scores (v3 NEW) =====
+        # PSNR score: from 6-view projection comparison
+        photo_score = metrics.get('mean_psnr_score', 0.0)
+        ssim_score_val = metrics.get('mean_ssim_score', 0.0)
+
+        # Fallback: if photometric metrics not computed, use confidence as proxy
+        if photo_score == 0.0 and ssim_score_val == 0.0:
+            logger.warning("Photometric metrics not available, using mean_confidence as fallback")
+            photo_score = metrics.get('mean_confidence', 0.0)
+            ssim_score_val = metrics.get('mean_confidence', 0.0)
 
         # ===== Seam Score: Exponential Decay (v2) =====
-        # 기존 Hard Clipping의 문제점:
-        #   seam > 0.1 → 무조건 0점 → Gradient Vanishing과 유사한 학습 정체
-        #
-        # 개선된 Exponential Decay:
-        #   Score = exp(-k * seam), k=15 (민감도 상수)
+        # Score = exp(-k * seam), k=15 (민감도 상수)
         #   - seam=0.0 → score=1.0 (완벽)
         #   - seam=0.05 → score≈0.47 (양호)
         #   - seam=0.1 → score≈0.22 (주의 필요)
@@ -623,10 +785,16 @@ class WandBSweepOptimizer:
         seam_sensitivity = 15.0  # k: 민감도 상수 (값이 클수록 seam에 민감)
         seam_score = np.exp(-seam_sensitivity * seam_val)
 
-        # ===== 가중 합산 =====
+        # ===== 가중 합산 (v3) =====
+        # Based on 3DGS (Kerbl et al., SIGGRAPH 2023):
+        #   - w_photo=0.50: Primary photometric quality
+        #   - w_ssim=0.15: Structural/perceptual similarity
+        #   - w_coverage=0.20: UV space utilization
+        #   - w_seam=0.15: Texture continuity at seams
         score = (
+            self.config.w_photo * photo_score +
+            self.config.w_ssim * ssim_score_val +
             self.config.w_coverage * coverage_score +
-            self.config.w_psnr * confidence_score +
             self.config.w_seam * seam_score
         )
 
@@ -795,6 +963,208 @@ class WandBSweepOptimizer:
         logger.info(f"Best params: {best_params}")
 
         return best_params
+
+    def _render_6view_projection_grid(
+        self,
+        metrics: Dict[str, Any],
+        frame_idx: int = 0,
+    ) -> Dict[str, Any]:
+        """
+        Render textured mesh projected to 6 camera views as a comparison grid.
+
+        Also computes photometric metrics (PSNR, SSIM) for score v3.
+
+        Layout: Each view shows [Original | Rendered] side by side for comparison.
+        Grid: 2 rows x 3 columns of view pairs.
+
+        Args:
+            metrics: Metrics dict containing vertex_colors, data_dir, etc.
+            frame_idx: Frame index to render (default: 0)
+
+        Returns:
+            Dict containing:
+                - grid_path: Path to saved grid image (or None if failed)
+                - mean_psnr_score: Average PSNR score across views [0, 1]
+                - mean_ssim_score: Average SSIM score across views [0, 1]
+                - mean_psnr_db: Average raw PSNR value (dB)
+                - per_view_psnr: List of per-view PSNR scores
+                - per_view_ssim: List of per-view SSIM scores
+        """
+        import cv2
+        import pickle
+
+        try:
+            output_dir = metrics['output_dir']
+            data_dir = metrics['data_dir']
+            views_to_use = metrics['views_to_use']
+            vertex_colors = metrics['vertex_colors']
+            fitting_result_dir = metrics['fitting_result_dir']
+
+            # Load camera parameters
+            cam_path = os.path.join(data_dir, 'new_cam.pkl')
+            with open(cam_path, 'rb') as f:
+                cams = pickle.load(f)
+
+            # Load mesh for first frame
+            params_dir = os.path.join(fitting_result_dir, 'params')
+            import glob
+            param_files = sorted(glob.glob(os.path.join(params_dir, 'step_2_frame_*.pkl')))
+            if not param_files:
+                logger.warning("No parameter files found")
+                return None
+
+            with open(param_files[frame_idx], 'rb') as f:
+                params = pickle.load(f)
+
+            # Forward mesh
+            from articulation_th import ArticulationTorch
+            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            for k, v in params.items():
+                if not isinstance(v, torch.Tensor):
+                    params[k] = torch.tensor(v, dtype=torch.float32, device=device)
+
+            body_model = ArticulationTorch()
+            V, J = body_model.forward(
+                params['thetas'], params['bone_lengths'],
+                params['rotation'], params['trans'] / 1000,
+                params['scale'] / 1000,
+                params.get('chest_deformer', torch.zeros(1, 1, device=device)),
+            )
+            vertices = V[0].detach()
+
+            # Load UV renderer for faces
+            from .uv_renderer import create_uv_renderer
+            uv_renderer = create_uv_renderer(uv_size=256, model_dir='mouse_model/mouse_txt')
+            faces = uv_renderer.faces_vert_th
+
+            # Setup texture sampler
+            from .texture_sampler import TextureSampler
+            sampler = TextureSampler(uv_size=256, device=str(device))
+            cam_list = [cams[i] for i in views_to_use]
+            sampler.set_cameras(cam_list)
+
+            # Render each view - create [Original | Rendered] pairs
+            view_pairs = []
+            colors_np = vertex_colors.cpu().numpy()
+            faces_np = faces.cpu().numpy()
+
+            # Photometric metrics collectors
+            psnr_scores = []
+            psnr_dbs = []
+            ssim_scores = []
+
+            for view_idx, view_id in enumerate(views_to_use):
+                # Load original image (BGR)
+                video_path = os.path.join(data_dir, 'videos_undist', f'{view_id}.mp4')
+                cap = cv2.VideoCapture(video_path)
+                cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+                ret, image_bgr = cap.read()
+                cap.release()
+
+                if not ret:
+                    logger.warning(f"Failed to read frame from view {view_id}")
+                    continue
+
+                H, W = image_bgr.shape[:2]
+
+                # Original image with label
+                original = image_bgr.copy()
+                cv2.putText(original, f'View {view_id} - Original', (10, 30),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+
+                # Rendered image on white background (better visibility for dark mouse fur)
+                rendered = np.ones_like(image_bgr) * 255
+
+                # Project vertices
+                proj_2d = sampler.project_vertices(vertices, view_idx=view_idx).cpu().numpy()
+
+                # Draw textured triangles on black background (sample every Nth for speed)
+                face_sampling = self.config.projection_face_sampling
+                for face in faces_np[::face_sampling]:
+                    pts = proj_2d[face].astype(np.int32)
+                    face_colors = colors_np[face]
+
+                    # Skip out-of-bounds faces
+                    if (pts[:, 0] < 0).any() or (pts[:, 0] >= W).any() or \
+                       (pts[:, 1] < 0).any() or (pts[:, 1] >= H).any():
+                        continue
+
+                    # Average color (RGB -> BGR for OpenCV)
+                    avg_color_rgb = face_colors.mean(axis=0) * 255
+                    avg_color_bgr = tuple(int(c) for c in avg_color_rgb[::-1])
+                    cv2.fillPoly(rendered, [pts], avg_color_bgr)
+
+                # ===== Compute photometric metrics BEFORE adding text labels =====
+                # Create mask for mesh region (non-white pixels)
+                mesh_mask = create_mesh_mask(rendered, background_value=255)
+
+                # Compute PSNR in masked region
+                psnr_score, psnr_db = compute_psnr_masked(rendered, image_bgr, mesh_mask)
+                psnr_scores.append(psnr_score)
+                psnr_dbs.append(psnr_db)
+
+                # Compute SSIM in masked region
+                ssim_score, _ = compute_ssim_masked(rendered, image_bgr, mesh_mask)
+                ssim_scores.append(ssim_score)
+
+                # Add label to rendered (black text on white background)
+                cv2.putText(rendered, f'View {view_id} - Rendered', (10, 30),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
+
+                # Create side-by-side pair [Original | Rendered]
+                pair = np.hstack([original, rendered])
+                view_pairs.append(pair)
+
+            if len(view_pairs) < 6:
+                logger.warning(f"Only {len(view_pairs)} views rendered")
+                # Pad with black images if needed
+                while len(view_pairs) < 6:
+                    view_pairs.append(np.zeros_like(view_pairs[0]))
+
+            # Create 2x3 grid of pairs
+            row1 = np.hstack(view_pairs[:3])
+            row2 = np.hstack(view_pairs[3:6])
+            grid = np.vstack([row1, row2])
+
+            # Resize if too large
+            max_width = self.config.projection_max_width
+            if grid.shape[1] > max_width:
+                scale = max_width / grid.shape[1]
+                grid = cv2.resize(grid, None, fx=scale, fy=scale)
+
+            # Save
+            grid_path = os.path.join(output_dir, 'projection_6view_grid.png')
+            cv2.imwrite(grid_path, grid)
+
+            # Compute mean metrics
+            mean_psnr_score = np.mean(psnr_scores) if psnr_scores else 0.0
+            mean_ssim_score = np.mean(ssim_scores) if ssim_scores else 0.0
+            mean_psnr_db = np.mean(psnr_dbs) if psnr_dbs else 0.0
+
+            logger.info(f"6-view projection: PSNR={mean_psnr_db:.1f}dB (score={mean_psnr_score:.3f}), SSIM={mean_ssim_score:.3f}")
+            logger.info(f"6-view projection grid saved: {grid_path}")
+
+            return {
+                'grid_path': grid_path,
+                'mean_psnr_score': mean_psnr_score,
+                'mean_ssim_score': mean_ssim_score,
+                'mean_psnr_db': mean_psnr_db,
+                'per_view_psnr': psnr_scores,
+                'per_view_ssim': ssim_scores,
+            }
+
+        except Exception as e:
+            logger.warning(f"Failed to render 6-view projection grid: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                'grid_path': None,
+                'mean_psnr_score': 0.0,
+                'mean_ssim_score': 0.0,
+                'mean_psnr_db': 0.0,
+                'per_view_psnr': [],
+                'per_view_ssim': [],
+            }
 
 
 def run_wandb_sweep(
