@@ -473,9 +473,19 @@ class UVMapPipeline:
         print(f"  Texture saved: {texture_path}")
 
         # Confidence map - detach to handle gradient tensors
-        conf_img = (confidence.detach().cpu().numpy() * 255).astype(np.uint8)
+        # Clip to [0, 1] to prevent overflow (confidence can exceed 1.0 with multi-view fusion)
+        conf_np = confidence.detach().cpu().numpy()
+        conf_clipped = np.clip(conf_np, 0, 1)
+        conf_gray = (conf_clipped * 255).astype(np.uint8)
+
+        # Apply colormap for better visualization (TURBO: blue=low, red=high)
+        conf_colored = cv2.applyColorMap(conf_gray, cv2.COLORMAP_TURBO)
         conf_path = os.path.join(self.config.output_dir, 'confidence.png')
-        cv2.imwrite(conf_path, conf_img)
+        cv2.imwrite(conf_path, conf_colored)
+
+        # Also save raw grayscale for programmatic use
+        conf_gray_path = os.path.join(self.config.output_dir, 'confidence_gray.png')
+        cv2.imwrite(conf_gray_path, conf_gray)
 
         # UV mask
         uv_mask = self.uv_renderer.get_uv_mask()
