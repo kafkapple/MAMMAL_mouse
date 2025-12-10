@@ -292,7 +292,8 @@ class UVMapPipeline:
             params['chest_deformer'],
         )
 
-        return V[0]  # Remove batch dimension
+        # Detach from body_model graph (only texture is optimized, not mesh)
+        return V[0].detach()  # Remove batch dimension
 
     def _load_video_frame(
         self,
