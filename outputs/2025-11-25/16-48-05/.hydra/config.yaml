@@ -1,0 +1,50 @@
+mode: multi_view
+data:
+  data_dir: data/examples/markerless_mouse_1_nerf/
+  views_to_use:
+  - 0
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+preprocess:
+  input_video_path: data/shank3/100-KO-male-56-20200615.avi
+  output_data_dir: data/preprocessed_shank3/
+  mask_method: opencv_background_subtraction
+  background_subtraction:
+    history: 500
+    var_threshold: 16
+    detect_shadows: true
+  morphology:
+    kernel_size: 5
+    open_iterations: 1
+    close_iterations: 1
+  keypoint_method: opencv_geometric
+  geometric:
+    min_contour_area: 100
+    confidence_default: 0.7
+    confidence_center: 1.0
+    confidence_extremes: 0.5
+  camera:
+    focal_length: 1000.0
+    z_distance: 1000.0
+fitter:
+  start_frame: 0
+  end_frame: 10
+  interval: 1
+  resume: false
+  with_render: true
+  keypoint_num: 22
+  render_cameras:
+  - 0
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+optim:
+  solve_step0_iters: 5
+  solve_step1_iters: 50
+  solve_step2_iters: 15
+result_folder: results/markerless_fitting/

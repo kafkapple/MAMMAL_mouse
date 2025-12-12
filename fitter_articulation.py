@@ -568,31 +568,37 @@ class MouseFitter():
 
         return body_param 
 
-    def calc_2d_keypoint_loss(self, J3d, x2): 
-        loss = 0 
-        for camid in range(self.camN): 
+    def calc_2d_keypoint_loss(self, J3d, x2):
+        loss = 0
+        sparse_indices = getattr(self.cfg.fitter, 'sparse_keypoint_indices', None)
+
+        for camid in range(self.camN):
             # Fix: proper matrix multiplication order for camera projection
             # J3d: (1, 22, 3), Rs: (1, 3, 3) -> need (1, 3, 3) @ (1, 3, 22) = (1, 3, 22)
             # Camera projection with corrected matrix operations
             J3d_t = J3d.transpose(1, 2)  # (1, 3, 22)
             rotated = self.Rs[camid] @ J3d_t  # (1, 3, 3) @ (1, 3, 22) = (1, 3, 22)
-            
+
             # T vector broadcasting
             T_vec = self.Ts[camid]  # Should be (1, 3, 1)
             if T_vec.dim() == 2:
                 T_vec = T_vec.unsqueeze(2)  # (1, 3) -> (1, 3, 1)
-                
+
             J3d_cam = rotated + T_vec  # (1, 3, 22) + (1, 3, 1) = (1, 3, 22)
             J2d = self.Ks[camid] @ J3d_cam  # (1, 3, 3) @ (1, 3, 22) = (1, 3, 22)
             J2d = J2d.transpose(1, 2)  # (1, 22, 3)
-            J2d = J2d / J2d[:,:,2:3]  # Normalize by z coordinate  
+            J2d = J2d / J2d[:,:,2:3]  # Normalize by z coordinate
             J2d = J2d[:,:,0:2]  # Take only x,y coordinates: (1, 22, 2)
-            
+
+            # Apply sparse keypoint filtering if configured
+            if sparse_indices is not None:
+                J2d = J2d[:, sparse_indices, :]  # (1, N_sparse, 2)
+
             # Fix keypoint_weight broadcasting: ensure it matches the tensor dimensions
-            # keypoint_weight has shape (1, 22, 1), need to broadcast to match (1, 22, 2)
-            diff = (J2d - x2[:,camid,:,0:2]) * x2[:,camid,:,2:]  # Shape: (1, 22, 2)
+            # keypoint_weight shape matches number of keypoints (sparse or full)
+            diff = (J2d - x2[:,camid,:,0:2]) * x2[:,camid,:,2:]  # Shape: (1, N_kpts, 2)
             weighted_diff = diff * self.keypoint_weight[..., [0,0]]  # Broadcast weight to last dim
-            loss += torch.mean(torch.norm(weighted_diff, dim=-1) ) 
+            loss += torch.mean(torch.norm(weighted_diff, dim=-1) )
         return loss     
 
     def calc_3d_loss(self, x1, x2): 
@@ -1284,19 +1290,25 @@ class MouseFitter():
 
             # Predicted keypoints (project 3D to 2D)
             data2d_pred = (joints@cam['R'] + T)@cam["K"]
-            data2d_pred = data2d_pred[:,0:2] / data2d_pred[:,2:]
+            data2d_pred = data2d_pred[:,0:2] / data2d_pred[:,2:]  # [22, 2]
+
+            # Apply sparse filtering to predicted keypoints
+            if sparse_indices:
+                data2d_pred = data2d_pred[sparse_indices, :]  # [N_sparse, 2]
 
             # GT keypoints (from target_2d if available)
             data2d_gt = None
             gt_conf = None
             if target_2d is not None:
-                gt_data = target_2d[batch_id, view_idx].detach().cpu().numpy()  # [22, 3]
-                data2d_gt = gt_data[:, :2]  # [22, 2] - xy only
+                gt_data = target_2d[batch_id, view_idx].detach().cpu().numpy()  # [N_kpts, 3]
+                data2d_gt = gt_data[:, :2]  # [N_kpts, 2] - xy only
                 gt_conf = gt_data[:, 2]  # confidence
 
             # Determine which indices to draw
+            # In sparse mode: indices_to_draw are positions in sparse array (0 to N-1)
+            # The original keypoint indices are stored in sparse_indices for labeling
             if sparse_indices:
-                indices_to_draw = sparse_indices
+                indices_to_draw = list(range(len(sparse_indices)))  # Use sparse array positions
             else:
                 indices_to_draw = list(range(22))
 
@@ -1304,7 +1316,8 @@ class MouseFitter():
             img_pred = myimages[view_idx].copy()
             img_pred = self._draw_keypoints_with_labels(
                 img_pred, data2d_pred, indices_to_draw,
-                color=(0, 255, 0), radius=7, show_labels=True
+                color=(0, 255, 0), radius=7, show_labels=True,
+                original_indices=sparse_indices
             )
             pred_images.append(img_pred)
 
@@ -1316,7 +1329,7 @@ class MouseFitter():
                 img_gt = self._draw_keypoints_with_labels(
                     img_gt, data2d_gt, valid_gt_indices,
                     color=(0, 0, 255), radius=7, show_labels=True,
-                    confidence=gt_conf  # Include confidence values
+                    confidence=gt_conf, original_indices=sparse_indices
                 )
                 gt_images.append(img_gt)
 
@@ -1326,12 +1339,13 @@ class MouseFitter():
                 img_compare = self._draw_keypoints_with_labels(
                     img_compare, data2d_gt, valid_gt_indices,
                     color=(0, 0, 255), radius=9, show_labels=True, label_prefix="GT:",
-                    confidence=gt_conf  # Include confidence values
+                    confidence=gt_conf, original_indices=sparse_indices
                 )
                 # Draw Pred on top (green, smaller)
                 img_compare = self._draw_keypoints_with_labels(
                     img_compare, data2d_pred, indices_to_draw,
-                    color=(0, 255, 0), radius=5, show_labels=False
+                    color=(0, 255, 0), radius=5, show_labels=False,
+                    original_indices=sparse_indices
                 )
                 # Add legend to comparison image
                 img_compare = self._add_legend(img_compare, sparse_indices)
@@ -1354,21 +1368,23 @@ class MouseFitter():
             cv2.imwrite(f"{base_name}_compare.png", compare_outputimg)
 
     def _draw_keypoints_with_labels(self, img, proj, indices, color=(0, 255, 0), radius=9,
-                                      show_labels=True, label_prefix="", confidence=None):
+                                      show_labels=True, label_prefix="", confidence=None,
+                                      original_indices=None):
         """
         Draw keypoints with index:label text annotations and optional confidence values.
 
         Args:
             img: Image to draw on
             proj: Projected 2D keypoints [N, 2]
-            indices: List of keypoint indices to draw
+            indices: List of array positions to draw (0 to N-1)
             color: BGR color tuple
             radius: Circle radius
             show_labels: Whether to show text labels
             label_prefix: Prefix for labels (e.g., "GT:")
             confidence: Optional confidence array [N] for each keypoint
+            original_indices: Original keypoint indices for labeling (sparse mode)
         """
-        for idx in indices:
+        for i, idx in enumerate(indices):
             if idx >= proj.shape[0]:
                 continue
             x, y = proj[idx, 0], proj[idx, 1]
@@ -1379,13 +1395,15 @@ class MouseFitter():
             cv2.circle(img, p, radius, color, -1)
 
             if show_labels:
-                label = self.KEYPOINT_LABELS.get(idx, str(idx))
+                # Use original index for label if available (sparse mode)
+                label_idx = original_indices[idx] if original_indices else idx
+                label = self.KEYPOINT_LABELS.get(label_idx, str(label_idx))
                 # Include confidence if available
                 if confidence is not None and idx < len(confidence):
                     conf_val = confidence[idx]
-                    text = f"{label_prefix}{idx}:{label}({conf_val:.2f})"
+                    text = f"{label_prefix}{label_idx}:{label}({conf_val:.2f})"
                 else:
-                    text = f"{label_prefix}{idx}:{label}"
+                    text = f"{label_prefix}{label_idx}:{label}"
 
                 # Draw text with background for visibility
                 font = cv2.FONT_HERSHEY_SIMPLEX

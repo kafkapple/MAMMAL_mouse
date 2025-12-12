@@ -177,6 +177,84 @@ results/uvmap/
 └── texture.pt            # Tensor for downstream use
 ```
 
+---
+
+## Export to Blender (OBJ + UV Texture)
+
+### Single Frame Export
+```bash
+python scripts/export_to_blender.py \
+    --mesh results/fitting/markerless_mouse_1_nerf_v012345_kp22_*/obj/step_2_frame_000000.obj \
+    --texture results/uvmap/texture_final.png \
+    --output exports/mouse_frame0_textured.obj
+```
+
+### Batch Export (Multiple Frames)
+```bash
+# Export frames 0-9
+RESULT_DIR=results/fitting/markerless_mouse_1_nerf_v012345_kp22_20251206_165254
+TEXTURE=results/uvmap/texture_final.png
+
+for i in $(seq -f "%06g" 0 9); do
+    python scripts/export_to_blender.py \
+        --mesh ${RESULT_DIR}/obj/step_2_frame_${i}.obj \
+        --texture ${TEXTURE} \
+        --output exports/mouse_frame${i}.obj
+done
+```
+
+### Export Output
+```
+exports/
+├── mouse_frame0_textured.obj   # Mesh with UV coordinates
+├── mouse_frame0_textured.mtl   # Material definition
+└── texture_final.png           # UV texture map
+```
+
+### Blender Import
+1. **File > Import > Wavefront (.obj)**
+2. Select the `.obj` file
+3. Texture auto-loads from `.mtl` reference
+4. If texture missing: **Material Properties > Base Color > Image Texture > Select PNG**
+
+---
+
+## Export to Rerun (Interactive 3D Visualization)
+
+### Prerequisites
+```bash
+pip install rerun-sdk
+```
+
+### Export Mesh Sequence
+```bash
+# Full sequence
+python scripts/export_to_rerun.py \
+    --result_dir results/fitting/markerless_mouse_1_nerf_v012345_kp22_* \
+    --texture wandb_sweep_results/run_autumn-sweep-57/texture_final.png \
+    --output exports/mouse_sequence.rrd
+
+# Specific frame range
+python scripts/export_to_rerun.py \
+    --result_dir results/fitting/xxx \
+    --texture texture.png \
+    --start_frame 0 --end_frame 20 \
+    --output exports/short_sequence.rrd
+```
+
+### View in Rerun
+```bash
+rerun exports/mouse_sequence.rrd
+```
+
+### Rerun Features
+- **3D mesh** with vertex colors from UV texture
+- **Time scrubbing** for frame-by-frame analysis
+- **Camera controls** for orbit/pan/zoom
+- **Export** screenshots and videos
+
+---
+
 ### Available Fitting Results (Baseline)
 | Experiment | Path |
 |------------|------|

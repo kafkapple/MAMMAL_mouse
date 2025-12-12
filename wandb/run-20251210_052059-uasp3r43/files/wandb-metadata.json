@@ -1,0 +1,46 @@
+{
+  "os":  "Linux-6.8.0-87-generic-x86_64-with-glibc2.35",
+  "python":  "CPython 3.10.19",
+  "startedAt":  "2025-12-09T20:20:59.276501Z",
+  "args":  [
+    "--result_dir",
+    "results/fitting/markerless_mouse_1_nerf_v012345_kp22_20251206_165254",
+    "--sweep_id",
+    "gm4e24p6",
+    "--count",
+    "10"
+  ],
+  "program":  "-m uvmap.wandb_sweep",
+  "git":  {
+    "remote":  "https://github.com/kafkapple/MAMMAL_mouse.git",
+    "commit":  "649e427351ccb3ef59deb4654bdeb13942014e99"
+  },
+  "email":  "kafkapple@kaist.ac.kr",
+  "root":  "/home/joon/dev/MAMMAL_mouse",
+  "host":  "bori",
+  "executable":  "/home/joon/miniconda3/envs/mammal_stable/bin/python",
+  "cpu_count":  6,
+  "cpu_count_logical":  12,
+  "gpu":  "NVIDIA GeForce RTX 3060",
+  "gpu_count":  1,
+  "disk":  {
+    "/":  {
+      "total":  "491204837376",
+      "used":  "328082702336"
+    }
+  },
+  "memory":  {
+    "total":  "33468489728"
+  },
+  "gpu_nvidia":  [
+    {
+      "name":  "NVIDIA GeForce RTX 3060",
+      "memoryTotal":  "12884901888",
+      "cudaCores":  3584,
+      "architecture":  "Ampere",
+      "uuid":  "GPU-f0d65ab7-ec5d-40ab-e055-d06b70fd9e75"
+    }
+  ],
+  "cudaVersion":  "12.4",
+  "writerId":  "gyn4eo7vmh25jqn6dx8u7xq4e6mj3q55"
+}

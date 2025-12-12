@@ -1,0 +1,71 @@
+_wandb:
+    value:
+        cli_version: 0.23.1
+        e:
+            2hctfli22bhjbuomkt51tnoxiwoqknan:
+                args:
+                    - --result_dir
+                    - results/fitting/markerless_mouse_1_nerf_v012345_kp22_20251206_165254
+                    - --sweep_id
+                    - gm4e24p6
+                    - --count
+                    - "10"
+                cpu_count: 6
+                cpu_count_logical: 12
+                cudaVersion: "12.4"
+                disk:
+                    /:
+                        total: "491204837376"
+                        used: "328081604608"
+                email: kafkapple@kaist.ac.kr
+                executable: /home/joon/miniconda3/envs/mammal_stable/bin/python
+                git:
+                    commit: 006d653376f8931d1a736fb7bfb1a298951d4be1
+                    remote: https://github.com/kafkapple/MAMMAL_mouse.git
+                gpu: NVIDIA GeForce RTX 3060
+                gpu_count: 1
+                gpu_nvidia:
+                    - architecture: Ampere
+                      cudaCores: 3584
+                      memoryTotal: "12884901888"
+                      name: NVIDIA GeForce RTX 3060
+                      uuid: GPU-f0d65ab7-ec5d-40ab-e055-d06b70fd9e75
+                host: bori
+                memory:
+                    total: "33468489728"
+                os: Linux-6.8.0-87-generic-x86_64-with-glibc2.35
+                program: -m uvmap.wandb_sweep
+                python: CPython 3.10.19
+                root: /home/joon/dev/MAMMAL_mouse
+                startedAt: "2025-12-09T11:59:26.250522Z"
+                writerId: 2hctfli22bhjbuomkt51tnoxiwoqknan
+        m: []
+        python_version: 3.10.19
+        t:
+            "1":
+                - 1
+                - 50
+                - 105
+            "2":
+                - 1
+                - 50
+                - 105
+            "3":
+                - 2
+                - 14
+            "4": 3.10.19
+            "5": 0.23.1
+            "12": 0.23.1
+            "13": linux-x86_64
+do_optimization:
+    value: true
+fusion_method:
+    value: average
+opt_iters:
+    value: 50
+uv_size:
+    value: 512
+visibility_threshold:
+    value: 0.6421755923449957
+w_tv:
+    value: 0.0004571680034889158

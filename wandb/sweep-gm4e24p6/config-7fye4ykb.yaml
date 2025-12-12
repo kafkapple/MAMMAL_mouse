@@ -1,0 +1,14 @@
+wandb_version: 1
+
+do_optimization:
+  value: false
+fusion_method:
+  value: average
+opt_iters:
+  value: 100
+uv_size:
+  value: 512
+visibility_threshold:
+  value: 0.19275546176017877
+w_tv:
+  value: 0.00019630874664566616

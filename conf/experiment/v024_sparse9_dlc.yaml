@@ -1,0 +1,56 @@
+# @package _global_
+# Experiment: 3-view (120° spacing) + 9 keypoints (DLC style)
+# Purpose: Test if DLC keypoints can achieve 6V quality with only 3 cameras
+#
+# Usage:
+#   Debug:  ./run_experiment.sh v024_sparse9_dlc --debug
+#   Full:   ./run_experiment.sh v024_sparse9_dlc
+
+defaults:
+  - override /dataset: markerless
+
+experiment_name: v024_sparse9_dlc
+experiment_description: "3 views (120° spacing) with 9 DLC-style keypoints"
+
+data:
+  views_to_use: [0, 2, 4]  # 120° spacing - optimal 3-view configuration
+
+fitter:
+  render_cameras: [0, 2, 4]
+  use_keypoints: true
+  keypoint_num: 9
+  # DLC keypoint indices: ears, nose, neck, tail_base/tip, front_paws, hind_paws
+  sparse_keypoint_indices: [0, 1, 2, 3, 4, 5, 6, 8, 12]
+  with_render: true
+
+# Optimization settings
+optim:
+  solve_step0_iters: 20
+  solve_step1_iters: 150
+  solve_step2_iters: 50
+
+# Loss weights (slightly less regularization since more keypoints provide constraints)
+loss_weights:
+  theta: 4.5
+  "3d": 2.5
+  "2d": 0.35
+  bone: 0.5
+  scale: 0.5
+  chest_deformer: 0.1
+  stretch: 1.0
+  temp: 0.25
+  temp_d: 0.2
+  mask_step0: 300.0
+  mask_step1: 400.0
+  mask_step2: 3500.0
+
+keypoint_weights:
+  default: 1.0
+  # NOTE: idx refers to sparse array position, NOT original keypoint index
+  # sparse_keypoint_indices: [0, 1, 2, 3, 4, 5, 6, 8, 12]
+  # pos 0=left_ear, 1=right_ear, 2=nose, 3=neck, 4=tail_tip, 5=tail_base, 6=front_paw, 7=front_paw, 8=hind_paw
+  idx_4: 0.4       # tail_tip (original idx 4) - less reliable
+  idx_5: 2.0       # tail_base (original idx 5) - important
+  idx_6: 1.5       # front paw (original idx 6)
+  idx_7: 1.5       # front paw (original idx 8)
+  tail_step2: 10.0

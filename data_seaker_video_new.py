@@ -12,35 +12,41 @@ from omegaconf import DictConfig
 import hydra.utils # Added for path resolution
 
 class DataSeakerDet():
-    def __init__(self, cfg: DictConfig): 
+    def __init__(self, cfg: DictConfig):
         self.cfg = cfg
         self.data_dir = hydra.utils.to_absolute_path(cfg.data.data_dir)
         self.raw_caps = []
-        self.bg_caps  = []  
+        self.bg_caps  = []
         self.views_to_use = cfg.data.views_to_use
-        
-        for k in self.views_to_use: 
+
+        for k in self.views_to_use:
             video_path = os.path.join(self.data_dir, "videos_undist", "{}.mp4".format(k))
-            cap = cv2.VideoCapture(video_path) 
-            self.raw_caps.append(cap) 
-            mask_path = os.path.join(self.data_dir, "simpleclick_undist", "{}.mp4".format(k)) 
-            cap = cv2.VideoCapture(mask_path) 
-            self.bg_caps.append(cap) 
-        self.totalframes = 18000 
+            cap = cv2.VideoCapture(video_path)
+            self.raw_caps.append(cap)
+            mask_path = os.path.join(self.data_dir, "simpleclick_undist", "{}.mp4".format(k))
+            cap = cv2.VideoCapture(mask_path)
+            self.bg_caps.append(cap)
+        self.totalframes = 18000
 
         cam_pkl_path = os.path.join(self.data_dir, "new_cam.pkl")
         print(f"Attempting to open camera pkl: {cam_pkl_path}") # Debug print
-        with open(cam_pkl_path, 'rb') as f: 
+        with open(cam_pkl_path, 'rb') as f:
             self.cams_dict = pickle.load(f)
-        for camid in self.views_to_use: 
+        for camid in self.views_to_use:
             self.cams_dict[camid]['T'] = np.expand_dims(self.cams_dict[camid]['T'], 0)
             self.cams_dict[camid]['R'] = self.cams_dict[camid]['R'].T
             self.cams_dict[camid]['K'] = self.cams_dict[camid]['K'].T
         self.cams_dict_out = []
-        for camid in self.views_to_use: 
+        for camid in self.views_to_use:
             self.cams_dict_out.append(self.cams_dict[camid])
 
-        self.keypoint_num = 22 
+        # Sparse keypoint support: use indices from config if available
+        self.sparse_keypoint_indices = getattr(cfg.fitter, 'sparse_keypoint_indices', None)
+        if self.sparse_keypoint_indices is not None:
+            self.keypoint_num = len(self.sparse_keypoint_indices)
+            print(f"Using sparse keypoints: {self.sparse_keypoint_indices} ({self.keypoint_num} keypoints)")
+        else:
+            self.keypoint_num = 22 
 
         self.poses2d =[] 
         for camid in self.views_to_use: 
@@ -85,17 +91,22 @@ class DataSeakerDet():
 
         ## 4: fetch keypoints
         # Note: poses2d is stored in order of views_to_use, so use enumerate index
-        all_keypoints =[]
+        all_keypoints = []
         for pose_idx, camid in enumerate(self.views_to_use):
-            data = self.poses2d[pose_idx][index]
-            w = data[:,2]
-            data[w<0.25,:] = 0
-            all_keypoints.append(data) 
+            data = self.poses2d[pose_idx][index].copy()  # (22, 3)
+            w = data[:, 2]
+            data[w < 0.25, :] = 0
+
+            # Apply sparse keypoint filtering if configured
+            if self.sparse_keypoint_indices is not None:
+                data = data[self.sparse_keypoint_indices, :]  # (N_sparse, 3)
+
+            all_keypoints.append(data)
 
         output = {
-            "imgs": imgs, 
-            "bgs" : bgs, 
-            "label2d": np.asarray(all_keypoints) 
+            "imgs": imgs,
+            "bgs": bgs,
+            "label2d": np.asarray(all_keypoints)
         }
 
         return output

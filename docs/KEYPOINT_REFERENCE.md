@@ -160,6 +160,59 @@ use_keypoints: true
 
 ---
 
+## Sparse Keypoint 구현 방식
+
+두 가지 방식으로 sparse keypoints를 사용할 수 있습니다:
+
+### 방식 A: Weight 기반 (기존)
+
+```yaml
+fitter:
+  keypoint_num: 22              # 전체 22개 유지
+  sparse_keypoint_indices: [2, 5, 3]
+
+keypoint_weights:
+  default: 0.0                  # 모든 keypoints 비활성화
+  idx_2: 5.0                    # nose만 활성화
+  idx_5: 3.0                    # tail_root만 활성화
+  idx_3: 5.0                    # neck만 활성화
+```
+
+- 데이터 로더: 22개 전부 로드
+- Loss 계산: 22개 × weight (대부분 0)
+- 사용 설정: `sparse_3view.yaml`, `sparse_5view.yaml` 등
+
+### 방식 B: Filtering 기반 (신규)
+
+```yaml
+fitter:
+  keypoint_num: 7               # sparse 수와 일치
+  sparse_keypoint_indices: [0, 1, 2, 3, 5, 18, 21]
+
+keypoint_weights:
+  default: 1.0                  # 모든 sparse keypoints 활성화
+  idx_4: 2.0                    # sparse 배열 내 위치 (= 원본 idx 5)
+```
+
+- 데이터 로더: N개만 로드 (filtering)
+- Loss 계산: N개만 처리 (효율적)
+- 사용 설정: `v024_sparse7_mars.yaml`, `v024_sparse9_dlc.yaml`
+
+### 방식 비교
+
+| 항목 | Weight 방식 | Filtering 방식 |
+|------|-------------|----------------|
+| `keypoint_num` | 22 | N_sparse |
+| 데이터 로드 | 22개 | N개 |
+| 메모리 | 더 사용 | 효율적 |
+| `idx_N` 의미 | 원본 인덱스 | sparse 배열 내 위치 |
+| 결과 | 동등 | 동등 |
+
+**주의**: Filtering 방식에서 `idx_N`은 **sparse 배열 내 위치**를 의미합니다.
+예: `sparse_keypoint_indices: [0,1,2,3,5,18,21]`에서 `idx_4`는 원본 인덱스 5 (tail_root)
+
+---
+
 ### Keypoint 수 vs 예상 정확도
 
 ```

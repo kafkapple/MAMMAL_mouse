@@ -1,0 +1,6 @@
+- dataset=default_markerless
+- fitter.start_frame=0
+- fitter.end_frame=10
+- fitter.interval=1
+- fitter.with_render=true
+- result_folder=results/markerless_fitting/

@@ -1,0 +1,4 @@
+- dataset=default_markerless
+- fitter.start_frame=0
+- fitter.end_frame=2
+- fitter.with_render=false

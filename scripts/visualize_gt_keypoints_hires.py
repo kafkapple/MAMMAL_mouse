@@ -130,7 +130,7 @@ def get_label_position(x, y, idx, img_w, img_h, occupied_regions, text_w, text_h
 
 
 def draw_keypoints_hires(img, keypoints_2d, font_scale=0.6, circle_radius=12,
-                          show_confidence=True, alpha=0.7):
+                          show_confidence=True, alpha=0.7, show_labels=True):
     """
     Draw all 22 keypoints with high-quality labels and smart positioning.
 
@@ -141,6 +141,7 @@ def draw_keypoints_hires(img, keypoints_2d, font_scale=0.6, circle_radius=12,
         circle_radius: Keypoint circle radius
         show_confidence: Whether to show confidence values
         alpha: Background transparency (0-1)
+        show_labels: If False, only show colored circles with index numbers (no text labels)
 
     Returns:
         Annotated image
@@ -172,16 +173,20 @@ def draw_keypoints_hires(img, keypoints_2d, font_scale=0.6, circle_radius=12,
         label = GT_KEYPOINT_LABELS.get(idx, str(idx))
         conf = confidence[idx] if idx < len(confidence) else 0.0
 
-        if show_confidence:
-            text = f"{idx}:{label}({conf:.2f})"
+        # Prepare text only if showing labels
+        if show_labels:
+            if show_confidence:
+                text = f"{idx}:{label}({conf:.2f})"
+            else:
+                text = f"{idx}:{label}"
+            (text_w, text_h), baseline = cv2.getTextSize(text, font, font_scale, thickness)
+            # Find optimal position
+            tx, ty, region = get_label_position(x, y, idx, w, h, occupied_regions, text_w, text_h)
+            occupied_regions.append(region)
         else:
-            text = f"{idx}:{label}"
-
-        (text_w, text_h), baseline = cv2.getTextSize(text, font, font_scale, thickness)
-
-        # Find optimal position
-        tx, ty, region = get_label_position(x, y, idx, w, h, occupied_regions, text_w, text_h)
-        occupied_regions.append(region)
+            text = ""
+            text_w, text_h = 0, 0
+            tx, ty = int(x), int(y)
 
         labels_info.append({
             'idx': idx,
@@ -194,25 +199,27 @@ def draw_keypoints_hires(img, keypoints_2d, font_scale=0.6, circle_radius=12,
         })
 
     # Draw all elements
-    # First pass: draw semi-transparent backgrounds
-    overlay = img.copy()
-    for info in labels_info:
-        # Background rectangle
-        cv2.rectangle(overlay,
-            (info['tx'] - 3, info['ty'] - info['text_h'] - 3),
-            (info['tx'] + info['text_w'] + 3, info['ty'] + 3),
-            (20, 20, 20), -1)
+    # First pass: draw semi-transparent backgrounds (only if showing labels)
+    if show_labels:
+        overlay = img.copy()
+        for info in labels_info:
+            # Background rectangle
+            cv2.rectangle(overlay,
+                (info['tx'] - 3, info['ty'] - info['text_h'] - 3),
+                (info['tx'] + info['text_w'] + 3, info['ty'] + 3),
+                (20, 20, 20), -1)
 
-    # Blend overlay
-    cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0, img)
+        # Blend overlay
+        cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0, img)
 
     # Second pass: draw circles and text
     for info in labels_info:
         color = info['color']
 
-        # Draw connecting line (subtle)
-        cv2.line(img, (int(info['x']), int(info['y'])),
-                (info['tx'], info['ty']), color, 1, cv2.LINE_AA)
+        # Draw connecting line (subtle) - only if showing labels
+        if show_labels:
+            cv2.line(img, (int(info['x']), int(info['y'])),
+                    (info['tx'], info['ty']), color, 1, cv2.LINE_AA)
 
         # Draw keypoint circle
         cv2.circle(img, (int(info['x']), int(info['y'])), circle_radius, color, -1, cv2.LINE_AA)
@@ -226,11 +233,12 @@ def draw_keypoints_hires(img, keypoints_2d, font_scale=0.6, circle_radius=12,
         cv2.putText(img, idx_text, (idx_x, idx_y), font, font_scale * 0.6, (0, 0, 0), 2, cv2.LINE_AA)
         cv2.putText(img, idx_text, (idx_x, idx_y), font, font_scale * 0.6, (255, 255, 255), 1, cv2.LINE_AA)
 
-        # Draw label text
-        cv2.putText(img, info['text'], (info['tx'], info['ty']),
-                   font, font_scale, (0, 0, 0), thickness + 1, cv2.LINE_AA)
-        cv2.putText(img, info['text'], (info['tx'], info['ty']),
-                   font, font_scale, color, thickness, cv2.LINE_AA)
+        # Draw label text (only if showing labels)
+        if show_labels and info['text']:
+            cv2.putText(img, info['text'], (info['tx'], info['ty']),
+                       font, font_scale, (0, 0, 0), thickness + 1, cv2.LINE_AA)
+            cv2.putText(img, info['text'], (info['tx'], info['ty']),
+                       font, font_scale, color, thickness, cv2.LINE_AA)
 
     return img
 
@@ -348,13 +356,14 @@ def main():
             print(f"  Warning: Could not read frame from video, creating blank image")
             img = np.zeros((1080, 1920, 3), dtype=np.uint8)
 
-        # Draw keypoints with high quality
+        # Draw keypoints with high quality (full labels version)
         img_annotated = draw_keypoints_hires(
             img, kp_2d,
             font_scale=args.font_scale,
             circle_radius=args.circle_radius,
             show_confidence=True,
-            alpha=0.6
+            alpha=0.6,
+            show_labels=True
         )
 
         # Add view title
@@ -365,10 +374,31 @@ def main():
         cv2.putText(img_annotated, title, (20, 50),
                     cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 2, cv2.LINE_AA)
 
-        # Save individual view at full resolution
+        # Save individual view at full resolution (with labels)
         output_path = os.path.join(args.output_dir, f"view_{view_idx}_gt_hires.png")
         cv2.imwrite(output_path, img_annotated, [cv2.IMWRITE_PNG_COMPRESSION, 3])
         print(f"  Saved: {output_path} ({w}x{h})")
+
+        # Draw keypoints without labels (clean version - numbers + colors only)
+        img_clean = draw_keypoints_hires(
+            img, kp_2d,
+            font_scale=args.font_scale,
+            circle_radius=args.circle_radius,
+            show_confidence=False,
+            alpha=0.6,
+            show_labels=False
+        )
+
+        # Add minimal title for clean version
+        cv2.putText(img_clean, f"View {view_idx}", (20, 50),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 0), 4, cv2.LINE_AA)
+        cv2.putText(img_clean, f"View {view_idx}", (20, 50),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 2, cv2.LINE_AA)
+
+        # Save clean version (numbers + colors only)
+        clean_path = os.path.join(args.output_dir, f"view_{view_idx}_clean.png")
+        cv2.imwrite(clean_path, img_clean, [cv2.IMWRITE_PNG_COMPRESSION, 3])
+        print(f"  Saved clean version: {clean_path}")
 
         view_images.append(img_annotated)
 

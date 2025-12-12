@@ -1,0 +1,153 @@
+[
+  {
+    "name": "markerless_mouse_1_nerf_v012345_sparse5_20251208_134918",
+    "num_views": 6,
+    "num_keypoints": 5,
+    "view_ids": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "keypoint_type": "sparse_5_minimal",
+    "num_frames": 5,
+    "metrics": {
+      "v2v_mean": 17.5889462081006,
+      "v2v_max": 61.79600098272853,
+      "v2v_std": 12.236318009363336,
+      "v2v_median": 15.107093303772782,
+      "chamfer": 10.329674954473202,
+      "hausdorff": 54.436845836569645
+    }
+  },
+  {
+    "name": "markerless_mouse_1_nerf_v012345_sparse7_20251207_172028",
+    "num_views": 6,
+    "num_keypoints": 7,
+    "view_ids": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "keypoint_type": "sparse_7_mars",
+    "num_frames": 20,
+    "metrics": {
+      "v2v_mean": 1.9925268628685004,
+      "v2v_max": 8.44478392866842,
+      "v2v_std": 1.9531292410250465,
+      "v2v_median": 1.1812819702170074,
+      "chamfer": 0.6626345273836007,
+      "hausdorff": 5.340589664382632
+    }
+  },
+  {
+    "name": "markerless_mouse_1_nerf_v012345_sparse9_20251207_081918",
+    "num_views": 6,
+    "num_keypoints": 9,
+    "view_ids": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "keypoint_type": "sparse_9_dlc",
+    "num_frames": 20,
+    "metrics": {
+      "v2v_mean": 1.756342825117605,
+      "v2v_max": 10.159099765306703,
+      "v2v_std": 2.166777736073762,
+      "v2v_median": 1.0051459843065205,
+      "chamfer": 0.5304993455231918,
+      "hausdorff": 5.219097150942393
+    }
+  },
+  {
+    "name": "markerless_mouse_1_nerf_v01234_sparse3_20251203_235123",
+    "num_views": 5,
+    "num_keypoints": 3,
+    "view_ids": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "keypoint_type": "sparse_3_core",
+    "num_frames": 20,
+    "metrics": {
+      "v2v_mean": 4.162213009822354,
+      "v2v_max": 28.926758980015244,
+      "v2v_std": 4.294819880477737,
+      "v2v_median": 2.78703219778427,
+      "chamfer": 1.1883173599927939,
+      "hausdorff": 9.48836904693262
+    }
+  },
+  {
+    "name": "markerless_mouse_1_nerf_v0123_sparse3_20251204_074430",
+    "num_views": 4,
+    "num_keypoints": 3,
+    "view_ids": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "keypoint_type": "sparse_3_core",
+    "num_frames": 20,
+    "metrics": {
+      "v2v_mean": 6.37533705151006,
+      "v2v_max": 28.678943720057312,
+      "v2v_std": 5.19861578066782,
+      "v2v_median": 4.627962637205066,
+      "chamfer": 1.5494430600851339,
+      "hausdorff": 10.347011889555676
+    }
+  },
+  {
+    "name": "markerless_mouse_1_nerf_v024_sparse3_20251204_153916",
+    "num_views": 3,
+    "num_keypoints": 3,
+    "view_ids": [
+      0,
+      2,
+      4
+    ],
+    "keypoint_type": "sparse_3_core",
+    "num_frames": 20,
+    "metrics": {
+      "v2v_mean": 5.14463281925826,
+      "v2v_max": 28.616070351202797,
+      "v2v_std": 4.514116835164647,
+      "v2v_median": 3.9621183623899228,
+      "chamfer": 1.4496378207098066,
+      "hausdorff": 10.06996958664889
+    }
+  },
+  {
+    "name": "markerless_mouse_1_nerf_v03_sparse3_20251205_014945",
+    "num_views": 2,
+    "num_keypoints": 3,
+    "view_ids": [
+      0,
+      3
+    ],
+    "keypoint_type": "sparse_3_core",
+    "num_frames": 20,
+    "metrics": {
+      "v2v_mean": 6.758182809770214,
+      "v2v_max": 31.62994534818818,
+      "v2v_std": 5.3726665499306625,
+      "v2v_median": 4.7775624887568675,
+      "chamfer": 2.647628680324131,
+      "hausdorff": 14.038276548931574
+    }
+  }
+]
