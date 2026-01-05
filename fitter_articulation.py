@@ -793,16 +793,27 @@ class MouseFitter():
             if abs(loss-loss_prev) < tolerate:
                 break
             loss_prev = loss
-            if self.cfg.fitter.with_render:
-                imgs = self.imgs.copy()
-                # Render to memory and add to grid collector instead of saving individual files
-                render_img = self.render(params, imgs, 0, None, self.cam_dict, step_name='Step0', return_image=True)
-                if render_img is not None:
-                    self.debug_collector.add_image('step0', i, render_img)
+            # Debug iteration images based on mode: "first_last", "all", or "none"
+            debug_mode = getattr(self.cfg.fitter, 'debug_iter_mode', 'first_last')
+            if self.cfg.fitter.with_render and debug_mode != 'none':
+                should_save = (debug_mode == 'all') or (i == 0)  # First iter
+                if should_save:
+                    imgs = self.imgs.copy()
+                    render_img = self.render(params, imgs, 0, None, self.cam_dict, step_name='Step0', return_image=True)
+                    if render_img is not None:
+                        self.debug_collector.add_image('step0', i, render_img)
         iter_pbar.close()
 
+        # Save last iteration for first_last mode
+        debug_mode = getattr(self.cfg.fitter, 'debug_iter_mode', 'first_last')
+        if self.cfg.fitter.with_render and debug_mode == 'first_last':
+            imgs = self.imgs.copy()
+            render_img = self.render(params, imgs, 0, None, self.cam_dict, step_name='Step0', return_image=True)
+            if render_img is not None:
+                self.debug_collector.add_image('step0', 'final', render_img)
+
         # Save Step0 debug images as compressed grid
-        if self.cfg.fitter.with_render and self.debug_collector.images.get('step0'):
+        if self.cfg.fitter.with_render and self.debug_collector.images.get('step0') and debug_mode != 'none':
             grid_path = f"{self.result_folder}/render/debug/step0_frame_{self.id:06d}_grid.jpg"
             self.debug_collector._save_single_grid('step0', grid_path)
 
@@ -861,12 +872,15 @@ class MouseFitter():
                 if abs(loss-loss_prev) < tolerate:
                     break
                 loss_prev = loss
-                if self.id == 0 and self.cfg.fitter.with_render:
-                    imgs = self.imgs.copy()
-                    # Render to memory and add to grid collector instead of saving individual files
-                    render_img = self.render(params, imgs, 0, None, self.cam_dict, step_name='Step1', return_image=True)
-                    if render_img is not None:
-                        self.debug_collector.add_image('step1', i, render_img)
+                # Debug iteration images based on mode
+                debug_mode = getattr(self.cfg.fitter, 'debug_iter_mode', 'first_last')
+                if self.id == 0 and self.cfg.fitter.with_render and debug_mode != 'none':
+                    should_save = (debug_mode == 'all') or (i == 0)  # First iter
+                    if should_save:
+                        imgs = self.imgs.copy()
+                        render_img = self.render(params, imgs, 0, None, self.cam_dict, step_name='Step1', return_image=True)
+                        if render_img is not None:
+                            self.debug_collector.add_image('step1', i, render_img)
 
             except RuntimeError as e:
                 if "CUDA" in str(e):
@@ -883,8 +897,16 @@ class MouseFitter():
 
         iter_pbar.close()
 
+        # Save last iteration for first_last mode
+        debug_mode = getattr(self.cfg.fitter, 'debug_iter_mode', 'first_last')
+        if self.id == 0 and self.cfg.fitter.with_render and debug_mode == 'first_last':
+            imgs = self.imgs.copy()
+            render_img = self.render(params, imgs, 0, None, self.cam_dict, step_name='Step1', return_image=True)
+            if render_img is not None:
+                self.debug_collector.add_image('step1', 'final', render_img)
+
         # Save Step1 debug images as compressed grid
-        if self.id == 0 and self.cfg.fitter.with_render and self.debug_collector.images.get('step1'):
+        if self.id == 0 and self.cfg.fitter.with_render and self.debug_collector.images.get('step1') and debug_mode != 'none':
             grid_path = f"{self.result_folder}/render/debug/step1_frame_{self.id:06d}_grid.jpg"
             self.debug_collector._save_single_grid('step1', grid_path)
 

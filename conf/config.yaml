@@ -35,6 +35,10 @@ fitter:
   render_cameras: [0]
   use_keypoints: true  # Set to false to disable keypoint loss (silhouette only)
 
+  # Debug iteration visualization mode
+  # Options: "first_last" (default), "all", "none"
+  debug_iter_mode: "first_last"  # Only save first and last iteration images
+
   # Post-fitting visualization settings (auto-generated after fitting)
   generate_visualizations: true  # Generate videos/report after fitting
   create_videos: true            # Create mesh, keypoint, overlay videos
