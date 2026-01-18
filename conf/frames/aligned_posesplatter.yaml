@@ -1,0 +1,15 @@
+# @package _global_
+# Frame settings aligned with pose-splatter (frame_jump=5)
+# Total available: 18000 frames (100 fps × 180 seconds)
+# pose-splatter uses: frame_jump=5 → 3600 samples
+#
+# This config ensures MAMMAL frame indices match pose-splatter sample indices:
+#   MAMMAL frame 0 → raw frame 0 → pose-splatter sample 0
+#   MAMMAL frame 1 → raw frame 5 → pose-splatter sample 1
+#   ...
+
+fitter:
+  start_frame: 0
+  end_frame: 18000    # Full video (18000 raw frames)
+  interval: 5         # CRITICAL: Must match pose-splatter frame_jump!
+  # Result: 3600 MAMMAL frames, perfectly aligned with pose-splatter samples

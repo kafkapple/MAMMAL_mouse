@@ -1,0 +1,13 @@
+# @package _global_
+# Aligned test config for pose-splatter mesh init
+# - Interval=5 matches pose-splatter frame_jump=5
+# - 100 frames for quick testing (covers pose-splatter samples 0-99)
+#
+# Usage:
+#   ./run_experiment.sh baseline_6view_keypoint frames=aligned_test_100
+
+fitter:
+  start_frame: 0
+  end_frame: 500      # 500 raw frames / interval 5 = 100 MAMMAL frames
+  interval: 5         # CRITICAL: Must match pose-splatter frame_jump!
+  # Result: 100 MAMMAL frames aligned with pose-splatter samples 0-99

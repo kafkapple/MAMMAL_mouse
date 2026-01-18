@@ -1,0 +1,7 @@
+# @package _global_
+# Paper settings + 100 frames (~1.4 hours)
+
+fitter:
+  start_frame: 0
+  end_frame: 500      # 500 / 5 = 100 frames
+  interval: 5

@@ -1,0 +1,9 @@
+# @package _global_
+# Quick test: 30 frames (~6 hours)
+# For rapid validation before full run
+
+fitter:
+  start_frame: 0
+  end_frame: 150      # 150 raw frames / interval 5 = 30 MAMMAL frames
+  interval: 5         # Match pose-splatter frame_jump
+  # Result: 30 frames, ~6 hours

@@ -1,0 +1,9 @@
+# @package _global_
+# Medium test: 500 frames (~4 days)
+# Reasonable subset for development
+
+fitter:
+  start_frame: 0
+  end_frame: 2500     # 2500 raw frames / interval 5 = 500 MAMMAL frames
+  interval: 5
+  # Result: 500 frames, ~4 days

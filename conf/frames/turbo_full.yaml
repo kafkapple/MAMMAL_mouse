@@ -1,0 +1,7 @@
+# @package _global_
+# Turbo settings + full frames (~10 hours)
+
+fitter:
+  start_frame: 0
+  end_frame: 18000    # 18000 / 5 = 3600 frames
+  interval: 5
