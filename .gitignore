@@ -108,3 +108,19 @@ htmlcov/
 !conf/**/*.yaml
 !mouse_model/**/*.pkl
 !mouse_model/*.pkl
+
+# ----- Logs -----
+*.log
+nohup.out
+
+# ----- Temporary files -----
+*.tmp
+*.temp
+/tmp/
+
+# ----- IDE -----
+.vscode/
+.idea/
+
+# ----- Jupyter -----
+.ipynb_checkpoints/
