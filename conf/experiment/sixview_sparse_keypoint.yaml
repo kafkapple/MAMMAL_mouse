@@ -28,10 +28,6 @@ fitter:
   with_render: true
 
 # Slightly more iterations for sparse keypoints
-optim:
-  solve_step0_iters: 15
-  solve_step1_iters: 150
-  solve_step2_iters: 45
 
 # Loss weights for sparse keypoint mode
 loss_weights:

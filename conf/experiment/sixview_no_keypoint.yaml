@@ -23,10 +23,6 @@ fitter:
   with_render: true
 
 # More iterations needed without keypoint guidance
-optim:
-  solve_step0_iters: 20
-  solve_step1_iters: 200
-  solve_step2_iters: 60
 
 # Silhouette-only mode settings
 silhouette:

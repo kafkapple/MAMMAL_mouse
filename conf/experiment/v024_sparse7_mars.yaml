@@ -24,10 +24,6 @@ fitter:
   with_render: true
 
 # Optimization settings (increased for fewer views)
-optim:
-  solve_step0_iters: 20
-  solve_step1_iters: 150
-  solve_step2_iters: 50
 
 # Loss weights (stronger regularization for 3-view)
 loss_weights:

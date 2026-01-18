@@ -23,10 +23,6 @@ fitter:
   with_render: true
 
 # Same optimization as baseline
-optim:
-  solve_step0_iters: 10
-  solve_step1_iters: 100
-  solve_step2_iters: 30
 
 # Adjusted loss weights for monocular
 loss_weights:

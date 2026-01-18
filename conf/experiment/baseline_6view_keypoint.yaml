@@ -20,14 +20,9 @@ fitter:
   render_cameras: [0, 1, 2, 3, 4, 5]
   use_keypoints: true
   keypoint_num: 22  # Full 22 keypoints
-  with_render: true
   # Frame settings inherited from /frames config
 
 # Original MAMMAL paper optimization settings
-optim:
-  solve_step0_iters: 10
-  solve_step1_iters: 100
-  solve_step2_iters: 30
 
 # Original MAMMAL paper loss weights
 loss_weights:
