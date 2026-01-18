@@ -2,7 +2,13 @@
 # Run MAMMAL mesh fitting experiments
 #
 # Usage:
-#   ./run_experiment.sh <experiment_name> [--debug] [--frames N]
+#   ./run_experiment.sh <experiment_name> [--debug] [--frames N] [frames=<config>] [optim=<config>]
+#
+# Options:
+#   --debug, -d         Quick test with 5 frames
+#   --frames N, -f N    Set custom end_frame
+#   frames=<config>     Use frame config from conf/frames/ (e.g., turbo_100, paper_full)
+#   optim=<config>      Use optim config from conf/optim/ (e.g., turbo, paper, fast)
 #
 # ============ Experiment Groups ============
 #
@@ -37,6 +43,10 @@ DEBUG_MODE=false
 CUSTOM_FRAMES=""
 
 shift || true
+FRAMES_CONFIG=""
+OPTIM_CONFIG=""
+HYDRA_OVERRIDES=""
+
 while [[ $# -gt 0 ]]; do
     case $1 in
         --debug|-d)
@@ -46,6 +56,19 @@ while [[ $# -gt 0 ]]; do
         --frames|-f)
             CUSTOM_FRAMES="$2"
             shift 2
+            ;;
+        frames=*)
+            FRAMES_CONFIG="${1#frames=}"
+            shift
+            ;;
+        optim=*)
+            OPTIM_CONFIG="${1#optim=}"
+            shift
+            ;;
+        *=*)
+            # Pass through any other Hydra overrides
+            HYDRA_OVERRIDES="$HYDRA_OVERRIDES $1"
+            shift
             ;;
         *)
             echo "Unknown option: $1"
@@ -120,9 +143,40 @@ if [[ "$DEBUG_MODE" == "true" ]]; then
     CMD="$CMD optim.solve_step2_iters=10"
 fi
 
-# Custom frame count
+# Custom frame count (--frames N)
 if [[ -n "$CUSTOM_FRAMES" ]]; then
     CMD="$CMD fitter.end_frame=$CUSTOM_FRAMES"
+fi
+
+# Frame config override (frames=turbo_100)
+if [[ -n "$FRAMES_CONFIG" ]]; then
+    if [[ -f "conf/frames/${FRAMES_CONFIG}.yaml" ]]; then
+        CMD="$CMD frames=$FRAMES_CONFIG"
+        echo "Using frames config: $FRAMES_CONFIG"
+    else
+        echo "Error: Frame config not found: conf/frames/${FRAMES_CONFIG}.yaml"
+        echo "Available: $(ls conf/frames/*.yaml | xargs -n1 basename | sed 's/.yaml//' | tr '
+' ' ')"
+        exit 1
+    fi
+fi
+
+# Optim config override (optim=turbo)
+if [[ -n "$OPTIM_CONFIG" ]]; then
+    if [[ -f "conf/optim/${OPTIM_CONFIG}.yaml" ]]; then
+        CMD="$CMD optim=$OPTIM_CONFIG"
+        echo "Using optim config: $OPTIM_CONFIG"
+    else
+        echo "Error: Optim config not found: conf/optim/${OPTIM_CONFIG}.yaml"
+        echo "Available: $(ls conf/optim/*.yaml | xargs -n1 basename | sed 's/.yaml//' | tr '
+' ' ')"
+        exit 1
+    fi
+fi
+
+# Additional Hydra overrides
+if [[ -n "$HYDRA_OVERRIDES" ]]; then
+    CMD="$CMD $HYDRA_OVERRIDES"
 fi
 
 echo ""
