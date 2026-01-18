@@ -57,7 +57,7 @@ class DebugGridCollector:
                 continue
 
             # Sort by iteration
-            sorted_imgs = sorted(self.images[step], key=lambda x: x[0])
+            sorted_imgs = sorted(self.images[step], key=lambda x: float('inf') if x[0] == 'final' else x[0])
 
             # Create grid
             grid = self._create_grid(sorted_imgs)
@@ -96,7 +96,7 @@ class DebugGridCollector:
         if step_name not in self.images or not self.images[step_name]:
             return None
 
-        sorted_imgs = sorted(self.images[step_name], key=lambda x: x[0])
+        sorted_imgs = sorted(self.images[step_name], key=lambda x: float('inf') if x[0] == 'final' else x[0])
         grid = self._create_grid(sorted_imgs)
 
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
