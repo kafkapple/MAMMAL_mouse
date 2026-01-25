@@ -16,7 +16,7 @@ mode: multi_view  # Options: multi_view, single_view_preprocess
 # Data settings (can be overridden by dataset config or --input_dir CLI argument)
 # NOTE: Use relative paths or override with --input_dir for portability across servers
 data:
-  data_dir: data/examples/markerless_mouse_1_nerf/  # Default example dataset (override with --input_dir)
+  data_dir: data/raw/markerless_mouse_1_nerf/  # Default example dataset (override with --input_dir)
   views_to_use: [0]
 
 # Preprocessing settings (can be overridden by preprocess config)
