@@ -276,15 +276,22 @@ class ArticulationTorch(Module):
                 trans[:,i] = joints[:,i] - joints[:,p]
         return trans 
 
-    def compute_rots(self, G_init, G_pose): 
-        G_rel = torch.zeros(G_init.shape, dtype=torch.float32, device=self.device) 
-        G_rel = torch.linalg.solve(G_init.transpose(2,3), G_pose.transpose(2,3)).transpose(2,3) 
-        R_diff = torch.zeros(G_init.shape, dtype=torch.float32, device=self.device) 
-        for i in range(self.jointnum): 
-            if i == 0: 
+    def compute_rots(self, G_init, G_pose):
+        """Compute relative rotations between initial and posed transforms.
+
+        Uses lstsq instead of solve for numerical stability when matrices
+        become near-singular during optimization.
+        """
+        G_rel = torch.zeros(G_init.shape, dtype=torch.float32, device=self.device)
+        # Use lstsq for numerical stability (handles near-singular matrices)
+        G_rel = torch.linalg.lstsq(G_init.transpose(2,3), G_pose.transpose(2,3)).solution.transpose(2,3)
+        R_diff = torch.zeros(G_init.shape, dtype=torch.float32, device=self.device)
+        for i in range(self.jointnum):
+            if i == 0:
                 R_diff[:,i] = G_rel[:,i]
-            else: 
-                R_diff[:,i] = torch.linalg.solve(G_rel[:,self.parents[i]], G_rel[:,i])
+            else:
+                # Use lstsq for numerical stability
+                R_diff[:,i] = torch.linalg.lstsq(G_rel[:,self.parents[i]], G_rel[:,i]).solution
         return R_diff 
 
 
