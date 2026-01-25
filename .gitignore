@@ -7,6 +7,7 @@ data/
 data.zip
 checkpoints/
 models/
+archive/
 
 # ----- All Results (consolidated under results/) -----
 results/
