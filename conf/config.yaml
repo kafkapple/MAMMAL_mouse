@@ -102,6 +102,6 @@ result_folder: results/fitting/
 # Hydra configuration
 hydra:
   run:
-    dir: results/logs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: results/logs/hydra/${now:%Y-%m-%d}/${now:%H-%M-%S}
   job:
     chdir: false  # Important: Do not change working directory
