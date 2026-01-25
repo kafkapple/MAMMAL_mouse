@@ -17,15 +17,16 @@ import pyrender
 from pyrender.constants import RenderFlags 
 import cv2 
 
-import trimesh 
-import torch.nn as nn 
-import torch.functional as F
-from articulation_th import ArticulationTorch 
-from bodymodel_th import BodyModelTorch 
+import trimesh
+from articulation_th import ArticulationTorch
 from data_seaker_video_new import DataSeakerDet
-import copy 
-from utils import *
-from scipy.spatial.transform import Rotation
+import copy
+from utils import (
+    pack_images, rodrigues_batch, Rmat2axis,
+    undist_points_cv2, draw_keypoints,
+    colormap, bones, bone_color_index, g_colors, joint_color_index,
+    DebugGridCollector, compress_existing_debug_folder
+)
 import matplotlib.pyplot as plt
 
 import hydra
@@ -36,22 +37,10 @@ import hydra.utils
 from mammal_ext.config import get_loss_weights, get_keypoint_weights
 
 from pytorch3d.renderer import (
-    look_at_view_transform,
     PerspectiveCameras,
-    OrthographicCameras,
-    PointLights,
-    DirectionalLights,
-    Materials,
     RasterizationSettings,
     MeshRenderer,
     MeshRasterizer,
-    SoftPhongShader,
-    HardPhongShader,
-    TexturesUV,
-    TexturesVertex,
-    HardFlatShader,
-    HardGouraudShader,
-    AmbientLights,
     SoftSilhouetteShader
 )
 from pytorch3d.structures import Meshes
