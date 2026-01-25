@@ -18,7 +18,7 @@ Based on MAMMAL (An et al., Nature Communications 2023).
 |------|------|
 | 데이터 | `data/examples/markerless_mouse_1_nerf/` |
 | 결과 | `results/fitting/` |
-| 로그 | `results/logs/` (hydra/, runtime/) |
+| 로그 | `logs/` (nohup), `results/logs/` (hydra) |
 | Config | `conf/` |
 | 확장 모듈 | `mammal_ext/` (GPU, loss, keypoint config) |
 | 문서 | `docs/MOC.md` (진입점) |
@@ -97,10 +97,10 @@ MAMMAL_mouse/
 ├── [ORIGINAL] fitter_articulation.py, articulation_th.py, bodymodel_*.py
 ├── [EXTENSION] mammal_ext/           # 확장 모듈 (원본 수정 최소화)
 │   └── config/                       # GPU, loss, keypoint 설정
-├── [RESULTS] results/                # 통합된 결과 폴더
+├── [RESULTS] results/                # 결과 폴더
 │   ├── fitting/                      # 피팅 결과
-│   ├── logs/hydra/                   # Hydra 로그
-│   └── logs/runtime/                 # 런타임 로그
+│   └── logs/                         # Hydra 로그
+├── [LOGS] logs/                      # nohup 런타임 로그
 ├── conf/                             # Hydra 설정
 └── tests/                            # 유닛 테스트
 ```

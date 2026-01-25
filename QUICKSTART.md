@@ -20,10 +20,10 @@ conda activate mammal_stable
 ```bash
 cd /home/joon/dev/MAMMAL_mouse && \
 nohup ./run_experiment.sh baseline_6view_keypoint frames=aligned_posesplatter optim=paper_fast \
-  > results/logs/runtime/fitting_paper_fast_$(date +%Y%m%d_%H%M%S).log 2>&1 &
+  > logs/fitting_paper_fast_$(date +%Y%m%d_%H%M%S).log 2>&1 &
 
 # 진행 확인
-tail -f results/logs/runtime/fitting_paper_fast_*.log
+tail -f logs/fitting_paper_fast_*.log
 ```
 
 ### 2. 피팅 완료 후 시각화
