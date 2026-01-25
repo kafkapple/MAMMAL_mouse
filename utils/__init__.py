@@ -1,11 +1,16 @@
-"""MAMMAL Mouse utilities."""
+"""MAMMAL Mouse utilities.
+
+Note: DebugGridCollector has been moved to mammal_ext.fitting.debug
+but is re-exported here for backward compatibility.
+"""
 
 import cv2
 import numpy as np
 import math
 import torch
 
-from .debug_grid import DebugGridCollector, compress_existing_debug_folder
+# Re-export from mammal_ext for backward compatibility
+from mammal_ext.fitting.debug import DebugGridCollector, compress_existing_debug_folder
 
 ## for dannce labeling (22 keypoints)
 import os

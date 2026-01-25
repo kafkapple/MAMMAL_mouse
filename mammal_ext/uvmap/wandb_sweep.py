@@ -833,9 +833,9 @@ class WandBSweepOptimizer:
         Returns:
             outputs: Dictionary with 'images' and optionally 'orbit_video'
         """
-        from visualization.textured_renderer import create_textured_renderer
-        from visualization.camera_paths import CameraPathGenerator, compute_mesh_bounds
-        from visualization.video_generator import VideoGenerator
+        from mammal_ext.visualization.textured_renderer import create_textured_renderer
+        from mammal_ext.visualization.camera_paths import CameraPathGenerator, compute_mesh_bounds
+        from mammal_ext.visualization.video_generator import VideoGenerator
         import cv2
         import pickle
         import glob

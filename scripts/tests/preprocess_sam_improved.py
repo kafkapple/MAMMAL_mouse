@@ -20,12 +20,12 @@ import sys
 # Add utils to path
 sys.path.insert(0, os.path.dirname(__file__))
 
-from preprocessing_utils.sam_inference import SAMInference
-from preprocessing_utils.mask_processing import (
+from mammal_ext.preprocessing.sam_inference import SAMInference
+from mammal_ext.preprocessing.mask_processing import (
     extract_mouse_mask, clean_mask, smooth_mask,
     TemporalMaskFilter
 )
-from preprocessing_utils.keypoint_estimation import (
+from mammal_ext.preprocessing.keypoint_estimation import (
     estimate_mammal_keypoints, TemporalKeypointSmoother,
     validate_keypoints, visualize_keypoints_on_frame
 )

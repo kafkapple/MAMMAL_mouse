@@ -33,7 +33,7 @@ from tqdm import tqdm
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from visualization.rerun_exporter import RerunExporter, MOUSE_BONES, get_keypoint_colors
+from mammal_ext.visualization.rerun_exporter import RerunExporter, MOUSE_BONES, get_keypoint_colors
 
 
 def load_obj_vertices(obj_path: str) -> np.ndarray:

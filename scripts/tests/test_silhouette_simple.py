@@ -6,7 +6,7 @@ import numpy as np
 import pickle
 import cv2
 from articulation_th import ArticulationTorch
-from preprocessing_utils.silhouette_renderer import (
+from mammal_ext.preprocessing.silhouette_renderer import (
     SilhouetteRenderer, SilhouetteLoss, load_target_mask, visualize_silhouette_comparison
 )
 from pytorch3d.utils import cameras_from_opencv_projection
