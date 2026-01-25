@@ -449,10 +449,19 @@ from utils import (
 - [x] Replace `from utils import *` with explicit imports
 - Commit: `72fd3b7`
 
+### Phase 5: Full Modularization ✅ (Completed 2025-01-26)
+- [x] Move `visualization/` → `mammal_ext/visualization/`
+- [x] Move `preprocessing_utils/` → `mammal_ext/preprocessing/`
+- [x] Move `uvmap/` → `mammal_ext/uvmap/`
+- [x] Move `debug_grid.py` → `mammal_ext/fitting/debug.py`
+- [x] Create backward compatibility wrappers
+- [x] Update all import statements
+- [x] Update `articulation_th.py` to use `mammal_ext.config`
+- Commit: `c3bf0a4`
+
 ### Deferred (Optional Future Work)
-- [ ] Move `visualization/` to `mammal_ext/visualization/`
-- [ ] Move `preprocessing_utils/` to `mammal_ext/preprocessing/`
 - [ ] Archive `results/fitting/_backup/` to external storage
+- [ ] Remove backward compatibility wrappers after transition period
 
 ---
 

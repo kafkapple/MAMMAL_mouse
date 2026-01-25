@@ -96,11 +96,30 @@ python -m visualization.mesh_visualizer --result_dir results/fitting/<exp> --sav
 MAMMAL_mouse/
 ├── [ORIGINAL] fitter_articulation.py, articulation_th.py, bodymodel_*.py
 ├── [EXTENSION] mammal_ext/           # 확장 모듈 (원본 수정 최소화)
-│   └── config/                       # GPU, loss, keypoint 설정
+│   ├── config/                       # GPU, loss, keypoint 설정
+│   ├── fitting/                      # Debug grid, fitting utilities
+│   ├── visualization/                # Mesh viz, video gen, Rerun export
+│   ├── preprocessing/                # Mask, keypoint, SAM inference
+│   └── uvmap/                        # UV texture mapping pipeline
+├── [COMPAT] visualization/, preprocessing_utils/, uvmap/  # Backward compat wrappers
 ├── [RESULTS] results/                # 결과 폴더
 │   ├── fitting/                      # 피팅 결과
 │   └── logs/                         # Hydra 로그
 ├── [LOGS] logs/                      # nohup 런타임 로그
 ├── conf/                             # Hydra 설정
 └── tests/                            # 유닛 테스트
+```
+
+## Module Import Guide
+
+```python
+# Recommended (new)
+from mammal_ext.visualization import MeshVisualizer
+from mammal_ext.preprocessing.keypoint_estimation import estimate_mammal_keypoints
+from mammal_ext.uvmap import UVPipeline
+from mammal_ext.config import configure_gpu
+
+# Deprecated (backward compatible, shows warning)
+from visualization import MeshVisualizer
+from preprocessing_utils.keypoint_estimation import estimate_mammal_keypoints
 ```
