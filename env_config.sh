@@ -17,7 +17,7 @@ case "$HOSTNAME" in
         # gpu03 서버: GPU 0-3 사용 가능 (H100), 기본 GPU 0
         export GPU_ID="${GPU_ID:-0}"
         export CONDA_PATH="$HOME/anaconda3"
-        export MAMMAL_ENV="mouse"
+        export MAMMAL_ENV="mammal_stable"
         ;;
     bori|bori.*)
         # bori 서버: GPU 0 사용 (GPU 1개만 있음)
