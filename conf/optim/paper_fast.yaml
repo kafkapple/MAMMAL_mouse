@@ -1,0 +1,32 @@
+# @package _global_
+#
+# Paper-based Fast Fitting (논문 설정 기반 전체 피팅 최적화)
+# ============================================================
+# Reference: An et al., "Three-dimensional surface motion capture of
+#            multiple freely moving pigs using MAMMAL"
+#            Nature Communications, 2023
+#
+# Paper quotes:
+#   - "5 iterations per frame yielded fairly good results for T > 0"
+#   - "For faster inference, we set wsil=0 to disable silhouette loss"
+#
+# Usage:
+#   ./run_experiment.sh baseline_6view_keypoint frames=aligned_posesplatter optim=paper_fast
+#
+# Post-fitting visualization:
+#   python -m visualization.mesh_visualizer --result_dir results/fitting/<exp_dir> --save_video
+
+optim:
+  solve_step0_iters: 60   # First frame initialization (paper: 60)
+  solve_step1_iters: 5    # Tracking iterations (paper: 3-5)
+  solve_step2_iters: 3    # Refinement iterations (paper: 3)
+
+fitter:
+  with_render: false           # Disable during fitting for speed
+  generate_visualizations: false
+  create_videos: false
+  create_report: false
+
+loss_weights:
+  mask_step1: 0.0   # Disable silhouette loss (paper: wsil=0)
+  mask_step2: 0.0

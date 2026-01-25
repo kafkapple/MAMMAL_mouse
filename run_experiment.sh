@@ -7,8 +7,8 @@
 # Options:
 #   --debug, -d         Quick test with 5 frames
 #   --frames N, -f N    Set custom end_frame
-#   frames=<config>     Use frame config from conf/frames/ (e.g., turbo_100, paper_full)
-#   optim=<config>      Use optim config from conf/optim/ (e.g., turbo, paper, fast)
+#   frames=<config>     Use frame config from conf/frames/ (e.g., aligned_posesplatter, aligned_test_100)
+#   optim=<config>      Use optim config from conf/optim/ (e.g., paper_fast, paper, fast)
 #
 # ============ Experiment Groups ============
 #

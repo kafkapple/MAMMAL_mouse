@@ -27,13 +27,15 @@ https://doi.org/10.1038/s41467-023-43483-w
 
 ## Config 파일 구조
 
-### Optimization Configs ()
-| Config | step1 | step2 | render | 용도 |
-|--------|-------|-------|--------|------|
-| default | 100 | 30 | ✅ | 기본 (느림) |
-| fast | 50 | 15 | ✅ | 빠른 테스트 |
-| **paper** | 5 | 3 | ✅ | 논문 설정 |
-| **turbo** | 5 | 3 | ❌ | 최고속 |
+### Optimization Configs (`conf/optim/`)
+| Config | step0 | step1 | step2 | render | 용도 |
+|--------|-------|-------|-------|--------|------|
+| default | 10 | 100 | 30 | ✅ | 기본 (느림) |
+| fast | 10 | 50 | 15 | ✅ | 빠른 테스트 |
+| paper | 60 | 5 | 3 | ✅ | 논문 설정 + 렌더링 |
+| **paper_fast** | **60** | 5 | 3 | ❌ | **논문 설정 + 최고속** ★ |
+
+> **paper_fast**: 논문과 동일한 iteration, 렌더링은 후처리로 대체 → 최고 속도
 
 ### Frame Configs ()
 | Config | 프레임 수 | 용도 |
@@ -57,17 +59,31 @@ https://doi.org/10.1038/s41467-023-43483-w
 
 ## 권장 실행 명령
 
+### 1. 피팅 실행
 ```bash
 cd /home/joon/dev/MAMMAL_mouse
 
-# Turbo 100프레임 (~15분)
-./run_experiment.sh baseline_6view_keypoint frames=aligned_test_100 optim=turbo
+# ★ 논문 설정 + 전체 (~10시간) - 권장
+nohup ./run_experiment.sh baseline_6view_keypoint frames=aligned_posesplatter optim=paper_fast \
+  > logs/fitting_paper_fast_$(date +%Y%m%d_%H%M%S).log 2>&1 &
 
-# Paper 100프레임 (~1.4시간)
-./run_experiment.sh baseline_6view_keypoint frames=aligned_test_100 optim=paper
+# 테스트용
+./run_experiment.sh baseline_6view_keypoint frames=aligned_test_100 optim=paper_fast
+```
 
-# Turbo 전체 (~10시간)
-./run_experiment.sh baseline_6view_keypoint frames=aligned_posesplatter optim=turbo
+### 2. 피팅 완료 후 시각화
+```bash
+# 샘플 프레임 렌더링
+python -m visualization.mesh_visualizer \
+    --result_dir results/fitting/<exp_dir> \
+    --start_frame 0 --end_frame 1 \
+    --save_video --no_rrd
+
+# 전체 시퀀스 비디오
+python -m visualization.mesh_visualizer \
+    --result_dir results/fitting/<exp_dir> \
+    --view_modes orbit fixed \
+    --save_video --save_rrd
 ```
 
 ---

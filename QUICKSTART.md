@@ -10,6 +10,55 @@ conda activate mammal_stable
 ./run_experiment.sh <config_name> [--debug]
 ```
 
+## Fast Full-Data Fitting (논문 설정 기반)
+
+> **Reference**: An et al., *Nature Communications* 2023
+> - "5 iterations per frame yielded fairly good results for T > 0"
+> - "For faster inference, we set wsil=0 to disable silhouette loss"
+
+### 1. 피팅 실행 (optim=paper_fast)
+```bash
+cd /home/joon/dev/MAMMAL_mouse && \
+nohup ./run_experiment.sh baseline_6view_keypoint frames=aligned_posesplatter optim=paper_fast \
+  > logs/fitting_paper_fast_$(date +%Y%m%d_%H%M%S).log 2>&1 &
+
+# 진행 확인
+tail -f logs/fitting_paper_fast_*.log
+```
+
+### 2. 피팅 완료 후 시각화
+```bash
+# 샘플 프레임 렌더링 (첫/마지막)
+python -m visualization.mesh_visualizer \
+    --result_dir results/fitting/<exp_dir> \
+    --start_frame 0 --end_frame 1 \
+    --save_video --no_rrd
+
+# 전체 시퀀스 비디오 생성
+python -m visualization.mesh_visualizer \
+    --result_dir results/fitting/<exp_dir> \
+    --view_modes orbit fixed \
+    --save_video --save_rrd
+```
+
+### paper_fast 설정
+| 항목 | 값 | 논문 근거 |
+|------|-----|----------|
+| step0_iters | 60 | 첫 프레임 초기화 |
+| step1_iters | 5 | "3-5 iterations" |
+| step2_iters | 3 | "3 iterations" |
+| mask_loss | 0.0 | "wsil=0" |
+| render | ❌ | 속도 최적화 (후처리로 대체) |
+
+### 예상 시간
+| Config | 100 프레임 | 3600 프레임 |
+|--------|-----------|-------------|
+| default | ~20시간 | ~31일 |
+| paper | ~1.4시간 | ~2일 |
+| **paper_fast** | **~15분** | **~10시간** |
+
+---
+
 ## All Experiment Commands
 
 ### Baseline
@@ -59,6 +108,21 @@ conda activate mammal_stable
 ```bash
 ./run_experiment.sh quick_test                     # Fast debug (5 frames, minimal iters)
 ./run_experiment.sh accurate_6views                # High quality (more iterations)
+```
+
+### Frame/Optim Override (Hydra)
+```bash
+# 프레임 설정 오버라이드
+./run_experiment.sh baseline_6view_keypoint frames=aligned_posesplatter  # 전체 3600
+./run_experiment.sh baseline_6view_keypoint frames=aligned_test_100      # 테스트 100
+
+# 최적화 설정 오버라이드
+./run_experiment.sh baseline_6view_keypoint optim=turbo   # 최고속 (~5x faster)
+./run_experiment.sh baseline_6view_keypoint optim=paper   # 논문 설정
+./run_experiment.sh baseline_6view_keypoint optim=fast    # 중간 속도
+
+# 조합
+./run_experiment.sh baseline_6view_keypoint frames=aligned_posesplatter optim=turbo
 ```
 
 ## Batch Run All Ablations
