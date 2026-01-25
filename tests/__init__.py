@@ -1,0 +1,1 @@
+"""MAMMAL Mouse tests."""

@@ -1,20 +1,9 @@
 # ===== GPU Configuration (MUST be before torch import) =====
+# Extracted to mammal_ext.config.gpu for reusability
+from mammal_ext.config import configure_gpu
+configure_gpu()
+
 import os
-import socket
-
-# Auto-detect server and set GPU
-_hostname = socket.gethostname()
-_gpu_defaults = {
-    'gpu05': '1',   # gpu05: use GPU 1
-    'bori': '0',    # bori: use GPU 0 (only 1 GPU)
-}
-_default_gpu = _gpu_defaults.get(_hostname.split('.')[0], '0')
-_gpu_id = os.environ.get('GPU_ID', os.environ.get('CUDA_VISIBLE_DEVICES', _default_gpu))
-
-os.environ['CUDA_VISIBLE_DEVICES'] = _gpu_id
-os.environ['EGL_DEVICE_ID'] = _gpu_id
-os.environ['PYOPENGL_PLATFORM'] = 'egl'
-os.environ['DISPLAY'] = ''  # Disable X11 for headless rendering
 
 import numpy as np
 import math
@@ -39,9 +28,12 @@ from utils import *
 from scipy.spatial.transform import Rotation
 import matplotlib.pyplot as plt
 
-import hydra # Added for Hydra main decorator
-from omegaconf import DictConfig # Added for MouseFitter type hinting
-import hydra.utils # Added for path resolution
+import hydra
+from omegaconf import DictConfig
+import hydra.utils
+
+# MAMMAL extension modules (extracted config logic)
+from mammal_ext.config import get_loss_weights, get_keypoint_weights
 
 from pytorch3d.renderer import (
     look_at_view_transform,
@@ -63,9 +55,7 @@ from pytorch3d.renderer import (
     SoftSilhouetteShader
 )
 from pytorch3d.structures import Meshes
-from torch.utils.tensorboard import SummaryWriter 
 from pytorch3d.utils import cameras_from_opencv_projection
-from omegaconf import DictConfig # Added for MouseFitter type hinting
 
 class MouseFitter():
     def __init__(self, cfg: DictConfig):
