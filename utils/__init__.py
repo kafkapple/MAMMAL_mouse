@@ -2,6 +2,9 @@
 
 Note: DebugGridCollector has been moved to mammal_ext.fitting.debug
 but is re-exported here for backward compatibility.
+
+Core utilities (rodrigues_batch, pack_images, etc.) remain here as they are
+used directly by original MAMMAL code.
 """
 
 import cv2
@@ -10,7 +13,11 @@ import math
 import torch
 
 # Re-export from mammal_ext for backward compatibility
-from mammal_ext.fitting.debug import DebugGridCollector, compress_existing_debug_folder
+from mammal_ext.fitting.debug import (
+    DebugGridCollector,
+    compress_existing_debug_folder,
+    create_iteration_grid_from_folder,
+)
 
 ## for dannce labeling (22 keypoints)
 import os
