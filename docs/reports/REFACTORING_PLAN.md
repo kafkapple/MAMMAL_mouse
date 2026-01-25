@@ -417,39 +417,42 @@ from utils import (
 
 ## 7. Implementation Checklist
 
-### Phase 1: Cleanup ✅
-- [ ] Delete `scripts/deprecated/`
-- [ ] Delete duplicate `data_seaker_video_new.py` files
-- [ ] Delete `utils.py.bak`
-- [ ] Archive `results/fitting/_backup/`
-- [ ] Run smoke test
+### Phase 1: Cleanup ✅ (Completed 2025-01-25)
+- [x] Delete `scripts/deprecated/` (14 files)
+- [x] Delete duplicate `data_seaker_video_new.py` files (2 files)
+- [x] Delete `utils.py.bak`
+- [x] Update `.gitignore` with archive/
+- Commit: `764f9f2`
 
-### Phase 2: Result Consolidation
-- [ ] Create unified results structure
-- [ ] Migrate `logs/` → `results/logs/runtime/`
-- [ ] Migrate `outputs/` → `results/debug/`
-- [ ] Migrate `wandb_sweep_results/` → `results/sweep/`
-- [ ] Update `.gitignore`
-- [ ] Update `conf/config.yaml` paths
-- [ ] Verify fitting still works
+### Phase 2: Result Consolidation ✅ (Completed 2025-01-25)
+- [x] Create unified results structure
+- [x] Migrate `logs/` → `results/logs/runtime/`
+- [x] Migrate `outputs/` → `results/debug/`
+- [x] Migrate `wandb_sweep_results/` → `results/sweep/`
+- [x] Remove `uvmap_experiments/` (empty)
+- [x] Update `conf/config.yaml` hydra paths
+- Commit: `326777c`
 
-### Phase 3: Module Extraction
-- [ ] Create `mammal_ext/` package
-- [ ] Extract GPU config
-- [ ] Extract loss weight config
-- [ ] Write unit tests
-- [ ] Update `fitter_articulation.py` imports
-- [ ] Move `visualization/` to `mammal_ext/`
-- [ ] Move `preprocessing_utils/` to `mammal_ext/`
-- [ ] Update all script imports
-- [ ] Full integration test
+### Phase 3: Module Extraction ✅ (Completed 2025-01-25)
+- [x] Create `mammal_ext/` package
+- [x] Extract GPU config → `mammal_ext/config/gpu.py`
+- [x] Extract loss weight config → `mammal_ext/config/loss_weights.py`
+- [x] Extract keypoint weight config → `mammal_ext/config/keypoint_weights.py`
+- [x] Write unit tests → `tests/test_mammal_ext.py`
+- [x] Update `fitter_articulation.py` imports
+- Commit: `ed4af14`
 
-### Phase 4: Import Cleanup
-- [ ] Fix duplicate DictConfig import
-- [ ] Remove unused imports (fitter_articulation.py)
-- [ ] Remove unused imports (articulation_th.py)
-- [ ] Replace wildcard imports
-- [ ] Final test run
+### Phase 4: Import Cleanup ✅ (Completed 2025-01-25)
+- [x] Remove duplicate DictConfig import
+- [x] Remove 18+ unused imports (fitter_articulation.py)
+- [x] Remove 4 unused imports (articulation_th.py)
+- [x] Replace `from utils import *` with explicit imports
+- Commit: `72fd3b7`
+
+### Deferred (Optional Future Work)
+- [ ] Move `visualization/` to `mammal_ext/visualization/`
+- [ ] Move `preprocessing_utils/` to `mammal_ext/preprocessing/`
+- [ ] Archive `results/fitting/_backup/` to external storage
 
 ---
 
