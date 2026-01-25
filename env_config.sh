@@ -3,8 +3,12 @@
 # Auto-detect server and set appropriate GPU/paths
 #
 # Usage: source env_config.sh (automatically sourced by run scripts)
+# Note: If CUDA_VISIBLE_DEVICES is already set externally, it takes precedence
 
 HOSTNAME=$(hostname)
+
+# Preserve externally set CUDA_VISIBLE_DEVICES
+EXTERNAL_CUDA_DEVICES="${CUDA_VISIBLE_DEVICES:-}"
 
 case "$HOSTNAME" in
     gpu05|gpu05.*)
@@ -14,8 +18,9 @@ case "$HOSTNAME" in
         export MAMMAL_ENV="mammal_stable"
         ;;
     gpu03|gpu03.*)
-        # gpu03 서버: GPU 0-3 사용 가능 (H100), 기본 GPU 0
-        export GPU_ID="${GPU_ID:-0}"
+        # gpu03 서버: GPU 4-7 사용 (A6000, sm_86)
+        # GPU 0-3은 Blackwell (sm_120) - PyTorch 미지원
+        export GPU_ID="${GPU_ID:-4}"
         export CONDA_PATH="$HOME/anaconda3"
         export MAMMAL_ENV="mammal_stable"
         ;;
@@ -33,8 +38,14 @@ case "$HOSTNAME" in
         ;;
 esac
 
-# Common GPU settings
-export CUDA_VISIBLE_DEVICES="$GPU_ID"
+# Use external CUDA_VISIBLE_DEVICES if set, otherwise use GPU_ID
+if [ -n "$EXTERNAL_CUDA_DEVICES" ]; then
+    export CUDA_VISIBLE_DEVICES="$EXTERNAL_CUDA_DEVICES"
+    export GPU_ID="$EXTERNAL_CUDA_DEVICES"
+else
+    export CUDA_VISIBLE_DEVICES="$GPU_ID"
+fi
+
 export EGL_DEVICE_ID="$GPU_ID"
 export PYOPENGL_PLATFORM=egl
 export DISPLAY=""
