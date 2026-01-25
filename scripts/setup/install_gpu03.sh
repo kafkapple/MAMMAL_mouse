@@ -22,11 +22,12 @@ else
     conda create -n $ENV_NAME python=3.10 -y
     conda activate $ENV_NAME
     
-    # Install PyTorch with CUDA
-    conda install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia -y
+    # Install PyTorch via pip (more stable than conda)
+    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
     
-    # Install PyTorch3D
-    pip install "git+https://github.com/facebookresearch/pytorch3d.git"
+    # Install PyTorch3D (prebuilt wheel for cu121/py310/torch2.5.1)
+    pip install fvcore iopath
+    pip install pytorch3d -f https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/py310_cu121_pyt251/download.html
 fi
 
 # Install/update requirements
