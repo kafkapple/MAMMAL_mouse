@@ -5,6 +5,8 @@ configure_gpu()
 
 import os
 
+import glob
+import re
 import numpy as np
 import math
 import torch
@@ -45,6 +47,24 @@ from pytorch3d.renderer import (
 )
 from pytorch3d.structures import Meshes
 from pytorch3d.utils import cameras_from_opencv_projection
+
+
+def find_last_completed_frame(result_folder):
+    """Scan result folder and find the last completed frame number."""
+    params_pattern = os.path.join(result_folder, "params/step_2_frame_*.pkl")
+    files = glob.glob(params_pattern)
+    
+    if not files:
+        return None
+    
+    # Extract frame numbers from filenames
+    frame_nums = []
+    for f in files:
+        match = re.search(r"step_2_frame_(\d+)\.pkl", f)
+        if match:
+            frame_nums.append(int(match.group(1)))
+    
+    return max(frame_nums) if frame_nums else None
 
 class MouseFitter():
     def __init__(self, cfg: DictConfig):
@@ -1504,6 +1524,7 @@ def preprocess_cli_args():
         '--start_frame': lambda v: f'fitter.start_frame={v}',
         '--end_frame': lambda v: f'fitter.end_frame={v}',
         '--with_render': lambda v: 'fitter.with_render=true',
+        '--resume_from': lambda v: f'fitter.resume_from={v}',
     }
 
     new_argv = [sys.argv[0]]
@@ -1568,11 +1589,35 @@ def optim_single(cfg: DictConfig):
     else:
         kp_str = "kp22"  # Full 22 keypoints
 
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    dynamic_result_folder = f"results/fitting/{dataset_name}_{views_str}_{kp_str}_{timestamp}"
-
-    fitter.result_folder = hydra.utils.to_absolute_path(dynamic_result_folder)
-    print(f"Results will be saved to: {fitter.result_folder}")
+    # Auto-resume logic: check if resume_from is specified
+    resume_from = getattr(cfg.fitter, 'resume_from', None)
+    
+    if resume_from:
+        # Use existing result folder
+        fitter.result_folder = hydra.utils.to_absolute_path(resume_from)
+        print(f"Resuming from: {fitter.result_folder}")
+        
+        # Find last completed frame
+        last_frame = find_last_completed_frame(fitter.result_folder)
+        if last_frame is not None:
+            # Start from next frame
+            next_frame = last_frame + cfg.fitter.interval
+            if next_frame < cfg.fitter.end_frame:
+                cfg.fitter.start_frame = next_frame
+                cfg.fitter.resume = True
+                print(f"Last completed frame: {last_frame}, resuming from frame {next_frame}")
+            else:
+                print(f"All frames already completed (last: {last_frame})")
+                return
+        else:
+            print("No completed frames found, starting from beginning")
+    else:
+        # Create new result folder with timestamp
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        dynamic_result_folder = f"results/fitting/{dataset_name}_{views_str}_{kp_str}_{timestamp}"
+        fitter.result_folder = hydra.utils.to_absolute_path(dynamic_result_folder)
+        print(f"Results will be saved to: {fitter.result_folder}")
+    
     os.makedirs(fitter.result_folder, exist_ok=True)
     subfolders = ["params", "render", "render/debug/", "render/keypoints/", "obj"]
     for subfolder in subfolders:
