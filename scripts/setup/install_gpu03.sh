@@ -1,10 +1,10 @@
 #!/bin/bash
 # MAMMAL_mouse Environment Setup for gpu03 server
-# Conda: ~/anaconda3, Env: mouse
+# Conda: ~/anaconda3, Env: mammal_stable
 
 set -e
 CONDA_PATH="$HOME/anaconda3"
-ENV_NAME="mouse"
+ENV_NAME="mammal_stable"
 
 echo "=== MAMMAL_mouse Setup for gpu03 server ==="
 echo "Conda: $CONDA_PATH"
