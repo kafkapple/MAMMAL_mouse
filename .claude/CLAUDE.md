@@ -5,6 +5,15 @@
 Markerless 3D mouse pose estimation and mesh reconstruction from multi-view video.
 Based on MAMMAL (An et al., Nature Communications 2023).
 
+## Repository
+
+| 항목 | URL |
+|------|-----|
+| **원본** | https://github.com/anl13/MAMMAL_mouse |
+| **수정본** | https://github.com/kafkapple/MAMMAL_mouse |
+
+**수정 원칙**: 원본 코드 수정 최소화. 모든 확장/수정은 `mammal_ext/` 하위에 모듈화하여 구현. 원본 파일 직접 수정 금지.
+
 ## Tech Stack
 
 - **Language**: Python 3.10
@@ -89,6 +98,8 @@ python -m visualization.mesh_visualizer --result_dir results/fitting/<exp> --sav
 - **논문 설정**: `docs/reference/MAMMAL_PAPER.md`
 - **코드 분석**: `docs/reports/CODEBASE_ANALYSIS.md`
 - **리팩토링**: `docs/reports/REFACTORING_PLAN.md`
+- **좌표계**: `docs/coordinates/coordinate_systems_reference.md`
+- **UV→Blender**: `docs/practical/UV_TEXTURE_TO_BLENDER.md`
 
 ## Architecture (after refactoring)
 
@@ -100,7 +111,8 @@ MAMMAL_mouse/
 │   ├── fitting/                      # Debug grid, fitting utilities
 │   ├── visualization/                # Mesh viz, video gen, Rerun export
 │   ├── preprocessing/                # Mask, keypoint, SAM inference
-│   └── uvmap/                        # UV texture mapping pipeline
+│   ├── uvmap/                        # UV texture mapping pipeline
+│   └── blender_export/              # Blender OBJ export, coord transform, 6-view grid
 ├── [COMPAT] visualization/, preprocessing_utils/, uvmap/  # Backward compat wrappers
 ├── [RESULTS] results/                # 결과 폴더
 │   ├── fitting/                      # 피팅 결과
@@ -122,4 +134,54 @@ from mammal_ext.config import configure_gpu
 # Deprecated (backward compatible, shows warning)
 from visualization import MeshVisualizer
 from preprocessing_utils.keypoint_estimation import estimate_mammal_keypoints
+
+# Blender export
+from mammal_ext.blender_export import transform_vertices, export_obj_with_uv
+from mammal_ext.blender_export.batch_export import batch_export
+from mammal_ext.blender_export.sequence_renderer import render_sequence
 ```
+
+## Coordinate Systems (Quick Reference)
+
+> 상세: `docs/coordinates/coordinate_systems_reference.md`
+
+### 좌표계 정의
+
+| 좌표계 | Up | Forward | Right | 대표 |
+|--------|-----|---------|-------|------|
+| **MAMMAL** | **-Y** | +X (head) | +Z | MAMMAL fitting |
+| **Blender World** | +Z | +Y | +X | Blender |
+| **OpenCV** | -Y (down) | +Z | +X | OpenCV, COLMAP |
+| **OpenGL** | +Y | -Z | +X | Blender camera |
+
+### MAMMAL 메쉬 특성
+
+- 단위: **mm** (체장 ~115mm, 높이 ~53mm, 폭 ~41mm)
+- X=body length, Y=height (+Y=back), Z=width
+
+### 좌표 변환
+
+| From → To | 공식 | 행렬 |
+|-----------|------|------|
+| **MAMMAL → Blender World** | `(x, z, -y)` | Rx(+90°) |
+| Blender World → MAMMAL | `(x, -z, y)` | Rx(-90°) |
+| OpenGL → Blender World | `(x, -z, y)` | Rx(-90°) |
+
+```python
+# MAMMAL → Blender World
+from mammal_ext.blender_export import transform_vertices, MAMMAL_TO_BLENDER
+vertices_blender = transform_vertices(vertices_mammal)  # center + mm→m + Rx(+90°)
+```
+
+### Blender 임포트 검증
+
+정상 기준: 등(back)이 +Z(위), 배(belly)가 -Z(아래), 크기 ~0.1m
+
+## Modularization Rules
+
+**원본 코드 수정 시 반드시 준수:**
+
+1. **원본 파일 직접 수정 금지** — `mammal_ext/` 하위에 모듈 생성
+2. **모듈 구조**: `mammal_ext/{기능명}/` (예: `blender_export/`, `visualization/`)
+3. **Backward compat wrapper**: 기존 import 경로 유지 필요 시 루트에 래퍼 파일 배치
+4. **scripts/**: CLI 진입점은 thin wrapper로, 실제 로직은 `mammal_ext/`에
