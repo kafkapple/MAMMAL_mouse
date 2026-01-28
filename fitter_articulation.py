@@ -309,45 +309,58 @@ class MouseFitter():
         self._plot_per_frame_losses(df, save_dir)
 
     def _plot_per_frame_losses(self, df, save_dir):
-        """Generate per-frame loss convergence plots."""
+        """Generate per-frame loss convergence plots.
+
+        When frame count exceeds MAX_FRAMES_PER_PAGE, splits into multiple
+        pages to avoid exceeding matplotlib's pixel limit (65536 per axis).
+        """
         frames = df['frame'].unique()
         if len(frames) <= 1:
             return
 
-        n_frames = len(frames)
-        n_cols = min(4, n_frames)
-        n_rows = (n_frames + n_cols - 1) // n_cols
+        sorted_frames = sorted(frames)
+        n_cols = min(4, len(sorted_frames))
+        MAX_FRAMES_PER_PAGE = 200  # 200 frames → 50 rows × 3px × 150dpi = 22500px (safe)
 
-        fig, axes = plt.subplots(n_rows, n_cols, figsize=(4*n_cols, 3*n_rows))
-        axes = np.atleast_2d(axes)
+        pages = [sorted_frames[i:i+MAX_FRAMES_PER_PAGE]
+                 for i in range(0, len(sorted_frames), MAX_FRAMES_PER_PAGE)]
 
-        for idx, frame in enumerate(sorted(frames)):
-            row, col = idx // n_cols, idx % n_cols
-            ax = axes[row, col]
+        for page_idx, page_frames in enumerate(pages):
+            n_frames = len(page_frames)
+            n_rows = (n_frames + n_cols - 1) // n_cols
 
-            frame_data = df[df['frame'] == frame]
-            for step in ['Step0', 'Step1', 'Step2']:
-                step_data = frame_data[frame_data['step'] == step]
-                if not step_data.empty:
-                    ax.plot(step_data['iteration'], step_data['total_loss'],
-                           label=step, marker='o', markersize=2)
+            fig, axes = plt.subplots(n_rows, n_cols, figsize=(4*n_cols, 3*n_rows))
+            axes = np.atleast_2d(axes)
 
-            ax.set_title(f'Frame {frame}')
-            ax.set_xlabel('Iteration')
-            ax.set_ylabel('Loss')
-            ax.legend(fontsize=6)
-            ax.grid(True, alpha=0.3)
+            for idx, frame in enumerate(page_frames):
+                row, col = idx // n_cols, idx % n_cols
+                ax = axes[row, col]
 
-        # Hide empty subplots
-        for idx in range(len(frames), n_rows * n_cols):
-            row, col = idx // n_cols, idx % n_cols
-            axes[row, col].set_visible(False)
+                frame_data = df[df['frame'] == frame]
+                for step in ['Step0', 'Step1', 'Step2']:
+                    step_data = frame_data[frame_data['step'] == step]
+                    if not step_data.empty:
+                        ax.plot(step_data['iteration'], step_data['total_loss'],
+                               label=step, marker='o', markersize=2)
 
-        plt.tight_layout()
-        plot_path = os.path.join(save_dir, 'loss_per_frame.png')
-        plt.savefig(plot_path, dpi=150)
-        plt.close()
-        print(f"Per-frame loss plot saved to: {plot_path}")
+                ax.set_title(f'Frame {frame}')
+                ax.set_xlabel('Iteration')
+                ax.set_ylabel('Loss')
+                ax.legend(fontsize=6)
+                ax.grid(True, alpha=0.3)
+
+            for idx in range(n_frames, n_rows * n_cols):
+                row, col = idx // n_cols, idx % n_cols
+                axes[row, col].set_visible(False)
+
+            plt.tight_layout()
+            if len(pages) == 1:
+                plot_path = os.path.join(save_dir, 'loss_per_frame.png')
+            else:
+                plot_path = os.path.join(save_dir, f'loss_per_frame_p{page_idx+1}.png')
+            plt.savefig(plot_path, dpi=150)
+            plt.close()
+            print(f"Per-frame loss plot saved to: {plot_path}")
 
     def set_cameras_dannce(self, cams):
         self.camN = len(cams)
