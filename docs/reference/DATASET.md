@@ -12,7 +12,7 @@
 | 원본 FPS | 100 fps |
 | 총 길이 | 180초 |
 | 총 프레임 | 18,000 |
-| 해상도 | 1024 × 1152 (H × W) |
+| 해상도 | 1024 x 1152 (H x W) |
 | 카메라 수 | 6 |
 
 ---
@@ -24,11 +24,11 @@
 | View | ID | 위치 설명 |
 |------|-----|----------|
 | 0 | cam0 | 기준 카메라 |
-| 1 | cam1 | ~60° 회전 |
-| 2 | cam2 | ~120° 회전 |
-| 3 | cam3 | 반대편 (180°) |
-| 4 | cam4 | ~240° 회전 |
-| 5 | cam5 | ~300° 회전 |
+| 1 | cam1 | ~60도 회전 |
+| 2 | cam2 | ~120도 회전 |
+| 3 | cam3 | 반대편 (180도) |
+| 4 | cam4 | ~240도 회전 |
+| 5 | cam5 | ~300도 회전 |
 
 ### Camera Parameters
 
@@ -52,10 +52,10 @@
 
 **Frame alignment**:
 ```
-MAMMAL frame 0 → raw frame 0 → pose-splatter sample 0
-MAMMAL frame 1 → raw frame 5 → pose-splatter sample 1
+MAMMAL frame 0 -> raw frame 0 -> pose-splatter sample 0
+MAMMAL frame 1 -> raw frame 5 -> pose-splatter sample 1
 ...
-MAMMAL frame 3599 → raw frame 17995 → pose-splatter sample 3599
+MAMMAL frame 3599 -> raw frame 17995 -> pose-splatter sample 3599
 ```
 
 ---
@@ -97,9 +97,8 @@ data/examples/markerless_mouse_1_nerf/
 ## Related Documents
 
 - [KEYPOINTS.md](KEYPOINTS.md) - 22 키포인트 정의
-- [CONFIG.md](CONFIG.md) - Config 파라미터
-- [../OPTIMIZATION_GUIDE.md](../OPTIMIZATION_GUIDE.md) - 피팅 설정
+- [ARCHITECTURE.md](ARCHITECTURE.md) - 시스템 아키텍처
 
 ---
 
-*Last updated: 2026-01-25*
+*Last updated: 2026-02-06*
