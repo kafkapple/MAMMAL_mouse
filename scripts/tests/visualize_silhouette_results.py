@@ -73,7 +73,7 @@ for name, path in params_files.items():
         sil = renderer.render_from_vertices_faces(V, faces, camera)
 
     # Compute metrics
-    from preprocessing_utils.silhouette_renderer import SilhouetteLoss
+    from mammal_ext.preprocessing.silhouette_renderer import SilhouetteLoss
     iou_loss = SilhouetteLoss.iou_loss(sil, target_mask)
     iou = 1.0 - iou_loss.item()
     coverage = sil.mean().item()
