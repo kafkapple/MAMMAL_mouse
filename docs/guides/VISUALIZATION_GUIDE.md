@@ -10,19 +10,19 @@
 
 ```bash
 # 샘플 프레임 렌더링 (첫 프레임만, 빠른 확인)
-python -m visualization.mesh_visualizer \
+python -m mammal_ext.visualization.mesh_visualizer \
     --result_dir results/fitting/<exp_dir> \
     --start_frame 0 --end_frame 1 \
     --save_video --no_rrd
 
 # 전체 시퀀스 비디오 (orbit + fixed 뷰)
-python -m visualization.mesh_visualizer \
+python -m mammal_ext.visualization.mesh_visualizer \
     --result_dir results/fitting/<exp_dir> \
     --view_modes orbit fixed \
     --save_video --save_rrd
 
 # 키포인트 + 스켈레톤 포함 렌더링
-python -m visualization.mesh_visualizer \
+python -m mammal_ext.visualization.mesh_visualizer \
     --result_dir results/fitting/<exp_dir> \
     --view_modes orbit \
     --show_keypoints --show_skeleton \
@@ -68,7 +68,7 @@ front, back, left, right, top, bottom 6개 시점에서 촬영한다.
 새로운 시점에서의 렌더링. 학습에 사용되지 않은 각도에서 메쉬를 평가한다.
 
 ```bash
-python -m visualization.mesh_visualizer \
+python -m mammal_ext.visualization.mesh_visualizer \
     --result_dir results/fitting/<exp_dir> \
     --view_modes novel \
     --save_video
@@ -83,7 +83,7 @@ python -m visualization.mesh_visualizer \
 전체 프레임을 순서대로 렌더링하여 비디오를 생성한다.
 
 ```bash
-python -m visualization.mesh_visualizer \
+python -m mammal_ext.visualization.mesh_visualizer \
     --result_dir results/fitting/<exp_dir> \
     --view_modes orbit fixed \
     --save_video --save_rrd
@@ -95,13 +95,13 @@ python -m visualization.mesh_visualizer \
 
 ```bash
 # 0~9번 프레임만
-python -m visualization.mesh_visualizer \
+python -m mammal_ext.visualization.mesh_visualizer \
     --result_dir results/fitting/<exp_dir> \
     --start_frame 0 --end_frame 10 \
     --save_video --no_rrd
 
 # 매 5프레임마다 (빠른 미리보기)
-python -m visualization.mesh_visualizer \
+python -m mammal_ext.visualization.mesh_visualizer \
     --result_dir results/fitting/<exp_dir> \
     --frame_interval 5 \
     --save_video --no_rrd

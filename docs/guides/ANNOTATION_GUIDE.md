@@ -561,7 +561,7 @@ for i, (x, y, conf) in enumerate(kpts[0]):
 
 시각적 검증:
 ```bash
-python preprocessing_utils/visualize_yolo_labels.py \
+python -m mammal_ext.preprocessing.visualize_yolo_labels \
   --images data/manual_labeling/images \
   --labels data/manual_labeling/labels \
   --output data/manual_labeling/viz \
@@ -636,7 +636,7 @@ cp -r data/manual_labeling/roboflow_export/train/labels/* data/manual_labeling/l
 
 ```bash
 # 수동 라벨(20) + geometric 라벨(50) 병합
-python preprocessing_utils/merge_datasets.py \
+python -m mammal_ext.preprocessing.merge_datasets \
   --manual data/manual_labeling \
   --geometric data/yolo_mouse_pose \
   --output data/yolo_mouse_pose_enhanced \
@@ -937,8 +937,8 @@ pkill -f "run_sam_gui"
 | `extract_unified_keypoints.py` | Unified 출력 → Keypoint JSON 추출 |
 | `extract_sam_keypoints.py` | SAM 클릭 → Keypoint (비추천) |
 | `fitter_articulation.py` | MAMMAL Mesh Fitting |
-| `preprocessing_utils/visualize_yolo_labels.py` | YOLO 라벨 시각화 |
-| `preprocessing_utils/merge_datasets.py` | 데이터셋 병합 |
+| `mammal_ext/preprocessing/visualize_yolo_labels.py` | YOLO 라벨 시각화 |
+| `mammal_ext/preprocessing/merge_datasets.py` | 데이터셋 병합 |
 | `scripts/train_yolo_pose.py` | YOLOv8 Pose 학습 |
 
 ---

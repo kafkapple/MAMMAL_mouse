@@ -399,7 +399,7 @@ self.term_weights = {
 ### 피팅 완료 후 시각화
 
 ```bash
-python -m visualization.mesh_visualizer \
+python -m mammal_ext.visualization.mesh_visualizer \
     --result_dir results/fitting/<exp_dir> \
     --start_frame 0 --end_frame 1 \
     --save_video --no_rrd

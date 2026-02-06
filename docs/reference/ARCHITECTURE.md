@@ -49,7 +49,7 @@ MAMMAL_mouse/
 │   ├── optim/                    # 최적화 설정
 │   └── frames/                   # 프레임 범위 설정
 │
-├── preprocessing_utils/          # 전처리 모듈
+├── mammal_ext/preprocessing/     # 전처리 모듈 (mammal_ext 내)
 │   ├── keypoint_estimation.py    # 기하학적 키포인트 추정
 │   ├── yolo_keypoint_detector.py # YOLO 검출기
 │   ├── superanimal_detector.py   # SuperAnimal 검출기

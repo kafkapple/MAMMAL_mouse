@@ -70,7 +70,7 @@ ffmpeg -i video.mp4 frames/%06d.png
 ### SAM 마스크 생성
 
 ```bash
-python preprocessing_utils/sam_inference.py \
+python -m mammal_ext.preprocessing.sam_inference \
     --input_dir frames/ --output_dir masks/
 ```
 
@@ -89,13 +89,13 @@ python scripts/preprocess.py \
 
 ```bash
 # 샘플 렌더링
-python -m visualization.mesh_visualizer \
+python -m mammal_ext.visualization.mesh_visualizer \
     --result_dir results/fitting/<exp> \
     --start_frame 0 --end_frame 1 \
     --save_video --no_rrd
 
 # 전체 시퀀스
-python -m visualization.mesh_visualizer \
+python -m mammal_ext.visualization.mesh_visualizer \
     --result_dir results/fitting/<exp> \
     --view_modes orbit fixed \
     --save_video --save_rrd

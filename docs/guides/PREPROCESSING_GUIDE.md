@@ -471,8 +471,8 @@ done
 | `process_annotated_frames.py` | Annotation 크로핑 |
 | `sam_point_prompt.py` | 포인트 프롬프트 테스트 |
 | `sam_mouse_only.py` | Negative 프롬프트 테스트 |
-| `preprocessing_utils/sam_inference.py` | SAM 래퍼 클래스 |
-| `preprocessing_utils/keypoint_estimation.py` | Geometric keypoint 추정 |
+| `mammal_ext/preprocessing/sam_inference.py` | SAM 래퍼 클래스 |
+| `mammal_ext/preprocessing/keypoint_estimation.py` | Geometric keypoint 추정 |
 
 ---
 

@@ -115,13 +115,13 @@ tail -f $(ls -t logs/fitting_paper_fast_*.log | head -1)
 
 ```bash
 # 샘플 프레임 렌더링
-python -m visualization.mesh_visualizer \
+python -m mammal_ext.visualization.mesh_visualizer \
     --result_dir results/fitting/<exp_dir> \
     --start_frame 0 --end_frame 1 \
     --save_video --no_rrd
 
 # 전체 시퀀스 비디오
-python -m visualization.mesh_visualizer \
+python -m mammal_ext.visualization.mesh_visualizer \
     --result_dir results/fitting/<exp_dir> \
     --view_modes orbit fixed \
     --save_video --save_rrd
