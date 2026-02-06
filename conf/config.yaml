@@ -2,7 +2,7 @@
 
 defaults:
   - _self_
-  - dataset: shank3  # Options: markerless, shank3, custom
+  - dataset: markerless  # Options: markerless, shank3, custom
   - preprocess: opencv  # Options: opencv, sam (future)
   - optim: fast  # Options: fast, accurate
   - frames: default  # Options: default (100), debug (5), full (1000)

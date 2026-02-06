@@ -18,7 +18,7 @@ data:
 fitter:
   render_cameras: [0, 2, 4]
   use_keypoints: true
-  keypoint_num: 9
+  keypoint_num: 22  # Total keypoints (sparse indices select from these)
   # DLC keypoint indices: ears, nose, neck, tail_base/tip, front_paws, hind_paws
   sparse_keypoint_indices: [0, 1, 2, 3, 4, 5, 6, 8, 12]
   with_render: true
