@@ -23,6 +23,7 @@ results/
 outputs/                    # Legacy Hydra output (now uses results/logs/)
 mouse_fitting_result/       # Legacy fitting output (now uses results/fitting/)
 wandb/                      # Legacy wandb logs (now uses results/wandb/)
+exports/                    # Generated mesh exports
 wandb_sweep_results/        # Legacy sweep results (now uses results/sweep/)
 uvmap_experiments/          # Legacy uvmap results (now uses results/uvmap/)
 
