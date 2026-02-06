@@ -378,8 +378,8 @@ def main():
     Example usage
     """
     # Paths
-    dannce_root = "/home/joon/dev/data/3DAnimals/fauna_mouse/large_scale/mouse_dannce_6view"
-    output_root = "/home/joon/dev/MAMMAL_mouse/data/yolo_mouse_pose"
+    dannce_root = os.environ.get("DANNCE_DATA", "/home/joon/dev/data/3DAnimals/fauna_mouse/large_scale/mouse_dannce_6view")  # Override with DANNCE_DATA env var
+    output_root = os.environ.get("YOLO_OUTPUT", "data/yolo_mouse_pose")  # Override with YOLO_OUTPUT env var
 
     # Create converter
     converter = DANNCEtoYOLOConverter(dannce_root, output_root)

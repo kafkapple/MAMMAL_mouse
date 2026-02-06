@@ -161,7 +161,7 @@ def main():
     print("Next Step: Run SAM Annotator")
     print("="*80)
     print("\nOption 1: Using existing sam_annotator (recommended)")
-    print("  cd /home/joon/dev/mouse-super-resolution")
+    print("  cd <path-to-mouse-super-resolution>")
     print(f"  python -m sam_annotator \\")
     print(f"      data.input_dir={args.output_dir} \\")
     print(f"      data.output_dir={args.output_dir}/annotations \\")

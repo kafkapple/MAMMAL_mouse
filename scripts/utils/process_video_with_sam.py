@@ -21,8 +21,6 @@ except ImportError:
     SAM_AVAILABLE = False
     print("Warning: SAM not available. Install with: pip install segment-anything")
 
-# Add mouse-super-resolution path for SAM annotator
-sys.path.insert(0, str(Path.home() / 'dev/mouse-super-resolution'))
 
 
 def get_largest_mask(masks):

@@ -6,7 +6,7 @@ import sys
 print(f"Python executable: {sys.executable}")
 print(f"NumPy version: {np.__version__}")
 
-file_path = "/home/joon/dev/MAMMAL_mouse/data/preprocessed_shank3/new_cam.pkl"
+file_path = "data/raw/markerless_mouse_1_nerf/new_cam.pkl"
 
 if not os.path.exists(file_path):
     print(f"Error: File not found at {file_path}")

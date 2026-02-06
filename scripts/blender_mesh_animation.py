@@ -28,7 +28,7 @@ import math
 from pathlib import Path
 
 # Configuration (modify these if running inside Blender directly)
-RESULT_DIR = "/home/joon/dev/MAMMAL_mouse/results/fitting/markerless_mouse_1_nerf_v01234_sparse3_20251203_235123"
+RESULT_DIR = None  # Set via --result_dir CLI argument or edit this variable
 OUTPUT_VIDEO = None  # Auto-generate if None
 FPS = 30
 RESOLUTION = (1920, 1080)
