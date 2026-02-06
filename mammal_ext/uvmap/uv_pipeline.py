@@ -235,8 +235,13 @@ class UVMapPipeline:
             self.config.result_dir, 'params',
             f'step_2_frame_{frame_idx:06d}.pkl'
         )
+        if not os.path.exists(param_path):
+            raise FileNotFoundError(f"Parameter file not found: {param_path}")
         with open(param_path, 'rb') as f:
-            params = pickle.load(f)
+            try:
+                params = pickle.load(f)
+            except (pickle.UnpicklingError, EOFError) as e:
+                raise RuntimeError(f"Corrupted parameter file {param_path}: {e}") from e
 
         # Forward pass to get vertices
         vertices = self._forward_mesh(params)

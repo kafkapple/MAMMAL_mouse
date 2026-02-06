@@ -38,8 +38,13 @@ def load_cameras(
 ) -> list:
     """Load 6-view camera calibration from new_cam.pkl."""
     cam_path = os.path.join(data_dir, "new_cam.pkl")
+    if not os.path.exists(cam_path):
+        raise FileNotFoundError(f"Camera file not found: {cam_path}")
     with open(cam_path, 'rb') as f:
-        cams = pickle.load(f)
+        try:
+            cams = pickle.load(f)
+        except (pickle.UnpicklingError, EOFError) as e:
+            raise RuntimeError(f"Corrupted camera file {cam_path}: {e}") from e
     return cams
 
 

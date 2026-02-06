@@ -184,8 +184,13 @@ class MeshVisualizer:
 
     def _load_vertices(self, params_path: str) -> np.ndarray:
         """Load and compute vertices from parameters."""
+        if not os.path.exists(params_path):
+            raise FileNotFoundError(f"Parameter file not found: {params_path}")
         with open(params_path, 'rb') as f:
-            params = pickle.load(f)
+            try:
+                params = pickle.load(f)
+            except (pickle.UnpicklingError, EOFError) as e:
+                raise RuntimeError(f"Corrupted parameter file {params_path}: {e}") from e
 
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
