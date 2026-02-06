@@ -42,3 +42,9 @@ tensorboard==2.13.0
 # PyTorch dependencies (installed separately via setup script)
 # fvcore
 # iopath
+
+# Optional dependencies (guarded with try/except in code)
+# wandb>=0.16.0          # WandB sweep optimization (mammal_ext.uvmap)
+# rerun-sdk>=0.18.0      # Rerun visualization (mammal_ext.visualization)
+# segment-anything       # SAM inference (mammal_ext.preprocessing)
+# optuna>=3.0.0          # Optuna optimization (mammal_ext.uvmap)

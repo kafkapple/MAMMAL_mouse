@@ -100,6 +100,18 @@ VALID_EXPERIMENTS=(
     "sparse_4view"               # 4-view + sparse 3
     "sparse_3view"               # 3-view + sparse 3
     "sparse_2view"               # 2-view + sparse 3
+    # Group 5: Silhouette-only (no keypoints)
+    "silhouette_only_6views"     # 6-view silhouette only
+    "silhouette_only_4views"     # 4-view silhouette only
+    "silhouette_only_3views"     # 3-view silhouette only
+    "silhouette_only_1view"      # 1-view silhouette only
+    # Group 6: Alternative configs
+    "monocular_keypoint"         # Monocular + keypoints
+    "accurate_6views"            # 6-view with higher iterations
+    "ablation_mask_weight"       # Mask weight ablation study
+    # Group 7: Legacy sparse (v024 series)
+    "v024_sparse7_mars"          # Legacy: 7 keypoints (MARS)
+    "v024_sparse9_dlc"           # Legacy: 9 keypoints (DLC)
     # Utility
     "quick_test"
 )
