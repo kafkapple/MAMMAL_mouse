@@ -12,7 +12,7 @@ Usage:
         --save_video
 
     # Or as library:
-    from visualization import MeshVisualizer, VisualizationConfig
+    from mammal_ext.visualization import MeshVisualizer, VisualizationConfig
 
     config = VisualizationConfig(result_dir="results/fitting/exp")
     visualizer = MeshVisualizer(config)

@@ -3,7 +3,7 @@ Coordinate System Transforms
 
 MAMMAL (-Y up, +X forward, +Z right) -> Blender World (+Z up, +Y forward, +X right)
 
-See docs/coordinates/coordinate_systems_reference.md for details.
+See docs/reference/COORDINATES.md for coordinate system details.
 """
 
 import numpy as np

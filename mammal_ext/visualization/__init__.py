@@ -5,7 +5,7 @@ UV-textured mesh rendering, Rerun RRD export, and video generation.
 
 Usage:
     # Simple API
-    from visualization import visualize_fitting_results, render_preview
+    from mammal_ext.visualization import visualize_fitting_results, render_preview
 
     # Full visualization pipeline
     outputs = visualize_fitting_results(
@@ -23,7 +23,7 @@ Usage:
     )
 
     # Custom configuration
-    from visualization import MeshVisualizer, VisualizationConfig
+    from mammal_ext.visualization import MeshVisualizer, VisualizationConfig
 
     config = VisualizationConfig(
         result_dir="results/fitting/experiment",

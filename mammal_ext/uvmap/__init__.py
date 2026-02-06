@@ -51,14 +51,6 @@ from .optuna_optimizer import (
     OptimizationConfig as OptunaConfig,
 )
 
-# Lazy import for Optuna classes (only when optuna is available)
-def _get_optuna_optimizer():
-    from .optuna_optimizer import OptunaUVOptimizer
-    return OptunaUVOptimizer
-
-def _get_multi_objective_optimizer():
-    from .optuna_optimizer import MultiObjectiveUVMapObjective as MultiObjectiveUVOptimizer
-    return MultiObjectiveUVOptimizer
 
 __all__ = [
     # Core
