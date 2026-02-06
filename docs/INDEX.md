@@ -57,6 +57,7 @@ docs/
 | 문서 | 내용 |
 |------|------|
 | **[ARCHITECTURE](reference/ARCHITECTURE.md)** | 시스템 아키텍처, Hydra config, 3단계 최적화, 시나리오별 사용법, Shell scripts |
+| **[MAMMAL_EXT](reference/MAMMAL_EXT.md)** | mammal_ext 확장 모듈 아키텍처, 의존성 그래프, CLI 명령어 |
 | **[KEYPOINTS](reference/KEYPOINTS.md)** | 22 키포인트 정의, GT vs Model 불일치, Skeleton topology, Sparse configs |
 | **[DATASET](reference/DATASET.md)** | markerless_mouse_1_nerf 데이터셋 스펙 (6cam, 18K frames, pose-splatter 연동) |
 | **[OUTPUT_FORMAT](reference/OUTPUT_FORMAT.md)** | 출력 파일 형식 (OBJ/PKL/render), Loss 해석, Downstream 활용법 |
