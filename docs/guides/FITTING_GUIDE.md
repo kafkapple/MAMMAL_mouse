@@ -519,5 +519,17 @@ ln -s assets/colormaps colormaps
 
 ---
 
+## 관련 문서
+
+| 문서 | 내용 |
+|------|------|
+| [KEYPOINTS](../reference/KEYPOINTS.md) | 22 키포인트 정의 및 가중치 |
+| [EXPERIMENTS](../reference/EXPERIMENTS.md) | 실험 config 및 batch 실행 |
+| [OUTPUT_FORMAT](../reference/OUTPUT_FORMAT.md) | 피팅 결과 파일 형식 |
+| [ARCHITECTURE](../reference/ARCHITECTURE.md) | 시스템 아키텍처 및 Hydra config |
+| [QUICK_REFERENCE](../QUICK_REFERENCE.md) | 자주 쓰는 명령어 |
+
+---
+
 *Merged from: MESH_FITTING_GUIDE.md, MESH_FITTING_CHEATSHEET.md, FITTING_SCRIPTS_COMPARISON.md, MONOCULAR_FITTING_GUIDE.md, README_MONOCULAR.md, OPTIMIZATION_GUIDE.md, silhouette_parameters.md*
 *Created: 2026-02-06*

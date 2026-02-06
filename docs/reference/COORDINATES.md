@@ -257,4 +257,14 @@ for i in range(6):
 
 ---
 
+## 관련 문서
+
+| 문서 | 내용 |
+|------|------|
+| [VISUALIZATION_GUIDE](../guides/VISUALIZATION_GUIDE.md) | 메쉬 시각화 및 Blender 연동 |
+| [UVMAP_GUIDE](../guides/UVMAP_GUIDE.md) | Blender 내보내기 좌표 변환 |
+| [ARCHITECTURE](ARCHITECTURE.md) | MAMMAL 시스템 좌표계 맥락 |
+
+---
+
 *Last updated: 2026-02-06*

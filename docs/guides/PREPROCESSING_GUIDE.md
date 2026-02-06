@@ -476,5 +476,15 @@ done
 
 ---
 
+## 관련 문서
+
+| 문서 | 내용 |
+|------|------|
+| [ANNOTATION_GUIDE](ANNOTATION_GUIDE.md) | 키포인트 어노테이션 가이드 |
+| [DATASET](../reference/DATASET.md) | 원본 데이터셋 스펙 |
+| [FITTING_GUIDE](FITTING_GUIDE.md) | 전처리 후 피팅 실행 |
+
+---
+
 *Merged from: VIDEO_PROCESSING_GUIDE.md, QUICK_START_VIDEO.md, SAM_MASK_ACQUISITION_MANUAL.md, sam_preprocessing_plan.md*
 *Created: 2026-02-06*

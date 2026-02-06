@@ -180,4 +180,14 @@ R Hind:     [19,20], [20,21], [21,5]
 
 ---
 
+## 관련 문서
+
+| 문서 | 내용 |
+|------|------|
+| [FITTING_GUIDE](../guides/FITTING_GUIDE.md) | 키포인트 기반 메쉬 피팅 |
+| [ANNOTATION_GUIDE](../guides/ANNOTATION_GUIDE.md) | 키포인트 어노테이션 방법 |
+| [EXPERIMENTS](EXPERIMENTS.md) | 키포인트 ablation 실험 |
+
+---
+
 *Last updated: 2026-02-06*

@@ -587,5 +587,15 @@ usemtl mouse_material
 
 ---
 
+## 관련 문서
+
+| 문서 | 내용 |
+|------|------|
+| [FITTING_GUIDE](FITTING_GUIDE.md) | UV 텍스처 입력이 되는 메쉬 피팅 |
+| [COORDINATES](../reference/COORDINATES.md) | Blender 좌표 변환 |
+| [OUTPUT_FORMAT](../reference/OUTPUT_FORMAT.md) | 피팅 결과 파일 형식 |
+
+---
+
 *Merged from: uvmap_system.md, UV_TEXTURE_TO_BLENDER.md*
 *Last updated: 2026-02-06*

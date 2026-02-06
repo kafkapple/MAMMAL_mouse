@@ -943,6 +943,16 @@ pkill -f "run_sam_gui"
 
 ---
 
+## 관련 문서
+
+| 문서 | 내용 |
+|------|------|
+| [KEYPOINTS](../reference/KEYPOINTS.md) | 22 키포인트 정의 및 Skeleton |
+| [PREPROCESSING_GUIDE](PREPROCESSING_GUIDE.md) | SAM 마스크 전처리 파이프라인 |
+| [DATASET](../reference/DATASET.md) | 데이터셋 스펙 (6cam, 18K frames) |
+
+---
+
 *Merged from 14 source files: UNIFIED_ANNOTATOR_GUIDE.md, START_ANNOTATION.md, ANNOTATOR_COMPARISON.md, KEYPOINT_ANNOTATION_GUIDE.md, KEYPOINT_ANNOTATOR_V2_GUIDE.md, KEYPOINT_QUICK_START.md, KEYPOINT_WORKFLOW.md, MANUAL_LABELING_GUIDE.md, ROBOFLOW_LABELING_GUIDE.md, RUN_SAM.md, SAM_LAUNCHER_EXPLAINED.md, ANNOTATION_TIPS.md, ANNOTATION_TOOLS_README.md, QUICK_START_LABELING.md*
 
 *Created: 2026-02-06*
