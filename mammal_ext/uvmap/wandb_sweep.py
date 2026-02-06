@@ -853,8 +853,8 @@ class WandBSweepOptimizer:
             return outputs
 
         # Load body model and get vertices
-        from articulation_th import ArticulationTorch
-        body_model = ArticulationTorch()
+        from mammal_ext.model_loader import load_body_model
+        body_model = load_body_model(use_cache=False)
 
         with open(params_files[0], 'rb') as f:
             params = pickle.load(f)
@@ -1018,13 +1018,13 @@ class WandBSweepOptimizer:
                 params = pickle.load(f)
 
             # Forward mesh
-            from articulation_th import ArticulationTorch
+            from mammal_ext.model_loader import load_body_model
             device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
             for k, v in params.items():
                 if not isinstance(v, torch.Tensor):
                     params[k] = torch.tensor(v, dtype=torch.float32, device=device)
 
-            body_model = ArticulationTorch()
+            body_model = load_body_model(use_cache=False)
             V, J = body_model.forward(
                 params['thetas'], params['bone_lengths'],
                 params['rotation'], params['trans'] / 1000,

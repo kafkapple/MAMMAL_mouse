@@ -272,16 +272,11 @@ class UVMapPipeline:
             vertices: (N, 3) vertex positions
         """
         # Import body model
-        import sys
-        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        if project_root not in sys.path:
-            sys.path.insert(0, project_root)
-
-        from articulation_th import ArticulationTorch
+        from mammal_ext.model_loader import load_body_model
 
         # Initialize body model (lazy)
         if not hasattr(self, '_body_model'):
-            self._body_model = ArticulationTorch()
+            self._body_model = load_body_model()
 
         # Forward pass
         V, J = self._body_model.forward(

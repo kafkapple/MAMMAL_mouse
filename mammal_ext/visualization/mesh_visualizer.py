@@ -94,8 +94,8 @@ class MeshVisualizer:
 
         # Load body model
         print("Loading body model...")
-        from articulation_th import ArticulationTorch
-        self.body_model = ArticulationTorch()
+        from mammal_ext.model_loader import load_body_model
+        self.body_model = load_body_model()
 
         # Setup renderer
         print("Setting up renderer...")
