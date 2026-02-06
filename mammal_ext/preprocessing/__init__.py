@@ -25,7 +25,10 @@ from .mask_processing import (
     TemporalMaskFilter,
     calculate_iou,
 )
-from .sam_inference import SAMInference
+try:
+    from .sam_inference import SAMInference
+except ImportError:
+    SAMInference = None  # segment_anything not installed
 from .silhouette_renderer import (
     SilhouetteRenderer,
     SilhouetteLoss,

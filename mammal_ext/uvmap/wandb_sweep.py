@@ -9,7 +9,7 @@ This file re-exports all public symbols for backward compatibility.
 """
 
 # Re-export all public symbols
-from mammal_ext.uvmap.sweep_config import WandBSweepConfig, get_sweep_params_for_stage
+from mammal_ext.uvmap.sweep_config import WandBSweepConfig, get_sweep_params_for_stage, DEFAULT_SWEEP_PARAMS
 from mammal_ext.uvmap.sweep_metrics import compute_psnr_masked, compute_ssim_masked, create_mesh_mask
 from mammal_ext.uvmap.sweep_runner import WandBSweepOptimizer, run_wandb_sweep
 
