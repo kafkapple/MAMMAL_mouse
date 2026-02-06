@@ -8,5 +8,3 @@ optim:
   solve_step1_iters: 50   # Reduced from 100
   solve_step2_iters: 15   # Reduced from 30
 
-fitter:
-  interval: 2  # Process every 2nd frame instead of every frame

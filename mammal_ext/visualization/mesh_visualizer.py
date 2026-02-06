@@ -5,7 +5,7 @@ Main orchestrator for UV-textured mesh visualization.
 Integrates rendering, Rerun export, and video generation.
 
 Usage:
-    python -m visualization.mesh_visualizer \
+    python -m mammal_ext.visualization.mesh_visualizer \
         --result_dir results/fitting/experiment \
         --view_mode orbit \
         --save_rrd \

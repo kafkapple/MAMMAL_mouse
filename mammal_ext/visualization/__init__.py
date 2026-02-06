@@ -35,7 +35,7 @@ Usage:
     outputs = visualizer.run()
 
 CLI Usage:
-    python -m visualization.mesh_visualizer \\
+    python -m mammal_ext.visualization.mesh_visualizer \\
         --result_dir results/fitting/experiment \\
         --view_modes orbit fixed \\
         --save_rrd --save_video
