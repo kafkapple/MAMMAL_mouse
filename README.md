@@ -10,9 +10,9 @@ Markerless 3D mouse pose estimation and mesh reconstruction from multi-view vide
 |----------|-------------|
 | [QUICKSTART.md](QUICKSTART.md) | All experiment commands |
 | [Experiments Guide](conf/experiment/README.md) | Config details, ablation design |
-| [Output Guide](docs/guides/output.md) | Result files, 3D prior usage |
-| [Keypoint Reference](docs/KEYPOINT_REFERENCE.md) | 22 keypoints definition |
-| [Full Usage Guide](docs/guides/full_usage_guide.md) | Detailed documentation |
+| [Output Guide](docs/reference/OUTPUT_FORMAT.md) | Result files, 3D prior usage |
+| [Keypoint Reference](docs/reference/KEYPOINTS.md) | 22 keypoints definition |
+| [Full Usage Guide](docs/INDEX.md) | Detailed documentation |
 
 ## Installation
 

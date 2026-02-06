@@ -30,13 +30,16 @@ python fit_monocular.py \
     --device cuda
 ```
 
-### 3. Single-view Silhouette Fitting (크롭 이미지 + mask)
+### 3. Single-view Fitting (단일 뷰)
+
+> **Note**: `fit_cropped_frames.py`는 현재 미구현입니다. Single-view fitting은 `fit_monocular.py`를 사용하세요.
 
 ```bash
-python fit_cropped_frames.py \
-    data/100-KO-male-56-20200615_cropped \
-    --output-dir results/cropped_fitting \
-    --max-frames 10
+python fit_monocular.py \
+    --input_dir /path/to/cropped_images \
+    --output_dir results/single_view_result \
+    --max_images 10 \
+    --device cuda
 ```
 
 ---
@@ -409,12 +412,12 @@ python -m mammal_ext.visualization.mesh_visualizer \
 
 ## 스크립트 비교
 
-| 항목 | `fitter_articulation.py` | `fit_cropped_frames.py` |
-|------|--------------------------|-------------------------|
-| **용도** | Multi-view 3D fitting | Single-view silhouette fitting |
-| **입력** | 6카메라 비디오 + keypoints | SAM 크롭 이미지 + mask |
+| 항목 | `fitter_articulation.py` | `fit_monocular.py` |
+|------|--------------------------|---------------------|
+| **용도** | Multi-view 3D fitting | Single-view monocular fitting |
+| **입력** | 6카메라 비디오 + keypoints | 단일 RGB + mask |
 | **설정** | Hydra config | CLI arguments |
-| **출력** | `mouse_fitting_result/` | `results/` (지정 가능) |
+| **출력** | `mouse_fitting_result/` | `outputs/` (지정 가능) |
 | **카메라** | 캘리브레이션 필요 (`new_cam.pkl`) | 불필요 |
 
 ### 결과 확인
@@ -436,7 +439,7 @@ print("Keys:", params.keys())
 | 데이터셋 | 위치 | Masks | Keypoints | 스크립트 | Config |
 |---------|------|-------|-----------|---------|--------|
 | **Default Markerless** | `data/examples/markerless_mouse_1_nerf/` | Yes | Yes | `fitter_articulation.py` | `default_markerless` |
-| **Cropped** | `data/100-KO-male-56-20200615_cropped/` | Yes | Optional | `fit_cropped_frames.py` | `cropped` |
+| **Cropped** | `data/100-KO-male-56-20200615_cropped/` | Yes | Optional | `fit_monocular.py` | - |
 | **Upsampled** | `data/100-KO-male-56-20200615_upsampled/` | No | No | 전처리 필요 | `upsampled` |
 | **Fauna (Monocular)** | (외부 데이터) | Yes | No | `fit_monocular.py` | - |
 
@@ -502,7 +505,7 @@ ln -s assets/colormaps colormaps
 | 스크립트 | 용도 |
 |---------|------|
 | `fitter_articulation.py` | 메인 fitting (multi-view) |
-| `fit_cropped_frames.py` | Silhouette 기반 fitting (single-view) |
+
 | `fit_monocular.py` | Monocular MAMMAL fitting |
 | `extract_video_frames.py` | 비디오에서 프레임 추출 |
 | `run_sam_gui.py` | SAM annotation GUI |
