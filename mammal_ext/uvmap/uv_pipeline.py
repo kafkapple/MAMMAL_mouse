@@ -19,6 +19,9 @@ from .uv_renderer import UVRenderer, create_uv_renderer
 from .texture_sampler import TextureSampler, TextureAccumulator
 from .texture_optimizer import TextureOptimizer, TextureOptConfig, TextureModel
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 @dataclass
 class UVPipelineConfig:
@@ -89,7 +92,7 @@ class UVMapPipeline:
 
     def setup(self) -> None:
         """Initialize all pipeline components."""
-        print("Setting up UV Map Pipeline...")
+        logger.info("Setting up UV Map Pipeline")
 
         # 1. UV Renderer
         self.uv_renderer = create_uv_renderer(
@@ -139,10 +142,10 @@ class UVMapPipeline:
             self.config.output_dir = os.path.join(self.config.result_dir, 'uvmap')
         os.makedirs(self.config.output_dir, exist_ok=True)
 
-        print(f"Pipeline setup complete:")
-        print(f"  Views: {self.n_views}")
-        print(f"  Frames: {len(self.frames)}")
-        print(f"  UV size: {self.config.uv_size}")
+        logger.info("Pipeline setup complete:")
+        logger.info(f"  Views: {self.n_views}")
+        logger.info(f"  Frames: {len(self.frames)}")
+        logger.info(f"  UV size: {self.config.uv_size}")
 
     def _load_cameras(self) -> None:
         """Load camera parameters from data directory."""
@@ -346,14 +349,14 @@ class UVMapPipeline:
         Returns:
             texture_map: (3, H, W) final UV texture map
         """
-        print("\n=== UV Map Generation Pipeline ===")
+        logger.info("=== UV Map Generation Pipeline ===")
 
         # Setup if not done
         if self.uv_renderer is None:
             self.setup()
 
         # Stage 1: Accumulate textures across frames
-        print("\n[Stage 1] Accumulating textures from frames...")
+        logger.info("[Stage 1] Accumulating textures from frames...")
         self.texture_accumulator.reset()
 
         for frame_idx in tqdm(self.frames, desc="Processing frames"):
@@ -366,16 +369,16 @@ class UVMapPipeline:
                     self._save_intermediate(frame_idx)
 
             except Exception as e:
-                print(f"  Warning: Failed to process frame {frame_idx}: {e}")
+                logger.warning(f"Failed to process frame {frame_idx}: {e}")
                 continue
 
         # Get accumulated vertex colors
         vertex_colors, confidence = self.texture_accumulator.get_texture()
-        print(f"  Accumulated {self.texture_accumulator.n_frames} frames")
-        print(f"  Coverage: {(confidence > 0).float().mean() * 100:.1f}%")
+        logger.info(f"  Accumulated {self.texture_accumulator.n_frames} frames")
+        logger.info(f"  Coverage: {(confidence > 0).float().mean() * 100:.1f}%")
 
         # Stage 2: Render to UV space
-        print("\n[Stage 2] Rendering to UV space...")
+        logger.info("[Stage 2] Rendering to UV space...")
         texture_map = self.uv_renderer.render_position_map(vertex_colors)
 
         # Actually we need to render colors, not positions
@@ -385,14 +388,14 @@ class UVMapPipeline:
 
         # Stage 3: (Optional) Photometric optimization
         if self.config.do_optimization:
-            print("\n[Stage 3] Photometric optimization...")
+            logger.info("[Stage 3] Photometric optimization...")
             texture_map = self._optimize_texture(texture_map)
 
         # Stage 4: Save results
-        print("\n[Stage 4] Saving results...")
+        logger.info("[Stage 4] Saving results...")
         self._save_results(texture_map, confidence)
 
-        print("\n=== Pipeline Complete ===")
+        logger.info("=== Pipeline Complete ===")
         return texture_map
 
     def _optimize_texture(
@@ -465,7 +468,7 @@ class UVMapPipeline:
         img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         texture_path = os.path.join(self.config.output_dir, 'texture_final.png')
         cv2.imwrite(texture_path, img)
-        print(f"  Texture saved: {texture_path}")
+        logger.info(f"Texture saved: {texture_path}")
 
         # Confidence map - detach to handle gradient tensors
         # Clip to [0, 1] to prevent overflow (confidence can exceed 1.0 with multi-view fusion)
@@ -495,7 +498,7 @@ class UVMapPipeline:
             'confidence': confidence.cpu(),
             'uv_size': self.config.uv_size,
         }, tensor_path)
-        print(f"  Tensor saved: {tensor_path}")
+        logger.info(f"Tensor saved: {tensor_path}")
 
 
 def run_uvmap_pipeline(

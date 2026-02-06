@@ -14,6 +14,8 @@ import numpy as np
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 from datetime import datetime
+import logging
+logger = logging.getLogger(__name__)
 import base64
 
 
@@ -79,7 +81,7 @@ class HTMLReportGenerator:
         with open(output_path, 'w') as f:
             f.write(html)
 
-        print(f"Report saved: {output_path}")
+        logger.info(f"Report saved: {output_path}")
         return html
 
     def _generate_header(self) -> str:

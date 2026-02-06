@@ -18,6 +18,8 @@ Usage:
 
 import os
 import pickle
+import logging
+logger = logging.getLogger(__name__)
 import argparse
 import numpy as np
 from typing import List, Tuple, Optional
@@ -147,17 +149,17 @@ def render_sequence(
     if max_frames is not None:
         obj_files = obj_files[:max_frames]
 
-    print(f"Rendering {len(obj_files)} frames as 6-view grid")
-    print(f"  Result dir: {result_dir}")
-    print(f"  Texture: {texture_path}")
-    print(f"  Image size: {image_size}x{image_size} per view")
-    print()
+    logger.info(f"Rendering {len(obj_files)} frames as 6-view grid")
+    logger.info(f"Result dir: {result_dir}")
+    logger.info(f"Texture: {texture_path}")
+    logger.info(f"Image size: {image_size}x{image_size} per view")
+    
 
     # Load cameras
     cameras = load_cameras(data_dir)
     n_views = min(len(cameras), 6)
     cameras = cameras[:n_views]
-    print(f"  Loaded {n_views} cameras from {data_dir}")
+    logger.info(f"Loaded {n_views} cameras from {data_dir}")
 
     # Initialize renderer
     renderer = TexturedMeshRenderer(
@@ -197,13 +199,13 @@ def render_sequence(
 
         if i == 0:
             cv2.imwrite(sample_path, cv2.cvtColor(grid, cv2.COLOR_RGB2BGR))
-            print(f"  Sample image: {sample_path}")
+            logger.debug(f"Sample image: {sample_path}")
 
         if (i + 1) % 20 == 0 or (i + 1) == len(obj_files):
-            print(f"  [{i+1}/{len(obj_files)}] rendered")
+            logger.debug(f"[{i+1}/{len(obj_files)}] rendered")
 
     video.close()
-    print(f"\nVideo saved: {video_path}")
+    logger.info(f"Video saved: {video_path}")
     return video_path
 
 
