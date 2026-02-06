@@ -23,7 +23,7 @@ predictor = SamPredictor(sam)
 print("✅ SAM model loaded")
 
 # Load original video frame
-video_path = "data/preprocessed_shank3_sam/videos_undist/0.mp4"
+video_path = "data/raw/markerless_mouse_1_nerf/videos_undist/0.mp4"
 cap = cv2.VideoCapture(video_path)
 ret, frame = cap.read()
 cap.release()

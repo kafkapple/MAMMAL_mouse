@@ -6,7 +6,7 @@ This script replaces the failing OpenCV-based preprocessing with:
 - Improved geometric keypoint estimation based on accurate masks
 
 Usage:
-    python preprocess_sam_improved.py --video data/shank3/0.mp4 --output data/preprocessed_shank3_sam --num_frames 50
+    python preprocess_sam_improved.py --video data/raw/markerless_mouse_1_nerf/0.mp4 --output data/raw/markerless_mouse_1_nerf --num_frames 50
 """
 import cv2
 import numpy as np
@@ -260,10 +260,10 @@ def process_video(video_path, output_dir, num_frames=None, visualize_interval=10
 def main():
     parser = argparse.ArgumentParser(description="SAM-based preprocessing for MAMMAL")
     parser.add_argument('--video', type=str,
-                       default='data/preprocessed_shank3/videos_undist/0.mp4',
+                       default='data/raw/markerless_mouse_1_nerf/videos_undist/0.mp4',
                        help='Input video path')
     parser.add_argument('--output', type=str,
-                       default='data/preprocessed_shank3_sam',
+                       default='data/raw/markerless_mouse_1_nerf',
                        help='Output directory')
     parser.add_argument('--num_frames', type=int, default=None,
                        help='Number of frames to process (None = all)')

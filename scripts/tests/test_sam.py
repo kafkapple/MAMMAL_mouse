@@ -71,7 +71,7 @@ def visualize_sam_results(frame, masks, output_path):
 
 
 def main():
-    print("Testing SAM on shank3 video...")
+    print("Testing SAM on mouse video...")
 
     # Initialize SAM
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -92,7 +92,7 @@ def main():
     print("SAM loaded successfully!")
 
     # Load video
-    video_path = "data/preprocessed_shank3/videos_undist/0.mp4"
+    video_path = "data/raw/markerless_mouse_1_nerf/videos_undist/0.mp4"
     cap = cv2.VideoCapture(video_path)
 
     if not cap.isOpened():

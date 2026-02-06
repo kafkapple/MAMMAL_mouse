@@ -20,9 +20,9 @@ logger = logging.getLogger(__name__)
 # Configuration
 DEVICE = torch.device('cuda')
 IMAGE_SIZE = (480, 640)
-CAM_PATH = "data/preprocessed_shank3_sam/new_cam.pkl"
-MASK_VIDEO = "data/preprocessed_shank3_sam/simpleclick_undist/0.mp4"
-INIT_PARAMS_PATH = "mouse_fitting_result/results_preprocessed_shank3_20251104_010358/params/param0.pkl"
+CAM_PATH = "data/raw/markerless_mouse_1_nerf/new_cam.pkl"
+MASK_VIDEO = "data/raw/markerless_mouse_1_nerf/simpleclick_undist/0.mp4"
+INIT_PARAMS_PATH = "results/fitting/<your_experiment>/params/step_2_frame_000000.pkl  # Update with actual result path"
 FRAME_IDX = 0
 
 # Refinement params

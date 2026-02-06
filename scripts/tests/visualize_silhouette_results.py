@@ -14,8 +14,8 @@ import matplotlib.pyplot as plt
 
 DEVICE = torch.device('cuda')
 IMAGE_SIZE = (480, 640)
-CAM_PATH = "data/preprocessed_shank3_sam/new_cam.pkl"
-MASK_VIDEO = "data/preprocessed_shank3_sam/simpleclick_undist/0.mp4"
+CAM_PATH = "data/raw/markerless_mouse_1_nerf/new_cam.pkl"
+MASK_VIDEO = "data/raw/markerless_mouse_1_nerf/simpleclick_undist/0.mp4"
 FRAME_IDX = 0
 
 print("="*60)
@@ -52,7 +52,7 @@ faces = torch.from_numpy(bodymodel.faces_vert_np).long().to(DEVICE)
 
 # Load all params
 params_files = {
-    'Original Keypoint': 'mouse_fitting_result/results_preprocessed_shank3_20251104_010358/params/param0.pkl',
+    'Original Keypoint': 'results/fitting/<your_experiment>/params/step_2_frame_000000.pkl  # Update with actual result path',
     'Silhouette Refined': 'refined_params_silhouette.pkl',
 }
 

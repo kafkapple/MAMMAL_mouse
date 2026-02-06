@@ -112,7 +112,7 @@ def visualize_preprocessing(data_dir, output_dir, num_frames=5):
     print(f"Generated {len(frame_indices)} visualizations")
 
 if __name__ == "__main__":
-    data_dir = "data/preprocessed_shank3"
+    data_dir = "data/raw/markerless_mouse_1_nerf"
     output_dir = "preprocessing_debug"
 
     visualize_preprocessing(data_dir, output_dir, num_frames=5)

@@ -26,7 +26,7 @@ print("Body model loaded")
 
 # Load camera
 print("\n[2] Loading camera...")
-cam_path = "data/preprocessed_shank3_sam/new_cam.pkl"
+cam_path = "data/raw/markerless_mouse_1_nerf/new_cam.pkl"
 with open(cam_path, 'rb') as f:
     cam_dict = pickle.load(f)
 
@@ -104,7 +104,7 @@ print(f"Silhouette coverage: {(pred_silhouette > 0.5).float().mean():.2%}")
 print("\n[6] Loading target mask...")
 try:
     target_mask = load_target_mask(
-        "data/preprocessed_shank3_sam/simpleclick_undist/0.mp4",
+        "data/raw/markerless_mouse_1_nerf/simpleclick_undist/0.mp4",
         frame_idx=0,
         device=device
     )

@@ -25,7 +25,7 @@ print("Body model loaded")
 
 # Load saved params from previous fitting
 print("\n[2] Loading saved params...")
-param_file = "mouse_fitting_result/results_preprocessed_shank3_20251104_010358/params/param0.pkl"
+param_file = "results/fitting/<your_experiment>/params/step_2_frame_000000.pkl  # Update with actual result path"
 with open(param_file, 'rb') as f:
     params = pickle.load(f)
 
@@ -33,7 +33,7 @@ print(f"Params keys: {params.keys()}")
 
 # Load camera
 print("\n[3] Loading camera...")
-cam_path = "data/preprocessed_shank3_sam/new_cam.pkl"
+cam_path = "data/raw/markerless_mouse_1_nerf/new_cam.pkl"
 with open(cam_path, 'rb') as f:
     cam_dict = pickle.load(f)
 
@@ -89,7 +89,7 @@ print(f"Silhouette coverage: {(pred_silhouette > 0.5).float().mean():.2%}")
 # Load target mask
 print("\n[7] Loading target mask...")
 target_mask = load_target_mask(
-    "data/preprocessed_shank3_sam/simpleclick_undist/0.mp4",
+    "data/raw/markerless_mouse_1_nerf/simpleclick_undist/0.mp4",
     frame_idx=0,
     device=device
 )

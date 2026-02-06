@@ -48,7 +48,7 @@ def main():
     os.makedirs(output_dir, exist_ok=True)
 
     # Load video
-    video_path = "data/preprocessed_shank3/videos_undist/0.mp4"
+    video_path = "data/raw/markerless_mouse_1_nerf/videos_undist/0.mp4"
     cap = cv2.VideoCapture(video_path)
 
     if not cap.isOpened():

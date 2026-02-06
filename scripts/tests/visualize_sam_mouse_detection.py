@@ -10,7 +10,7 @@ print("SAM Mouse Detection Visualization")
 print("="*60)
 
 # Load original video frame
-video_path = "data/preprocessed_shank3_sam/videos_undist/0.mp4"
+video_path = "data/raw/markerless_mouse_1_nerf/videos_undist/0.mp4"
 cap = cv2.VideoCapture(video_path)
 ret, original_frame = cap.read()
 cap.release()
@@ -22,7 +22,7 @@ if not ret:
 print(f"✅ Loaded video frame: {original_frame.shape}")
 
 # Load SAM mask (inverted for mouse)
-mask_video_path = "data/preprocessed_shank3_sam/simpleclick_undist/0.mp4"
+mask_video_path = "data/raw/markerless_mouse_1_nerf/simpleclick_undist/0.mp4"
 cap_mask = cv2.VideoCapture(mask_video_path)
 ret_mask, mask_frame = cap_mask.read()
 cap_mask.release()
