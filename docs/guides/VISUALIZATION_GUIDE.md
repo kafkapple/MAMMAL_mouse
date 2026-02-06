@@ -206,7 +206,8 @@ results/fitting/<exp_dir>/
 | 문서 | 내용 |
 |------|------|
 | [UVMAP_GUIDE.md](UVMAP_GUIDE.md) | UV 텍스처 생성 및 Blender 내보내기 |
-| [EXPERIMENTS.md](../reference/EXPERIMENTS.md) | 실험 실행 가이드 |
+| [EXPERIMENTS.md](../reference/EXPERIMENTS.md)
+- [MAMMAL_EXT.md](../reference/MAMMAL_EXT.md) - mammal_ext 시각화 모듈 상세 | 실험 실행 가이드 |
 | [OUTPUT_FORMAT.md](../reference/OUTPUT_FORMAT.md) | 출력 형식 상세 |
 
 ---

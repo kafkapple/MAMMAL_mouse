@@ -84,14 +84,16 @@ faces = mesh.faces        # (F, 3)
 
 ```python
 import pickle
-from bodymodel_th import BodyModelTorch
+# Note: bodymodel_th.py is archived in _archive/
+# Use articulation_th.ArticulationTorch instead
+from articulation_th import ArticulationTorch
 
 with open("params/step_2_frame_000000.pkl", "rb") as f:
     params = pickle.load(f)
 
 # 메쉬 재생성
 bodymodel = BodyModelTorch(device='cuda')
-V, J = bodymodel.forward(
+V, J = model.forward(
     params["thetas"], params["bone_lengths"],
     params["rotation"], params["trans"], params["scale"],
     params["chest_deformer"]

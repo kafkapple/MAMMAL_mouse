@@ -10,7 +10,7 @@
 
 | 항목 | 내용 |
 |------|------|
-| **총 코드량** | 11,719 lines, 36 files |
+| **총 코드량** | 11,866 lines, 42 files |
 | **버전** | v0.2.0 |
 | **통합 방식** | Delegation pattern (monkey patching 아님) |
 | **원본 수정** | 3 files, ~8 lines만 수정 |
@@ -32,24 +32,24 @@ mammal_ext/
 ├── fitting/          (274L)       # 피팅 확장
 │   └── debug_collector.py         # DebugGridCollector (이미지 압축)
 │
-├── preprocessing/    (2,465L)     # 데이터 전처리
+├── preprocessing/    (2,521L)     # 데이터 전처리
 │   ├── sam_inference.py           # SAM segmentation
 │   ├── superanimal_preprocess.py  # SuperAnimal keypoint estimation
 │   ├── yolo_detector.py           # YOLO bounding box detection
 │   └── keypoint_estimator.py      # DeepLabCut integration
 │
-├── uvmap/            (4,988L)     # UV texture pipeline
+├── uvmap/            (5,402L)     # UV texture pipeline
 │   ├── uv_pipeline.py             # Main UV mapping CLI
 │   ├── texture_processor.py       # Texture projection/optimization
 │   ├── wandb_sweep.py             # WandB hyperparameter sweep
 │   └── optuna_hpo.py              # Optuna HPO integration
 │
-├── visualization/    (2,777L)     # 시각화
+├── visualization/    (2,433L)     # 시각화
 │   ├── mesh_visualizer.py         # Mesh + texture visualization
 │   ├── rerun_logger.py            # Rerun SDK integration
 │   └── video_generator.py         # Turntable/multi-view video
 │
-└── blender_export/   (815L)       # Blender 연동
+└── blender_export/   (817L)       # Blender 연동
     ├── batch_export.py            # OBJ sequence export
     └── coordinate_transform.py    # Y-up ↔ Z-up 변환
 ```

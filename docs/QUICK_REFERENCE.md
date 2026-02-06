@@ -195,4 +195,12 @@ ls results/fitting/<exp>/render/
 
 ---
 
-*Last updated: 2026-02-06*
+## 관련 문서
+
+- [INDEX.md](INDEX.md) - 문서 허브
+- [reference/MAMMAL_EXT.md](reference/MAMMAL_EXT.md) - mammal_ext 아키텍처
+- [reference/ARCHITECTURE.md](reference/ARCHITECTURE.md) - 전체 시스템 구조
+
+---
+
+*Last updated: 2026-02-07*

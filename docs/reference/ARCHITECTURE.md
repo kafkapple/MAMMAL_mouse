@@ -38,8 +38,8 @@ MAMMAL_mouse/
 ├── fitter_articulation.py        # 메인 multi-view fitter (Hydra + argparse)
 ├── fit_monocular.py              # 단일 뷰 monocular fitting
 ├── articulation_th.py            # 관절 모델 (PyTorch)
-├── bodymodel_th.py               # 바디 모델 (PyTorch)
-├── mouse_22_defs.py              # 22 keypoint 정의
+├── _archive/bodymodel_th.py      # 바디 모델 (archived, unused)
+├── _archive/mouse_22_defs.py     # 22 keypoint 정의 (archived)
 ├── utils.py                      # 유틸리티
 │
 ├── conf/                         # Hydra 설정
@@ -385,6 +385,7 @@ with open("new_cam.pkl", "rb") as f:
 - [COORDINATES.md](COORDINATES.md) - 좌표계
 - [PAPER.md](PAPER.md) - 논문 설정
 - [EXPERIMENTS.md](EXPERIMENTS.md) - 실험 명령어
+- [MAMMAL_EXT.md](MAMMAL_EXT.md) - mammal_ext 확장 모듈 아키텍처
 
 ---
 

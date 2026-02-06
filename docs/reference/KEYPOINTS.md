@@ -8,20 +8,20 @@
 
 ## GT vs Model Definition 불일치
 
-**중요**: GT annotation (`mouse_22_defs.py`)과 Model definition (`keypoint22_mapper.json`)의 Head keypoint 순서가 다르다.
+**중요**: GT annotation (`_archive/mouse_22_defs.py`, archived)과 Model definition (`keypoint22_mapper.json`)의 Head keypoint 순서가 다르다.
 
-| Index | GT Annotation (mouse_22_defs.py) | Model Definition (keypoint22_mapper.json) |
+| Index | GT Annotation (mouse_22_defs.py, archived in `_archive/`) | Model Definition (keypoint22_mapper.json) |
 |-------|----------------------------------|-------------------------------------------|
 | **0** | **left_ear_tip** | nose vertex |
 | **1** | **right_ear_tip** | left_ear vertex |
 | **2** | **nose** | right_ear vertex |
 | 3-21 | 동일 | 동일 |
 
-**실제 데이터 사용 시**: GT annotation 기준 (`mouse_22_defs.py`)을 따른다.
+**실제 데이터 사용 시**: GT annotation 기준 (`_archive/mouse_22_defs.py`, archived)을 따른다.
 
 ---
 
-## GT Keypoint Definition (mouse_22_defs.py 기준)
+## GT Keypoint Definition (mouse_22_defs.py 기준, archived in `_archive/`)
 
 ### Head (idx 0-2)
 
@@ -84,7 +84,7 @@
 
 ## DANNCE vs MAMMAL 키포인트 비교
 
-| Index | DANNCE (Original) | MAMMAL (mouse_22_defs.py) | 비고 |
+| Index | DANNCE (Original) | MAMMAL (mouse_22_defs.py, archived in `_archive/`) | 비고 |
 |-------|-------------------|---------------------------|------|
 | 0 | Left Ear | left_ear_tip | 동일 |
 | 1 | Right Ear | right_ear_tip | 동일 |
@@ -110,7 +110,7 @@ neck (3)             body_middle (4)        tail_root (5)
 ## Skeleton Topology (Bone Connections)
 
 ```
-# mouse_22_defs.py - mouse_22_bones
+# _archive/mouse_22_defs.py - mouse_22_bones (archived)
 Head:       [0,2], [1,2]           # ears -> nose
 Spine:      [2,3], [3,4], [4,5]    # nose -> neck -> body -> tail_root
 Tail:       [5,6], [6,7]           # tail_root -> tail_mid -> tail_end
@@ -173,7 +173,7 @@ R Hind:     [19,20], [20,21], [21,5]
 
 | 파일 | 설명 |
 |------|------|
-| `mouse_22_defs.py` | GT annotation 정의 (keypoint_names, bones) |
+| `_archive/mouse_22_defs.py` | GT annotation 정의 (archived) |
 | `mouse_model/keypoint22_mapper.json` | Model vertex/joint 매핑 |
 | `data/*/keypoints2d_undist/result_view_*.pkl` | GT 2D keypoints 데이터 |
 | `scripts/visualize_gt_keypoints_hires.py` | GT 시각화 스크립트 |
