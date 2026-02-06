@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "mammal-ext"
+version = "0.2.0"
+description = "Extension modules for MAMMAL mouse mesh fitting"
+requires-python = ">=3.9"
+dependencies = [
+    "torch",
+    "numpy<2.0",
+    "omegaconf>=2.3",
+    "tqdm",
+]
+
+[project.optional-dependencies]
+preprocessing = [
+    "segment-anything",
+    "scikit-learn",
+    "scikit-image",
+    "scipy",
+]
+uvmap = [
+    "pytorch3d",
+    "matplotlib",
+]
+visualization = [
+    "pytorch3d",
+    "opencv-python",
+]
+hpo = [
+    "wandb",
+    "optuna",
+]
+rerun = [
+    "rerun-sdk>=0.18",
+]
+all = [
+    "mammal-ext[preprocessing,uvmap,visualization,hpo,rerun]",
+]
+
+[tool.setuptools.packages.find]
+where = [".."]
+include = ["mammal_ext*"]
