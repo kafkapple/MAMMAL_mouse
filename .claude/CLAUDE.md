@@ -59,9 +59,16 @@ python -m visualization.mesh_visualizer --result_dir results/fitting/<exp> --sav
 - `aligned_posesplatter`: 3600 프레임 (전체, pose-splatter 정렬)
 - `aligned_test_100`: 100 프레임 (테스트)
 
-### Optim Configs
-- `paper_fast`: 논문 설정 + 렌더링 비활성화 (최고속)
-- `paper`: 논문 설정 + 렌더링
+### Optim Configs (`conf/optim/`)
+
+| Config | step1 | step2 | mask | 용도 |
+|--------|-------|-------|------|------|
+| `paper` | 5 | 3 | 0 | 논문 원본 (sequential, temporal init) |
+| `paper_fast` | 5 | 3 | 0 | = paper + render off (전체 피팅용) |
+| `fast` | 50 | 15 | 3000 | 독립 프레임 테스트 |
+| `accurate` | 200 | 50 | 3000 | 고품질 독립 피팅 (refit용) |
+
+> **SSOT**: 상세 비교 → `docs/EXPERIMENTS.md` Config 섹션
 
 ## Paper Settings Reference
 

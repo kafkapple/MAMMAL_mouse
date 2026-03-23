@@ -1625,11 +1625,17 @@ def optim_single(cfg: DictConfig):
         else:
             print("No completed frames found, starting from beginning")
     else:
-        # Create new result folder with timestamp
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        dynamic_result_folder = f"results/fitting/{dataset_name}_{views_str}_{kp_str}_{timestamp}"
-        fitter.result_folder = hydra.utils.to_absolute_path(dynamic_result_folder)
-        print(f"Results will be saved to: {fitter.result_folder}")
+        # Check if result_folder was explicitly overridden via CLI
+        default_result_folder = "results/fitting/"
+        if cfg.result_folder and cfg.result_folder != default_result_folder:
+            fitter.result_folder = hydra.utils.to_absolute_path(cfg.result_folder)
+            print(f"Results will be saved to (user-specified): {fitter.result_folder}")
+        else:
+            # Create new result folder with timestamp
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            dynamic_result_folder = f"results/fitting/{dataset_name}_{views_str}_{kp_str}_{timestamp}"
+            fitter.result_folder = hydra.utils.to_absolute_path(dynamic_result_folder)
+            print(f"Results will be saved to: {fitter.result_folder}")
     
     os.makedirs(fitter.result_folder, exist_ok=True)
     subfolders = ["params", "render", "render/debug/", "render/keypoints/", "obj"]
@@ -1643,7 +1649,13 @@ def optim_single(cfg: DictConfig):
     print(f"Config saved to: {config_path}")
 
     print("camN: ", camN)
-    targets = np.arange(cfg.fitter.start_frame, cfg.fitter.end_frame, cfg.fitter.interval).tolist()
+    # Support explicit frame_list for non-contiguous frame fitting (e.g., refit bad frames)
+    frame_list = getattr(cfg.fitter, 'frame_list', None)
+    if frame_list:
+        targets = list(frame_list)
+        print(f"Using explicit frame_list: {len(targets)} frames")
+    else:
+        targets = np.arange(cfg.fitter.start_frame, cfg.fitter.end_frame, cfg.fitter.interval).tolist()
 
     start = targets[0]
     total_frames = len(targets)
