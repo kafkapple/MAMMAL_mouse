@@ -72,29 +72,31 @@ accurate:         독립 프레임 고품질. fast 대비 4배 iteration.
 | GPU | 4 (A6000) |
 | Output | `results/fitting/refit_accurate_23/` |
 | Speed | ~14 min/frame |
-| Result (frame 720) | IoU 0.675 → 0.888 (+0.213) |
-| Status | 9/23 OBJ completed |
+| **Result** | **Mean IoU 0.689→0.840 (+0.151), 23/23 pass** |
+| Status | ✅ Completed (19,232s total, 836s/frame) |
+| Report | `docs/reports/260323_mesh_refit_experiment_report.md` |
 
-### E3: Parameter Sweep (in progress)
+### E3: Parameter Sweep ✅
 
 | 항목 | 값 |
 |------|---|
 | Configs | step1=[100,200,400] × mask_step2=[1000,3000,5000] = 9 |
 | Frames | Worst 5 (9480, 9360, 5520, 1320, 8400) |
-| GPU | 5 (A6000) |
-| Output | `results/fitting/sweep_s1_{N}_m_{M}/` |
-| Status | 1/9 configs in progress |
+| Output | `results/fitting/sweep_s1_{N}_m_{M}/`, `results/comparison/sweep/sweep_iou.json` |
+| **Best** | **s1_400_m_3000 (mean=0.820)** — only +0.004 vs current accurate |
+| **Finding** | **mask_step2=3000 is critical** (m=1000 → -10%p). step1 has diminishing returns |
+| Status | ✅ Completed |
 
-### E4: Dense Accurate (in progress)
+### E4: Dense Accurate ✅
 
 | 항목 | 값 |
 |------|---|
 | Config | `accurate` (step1=200, step2=50) |
-| Frames | M5 0-199 (200 consecutive frames, interval=5) |
-| GPU | 6 (M5 0-99), 7 (M5 100-199) |
+| Frames | M5 0-199 (200 consecutive, interval=5) |
 | Output | `results/fitting/dense_accurate_0_100/`, `dense_accurate_100_200/` |
-| Purpose | Interpolation 오차 실측 (accurate 기준) |
-| ETA | ~23h (overnight) |
+| **Finding** | Interpolation error same for fast vs accurate → **dominated by mouse motion nonlinearity** |
+| **Optimal interval** | **4 M5 frames (0.2s): 7.1% body, 900 keyframes, ~52h/4GPU** |
+| Status | ✅ Completed |
 
 ## Analysis Tools
 
@@ -127,17 +129,20 @@ results/
 │   ├── baseline_iou/              # IoU for all 100 frames
 │   ├── fast_vs_accurate/          # Single-view comparison
 │   ├── fast_vs_accurate_6view/    # 6-view comparison
-│   └── interpolation/             # [TODO] interpolation analysis
-└── docs/
-    └── EXPERIMENTS.md             # This file
+│   ├── interpolation/             # E4 interpolation analysis
+│   ├── sweep/                     # E3 sweep IoU comparison
+│   └── refit_23_final/            # E2 full comparison (6-view + textured)
+├── docs/
+│   ├── EXPERIMENTS.md             # This file
+│   └── reports/260323_mesh_refit_experiment_report.md  # Full report
 ```
 
-## Interpolation Analysis (E1 fast data, upper bound)
+## Interpolation Analysis (E4 accurate data, vertex-level)
 
-| M5 Interval | Time gap | Mean error | P95 error | Keyframes | 4GPU hours |
-|-------------|----------|-----------|-----------|-----------|------------|
-| 2 | 0.10s | 3.7% | 12.0% | 1800 | 105h |
-| 4 | 0.20s | 7.1% | 22.0% | 900 | 52h |
+| M5 Interval | Time gap | Mean (mm) | P95 (mm) | Mean % body | P95 % body | Keyframes | 4GPU hours |
+|-------------|----------|-----------|----------|-------------|------------|-----------|------------|
+| 2 | 0.10s | 2.40 | 4.79 | 3.8% | 7.5% | 1800 | 105h |
+| **4** | **0.20s** | **4.52** | **9.30** | **7.1%** | **14.6%** | **900** | **52h** |
 | **6** | **0.30s** | **10.2%** | **30.4%** | **600** | **35h** |
 | 12 | 0.60s | 19.5% | 52.8% | 300 | 17.5h |
 | 24 | 1.20s | 34.7% | 86.7% | 150 | 8.8h |

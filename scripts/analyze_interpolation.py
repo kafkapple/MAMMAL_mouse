@@ -38,6 +38,9 @@ def load_params(params_dir):
     params_list = []
     for f in files:
         fid = int(f.split("frame_")[1].split(".")[0])
+        import torch
+        # Params saved with pickle.dump (contains torch CUDA tensors)
+        # Must have CUDA available for deserialization, then move to CPU
         p = pickle.load(open(f, "rb"))
         # Convert torch tensors to numpy
         d = {}
@@ -69,7 +72,7 @@ def interpolate_params(params_a, params_b, alpha=0.5):
 def params_to_vertices(params, body_model):
     """Forward pass: params → mesh vertices using MAMMAL body model."""
     import torch
-    device = next(body_model.parameters()).device if hasattr(body_model, 'parameters') else 'cpu'
+    device = body_model.device if hasattr(body_model, 'device') else torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     thetas = torch.from_numpy(params["thetas"]).float().to(device)
     bone_lengths = torch.from_numpy(params["bone_lengths"]).float().to(device)
