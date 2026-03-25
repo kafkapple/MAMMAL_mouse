@@ -589,21 +589,40 @@ class MeshComparison:
         view_id: int = 3,
         fps: int = 2,
     ) -> str:
-        """Save comparison outputs: summary grid + videos (no individual frame images).
+        """Save comparison outputs: summary images + videos + IoU chart.
 
         Output structure:
             output_dir/
-            ├── summary_silhouette.jpg     # N-frame silhouette grid
-            ├── summary_textured.jpg       # N-frame textured grid (if 6-view)
-            ├── video_silhouette_v{N}.mp4  # Per-frame silhouette comparison
-            ├── video_textured_6view.mp4   # Per-frame 6-view textured grid
-            ├── iou_report.txt             # Quantitative results
-            └── iou_report.json            # Machine-readable
+            ├── iou_chart.jpg                  # Bar chart (BEFORE vs AFTER per frame)
+            ├── best_frame_6view_textured.jpg   # Best IoU frame, 6-view textured
+            ├── worst_frame_6view_textured.jpg  # Worst IoU frame, 6-view textured
+            ├── summary_silhouette.jpg          # All frames silhouette grid
+            ├── video_silhouette.mp4            # Silhouette sequence
+            ├── video_textured_6view.mp4        # 6-view textured sequence
+            ├── iou_report.txt
+            └── iou_report.json
         """
+        import json
         os.makedirs(output_dir, exist_ok=True)
 
-        # --- 1. Summary grids (static images, keep) ---
-        # Silhouette summary: N frames in grid
+        # --- 1. IoU chart (bar chart, BEFORE vs AFTER) ---
+        self._save_iou_chart(results, output_dir, view_id)
+
+        # --- 2. Best/Worst frame 6-view textured (1 image each) ---
+        results_with_iou = [(r, r.iou_b.get(view_id, 0)) for r in results if r.iou_b]
+        if results_with_iou:
+            results_with_iou.sort(key=lambda x: x[1])
+            worst_r, worst_iou = results_with_iou[0]
+            best_r, best_iou = results_with_iou[-1]
+
+            for r, label, iou in [(worst_r, "worst", worst_iou), (best_r, "best", best_iou)]:
+                img = r.images.get("grid_6view_textured")
+                if img is not None:
+                    path = os.path.join(output_dir, f"{label}_frame_{r.frame_id:06d}_6view.jpg")
+                    cv2.imwrite(path, img, [cv2.IMWRITE_JPEG_QUALITY, 90])
+                    print(f"  {label.upper()} frame {r.frame_id} (IoU={iou:.3f}): {path}")
+
+        # --- 3. Summary silhouette grid ---
         sil_key = f"compare_v{view_id}"
         sil_rows = [r.images[sil_key] for r in results if sil_key in r.images]
         if sil_rows:
@@ -621,65 +640,113 @@ class MeshComparison:
             cv2.imwrite(path, grid, [cv2.IMWRITE_JPEG_QUALITY, 90])
             print(f"  Summary silhouette: {path}")
 
-        # Textured 6-view summary: N frames in grid
-        tex_grids = [r.images.get("grid_6view_textured") for r in results]
-        tex_grids = [g for g in tex_grids if g is not None]
-        if tex_grids:
-            scale = 0.4
-            resized = [cv2.resize(g, None, fx=scale, fy=scale) for g in tex_grids]
-            cols = min(4, len(resized))
-            grid_rows = []
-            for i in range(0, len(resized), cols):
-                batch = resized[i:i + cols]
-                while len(batch) < cols:
-                    batch.append(np.zeros_like(batch[0]))
-                grid_rows.append(np.concatenate(batch, axis=1))
-            grid = np.concatenate(grid_rows, axis=0)
-            path = os.path.join(output_dir, "summary_textured_6view.jpg")
-            cv2.imwrite(path, grid, [cv2.IMWRITE_JPEG_QUALITY, 85])
-            print(f"  Summary textured 6-view: {path}")
-
-        # --- 2. Videos (per-frame sequences) ---
-        # Silhouette comparison video
+        # --- 4. Videos (per-frame sequences, proper multi-frame) ---
         if sil_rows:
-            vid_path = os.path.join(output_dir, f"video_silhouette_v{view_id}.mp4")
+            vid_path = os.path.join(output_dir, "video_silhouette.mp4")
             self._write_video(sil_rows, vid_path, fps)
-            print(f"  Video silhouette: {vid_path}")
 
-        # 6-view textured video
         tex_6v = [r.images.get("grid_6view_textured") for r in results]
         tex_6v = [g for g in tex_6v if g is not None]
         if tex_6v:
             vid_path = os.path.join(output_dir, "video_textured_6view.mp4")
             self._write_video(tex_6v, vid_path, fps)
-            print(f"  Video textured 6-view: {vid_path}")
 
-        # 6-view silhouette video
         sil_6v = [r.images.get("grid_6view") for r in results]
         sil_6v = [g for g in sil_6v if g is not None]
         if sil_6v:
             vid_path = os.path.join(output_dir, "video_silhouette_6view.mp4")
             self._write_video(sil_6v, vid_path, fps)
-            print(f"  Video silhouette 6-view: {vid_path}")
 
-        # --- 3. Reports ---
+        # --- 5. Reports ---
         self._save_report(results, output_dir, view_id)
         self._save_report_json(results, output_dir)
 
+        print(f"\n  Output: {output_dir} ({len(os.listdir(output_dir))} files)")
         return output_dir
 
     def _write_video(self, frames: List[np.ndarray], path: str, fps: int = 2):
-        """Write list of images as MP4 video."""
+        """Write list of images as MP4 video using ffmpeg pipe."""
+        import subprocess, tempfile
         if not frames:
             return
         H, W = frames[0].shape[:2]
-        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-        writer = cv2.VideoWriter(path, fourcc, fps, (W, H))
-        for frame in frames:
-            if frame.shape[:2] != (H, W):
-                frame = cv2.resize(frame, (W, H))
-            writer.write(frame)
-        writer.release()
+        # H264 requires even dimensions
+        W = W if W % 2 == 0 else W - 1
+        H = H if H % 2 == 0 else H - 1
+        if not path.endswith(".mp4"):
+            path = path.rsplit(".", 1)[0] + ".mp4"
+
+        cmd = [
+            "ffmpeg", "-y", "-f", "rawvideo", "-vcodec", "rawvideo",
+            "-s", f"{W}x{H}", "-pix_fmt", "bgr24", "-r", str(fps),
+            "-i", "-",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p",
+            "-crf", "23", "-preset", "fast",
+            path,
+        ]
+        try:
+            proc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
+                                    stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+            for frame in frames:
+                resized = cv2.resize(frame, (W, H)) if frame.shape[:2] != (H, W) else frame
+                proc.stdin.write(resized.tobytes())
+            proc.stdin.close()
+            ret = proc.wait()
+            if ret == 0:
+                print(f"  Video: {path} ({len(frames)} frames, {fps}fps, {W}x{H})")
+            else:
+                err = proc.stderr.read().decode()[-200:]
+                print(f"  Video FAILED: {path} (ffmpeg exit {ret}: {err})")
+        except FileNotFoundError:
+            print(f"  WARNING: ffmpeg not found, skipping video {path}")
+
+    def _save_iou_chart(self, results: List[FrameResult], output_dir: str, view_id: int):
+        """Generate IoU bar chart comparing BEFORE vs AFTER."""
+        try:
+            import matplotlib
+            matplotlib.use("Agg")
+            import matplotlib.pyplot as plt
+        except ImportError:
+            print("  WARNING: matplotlib not available, skipping IoU chart")
+            return
+
+        frame_ids = []
+        ious_a, ious_b = [], []
+        for r in results:
+            if view_id in r.iou_a and view_id in r.iou_b:
+                frame_ids.append(r.frame_id)
+                ious_a.append(r.iou_a[view_id])
+                ious_b.append(r.iou_b[view_id])
+
+        if not frame_ids:
+            return
+
+        fig, ax = plt.subplots(figsize=(max(10, len(frame_ids) * 0.5), 5))
+        x = np.arange(len(frame_ids))
+        w = 0.35
+        bars_a = ax.bar(x - w/2, ious_a, w, label="BEFORE (fast)", color="#CC4444", alpha=0.8)
+        bars_b = ax.bar(x + w/2, ious_b, w, label="AFTER (accurate)", color="#44AA44", alpha=0.8)
+        ax.axhline(y=self.config.iou_threshold, color="orange", linestyle="--", linewidth=1, label=f"Threshold ({self.config.iou_threshold})")
+        ax.set_xlabel("MAMMAL Frame ID")
+        ax.set_ylabel("Silhouette IoU")
+        ax.set_title(f"Mesh Fitting Quality: BEFORE vs AFTER (view {view_id})")
+        ax.set_xticks(x)
+        ax.set_xticklabels(frame_ids, rotation=45, ha="right", fontsize=7)
+        ax.set_ylim(0, 1.0)
+        ax.legend()
+        ax.grid(axis="y", alpha=0.3)
+
+        # Add mean annotations
+        mean_a, mean_b = np.mean(ious_a), np.mean(ious_b)
+        ax.text(0.98, 0.02, f"Mean: {mean_a:.3f} → {mean_b:.3f} (+{mean_b-mean_a:.3f})",
+                transform=ax.transAxes, ha="right", va="bottom", fontsize=9,
+                bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8))
+
+        plt.tight_layout()
+        path = os.path.join(output_dir, "iou_chart.jpg")
+        plt.savefig(path, dpi=150, bbox_inches="tight")
+        plt.close()
+        print(f"  IoU chart: {path}")
 
     def _save_report_json(self, results: List[FrameResult], output_dir: str):
         """Save machine-readable IoU report."""
