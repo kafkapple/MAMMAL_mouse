@@ -582,58 +582,120 @@ class MeshComparison:
             results.append(result)
         return results
 
-    def save_grid(
+    def save_results(
         self,
         results: List[FrameResult],
         output_dir: str,
         view_id: int = 3,
+        fps: int = 2,
     ) -> str:
-        """Save comparison summary grid image.
+        """Save comparison outputs: summary grid + videos (no individual frame images).
 
-        Creates a grid of per-frame comparison rows (GT | fast | accurate).
-
-        Returns:
-            Path to saved grid image.
+        Output structure:
+            output_dir/
+            ├── summary_silhouette.jpg     # N-frame silhouette grid
+            ├── summary_textured.jpg       # N-frame textured grid (if 6-view)
+            ├── video_silhouette_v{N}.mp4  # Per-frame silhouette comparison
+            ├── video_textured_6view.mp4   # Per-frame 6-view textured grid
+            ├── iou_report.txt             # Quantitative results
+            └── iou_report.json            # Machine-readable
         """
         os.makedirs(output_dir, exist_ok=True)
 
-        # Save individual frame comparisons (including 6-view grids)
-        for r in results:
-            for key, img in r.images.items():
-                path = os.path.join(output_dir, f"frame_{r.frame_id:06d}_{key}.jpg")
-                cv2.imwrite(path, img, [cv2.IMWRITE_JPEG_QUALITY, 90])
-                if key == "grid_6view":
-                    print(f"  6-view grid: {path}")
+        # --- 1. Summary grids (static images, keep) ---
+        # Silhouette summary: N frames in grid
+        sil_key = f"compare_v{view_id}"
+        sil_rows = [r.images[sil_key] for r in results if sil_key in r.images]
+        if sil_rows:
+            scale = 0.5
+            resized = [cv2.resize(r, None, fx=scale, fy=scale) for r in sil_rows]
+            cols = self.config.grid_cols
+            grid_rows = []
+            for i in range(0, len(resized), cols):
+                batch = resized[i:i + cols]
+                while len(batch) < cols:
+                    batch.append(np.zeros_like(batch[0]))
+                grid_rows.append(np.concatenate(batch, axis=1))
+            grid = np.concatenate(grid_rows, axis=0)
+            path = os.path.join(output_dir, "summary_silhouette.jpg")
+            cv2.imwrite(path, grid, [cv2.IMWRITE_JPEG_QUALITY, 90])
+            print(f"  Summary silhouette: {path}")
 
-        # Create summary grid
-        key = f"compare_v{view_id}"
-        rows = [r.images[key] for r in results if key in r.images]
-        if not rows:
-            print("No comparison images to create grid")
-            return ""
+        # Textured 6-view summary: N frames in grid
+        tex_grids = [r.images.get("grid_6view_textured") for r in results]
+        tex_grids = [g for g in tex_grids if g is not None]
+        if tex_grids:
+            scale = 0.4
+            resized = [cv2.resize(g, None, fx=scale, fy=scale) for g in tex_grids]
+            cols = min(4, len(resized))
+            grid_rows = []
+            for i in range(0, len(resized), cols):
+                batch = resized[i:i + cols]
+                while len(batch) < cols:
+                    batch.append(np.zeros_like(batch[0]))
+                grid_rows.append(np.concatenate(batch, axis=1))
+            grid = np.concatenate(grid_rows, axis=0)
+            path = os.path.join(output_dir, "summary_textured_6view.jpg")
+            cv2.imwrite(path, grid, [cv2.IMWRITE_JPEG_QUALITY, 85])
+            print(f"  Summary textured 6-view: {path}")
 
-        # Resize for grid (half size for readability)
-        scale = 0.5
-        rows_resized = [cv2.resize(r, None, fx=scale, fy=scale) for r in rows]
+        # --- 2. Videos (per-frame sequences) ---
+        # Silhouette comparison video
+        if sil_rows:
+            vid_path = os.path.join(output_dir, f"video_silhouette_v{view_id}.mp4")
+            self._write_video(sil_rows, vid_path, fps)
+            print(f"  Video silhouette: {vid_path}")
 
-        # Stack vertically (max grid_cols per row)
-        cols = self.config.grid_cols
-        grid_rows = []
-        for i in range(0, len(rows_resized), cols):
-            batch = rows_resized[i : i + cols]
-            # Pad to fill row
-            while len(batch) < cols:
-                batch.append(np.zeros_like(batch[0]))
-            grid_rows.append(np.concatenate(batch, axis=1))
+        # 6-view textured video
+        tex_6v = [r.images.get("grid_6view_textured") for r in results]
+        tex_6v = [g for g in tex_6v if g is not None]
+        if tex_6v:
+            vid_path = os.path.join(output_dir, "video_textured_6view.mp4")
+            self._write_video(tex_6v, vid_path, fps)
+            print(f"  Video textured 6-view: {vid_path}")
 
-        grid = np.concatenate(grid_rows, axis=0)
-        grid_path = os.path.join(output_dir, "summary_grid.jpg")
-        cv2.imwrite(grid_path, grid, [cv2.IMWRITE_JPEG_QUALITY, 90])
-        print(f"Summary grid saved: {grid_path}")
+        # 6-view silhouette video
+        sil_6v = [r.images.get("grid_6view") for r in results]
+        sil_6v = [g for g in sil_6v if g is not None]
+        if sil_6v:
+            vid_path = os.path.join(output_dir, "video_silhouette_6view.mp4")
+            self._write_video(sil_6v, vid_path, fps)
+            print(f"  Video silhouette 6-view: {vid_path}")
 
-        # Save IoU report
+        # --- 3. Reports ---
         self._save_report(results, output_dir, view_id)
-        return grid_path
+        self._save_report_json(results, output_dir)
+
+        return output_dir
+
+    def _write_video(self, frames: List[np.ndarray], path: str, fps: int = 2):
+        """Write list of images as MP4 video."""
+        if not frames:
+            return
+        H, W = frames[0].shape[:2]
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        writer = cv2.VideoWriter(path, fourcc, fps, (W, H))
+        for frame in frames:
+            if frame.shape[:2] != (H, W):
+                frame = cv2.resize(frame, (W, H))
+            writer.write(frame)
+        writer.release()
+
+    def _save_report_json(self, results: List[FrameResult], output_dir: str):
+        """Save machine-readable IoU report."""
+        import json
+        data = {}
+        for r in results:
+            data[r.frame_id] = {
+                "iou_a": {str(k): float(v) for k, v in r.iou_a.items()},
+                "iou_b": {str(k): float(v) for k, v in r.iou_b.items()},
+            }
+        path = os.path.join(output_dir, "iou_report.json")
+        with open(path, "w") as f:
+            json.dump(data, f, indent=2)
+
+    # Keep old name as alias for backwards compatibility
+    save_grid = save_results
 
     def _save_report(self, results: List[FrameResult], output_dir: str, view_id: int):
         """Save text report of IoU comparison."""

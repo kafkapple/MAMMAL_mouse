@@ -91,20 +91,20 @@ def main():
         label_b=args.label_b,
     )
 
-    for vid in args.views:
-        output_dir = os.path.join(args.output, f"view_{vid}")
-        comp.save_grid(results, output_dir, view_id=vid)
+    # Save results: summary grids + videos (no individual frame images)
+    # Use primary view for silhouette summary, all views for 6-view grid
+    primary_view = args.views[0] if len(args.views) == 1 else 3
+    comp.save_results(results, args.output, view_id=primary_view)
 
-    # Print summary
+    # Print summary (primary view only)
     print(f"\n{'='*50}")
-    print("Summary:")
+    print(f"Summary (view {primary_view}):")
     for r in results:
-        for vid in args.views:
-            iou_a = r.iou_a.get(vid, -1)
-            iou_b = r.iou_b.get(vid, -1)
-            delta = iou_b - iou_a if iou_a >= 0 and iou_b >= 0 else 0
-            marker = "✓" if iou_b >= config.iou_threshold else "✗"
-            print(f"  Frame {r.frame_id:>6}: fast={iou_a:.3f} → accurate={iou_b:.3f} ({delta:+.3f}) {marker}")
+        iou_a = r.iou_a.get(primary_view, -1)
+        iou_b = r.iou_b.get(primary_view, -1)
+        delta = iou_b - iou_a if iou_a >= 0 and iou_b >= 0 else 0
+        marker = "+" if iou_b >= config.iou_threshold else "x"
+        print(f"  Frame {r.frame_id:>6}: {iou_a:.3f} -> {iou_b:.3f} ({delta:+.3f}) {marker}")
 
 
 if __name__ == "__main__":
