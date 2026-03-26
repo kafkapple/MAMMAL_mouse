@@ -141,39 +141,63 @@ def main():
         print(f"Video: {vid_path} ({len(frame_ids)} frames, {args.fps}fps)")
 
     else:
-        # 6-view grid: 2 rows of 3 views, GT on top, Mesh on bottom
+        # 6-view grid + per-view individual videos
         scale = 0.35
-        vW = int(1152 * scale) // 2 * 2  # Force even
+        vW = int(1152 * scale) // 2 * 2
         vH = int(1024 * scale) // 2 * 2
         gridW = vW * 3
-        gridH = (vH * 2 + 30) * 2  # (GT row + Mesh row + header) × 2 halves
+        gridH = (vH * 2 + 30) * 2
         gridH = gridH // 2 * 2
-        vid_path = os.path.join(args.output, "sequence_6view.mp4")
 
-        cmd = ["ffmpeg", "-y", "-f", "rawvideo", "-vcodec", "rawvideo",
-               "-s", f"{gridW}x{gridH}", "-pix_fmt", "bgr24", "-r", str(args.fps),
-               "-i", "-", "-c:v", "libx264", "-pix_fmt", "yuv420p",
-               "-crf", "23", "-preset", "fast", vid_path]
-        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
-                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # Per-view video size: [GT | Mesh] side-by-side, half resolution
+        pvW = 1152 // 2 * 2
+        pvH = 1024 // 2 * 2
+
+        def make_ffmpeg(path, w, h):
+            cmd = ["ffmpeg", "-y", "-f", "rawvideo", "-vcodec", "rawvideo",
+                   "-s", f"{w}x{h}", "-pix_fmt", "bgr24", "-r", str(args.fps),
+                   "-i", "-", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                   "-crf", "23", "-preset", "fast", path]
+            return subprocess.Popen(cmd, stdin=subprocess.PIPE,
+                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        # Open all writers
+        grid_path = os.path.join(args.output, "sequence_6view.mp4")
+        grid_proc = make_ffmpeg(grid_path, gridW, gridH)
+
+        view_procs = {}
+        for vid in range(6):
+            vp = os.path.join(args.output, f"sequence_v{vid}.mp4")
+            view_procs[vid] = make_ffmpeg(vp, pvW * 2, pvH)
 
         for i, fid in enumerate(frame_ids):
             verts = load_verts(os.path.join(args.obj_dir, f"step_2_frame_{fid:06d}.obj"))
             gt_views, mesh_views = [], []
             for vid in range(6):
-                gt = cv2.resize(load_gt(fid, vid), (vW, vH))
-                mesh = cv2.resize(render_mesh(verts, vid), (vW, vH))
-                gt_views.append(gt)
-                mesh_views.append(mesh)
+                gt_full = load_gt(fid, vid)
+                mesh_full = render_mesh(verts, vid)
 
-            # Build grid
+                # Per-view video: [GT | Mesh] at half res
+                gt_half = cv2.resize(gt_full, (pvW, pvH))
+                mesh_half = cv2.resize(mesh_full, (pvW, pvH))
+                cv2.putText(gt_half, f"GT v{vid} f{fid}", (5, 20),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                cv2.putText(mesh_half, "Mesh", (5, 20),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                pv_frame = np.concatenate([gt_half, mesh_half], axis=1)
+                view_procs[vid].stdin.write(pv_frame.tobytes())
+
+                # Collect for grid
+                gt_views.append(cv2.resize(gt_full, (vW, vH)))
+                mesh_views.append(cv2.resize(mesh_full, (vW, vH)))
+
+            # 6-view grid
             header_gt = np.full((30, gridW, 3), (60, 60, 60), dtype=np.uint8)
             cv2.putText(header_gt, f"GT  |  Frame {fid}", (10, 22),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
             header_mesh = np.full((30, gridW, 3), (30, 80, 30), dtype=np.uint8)
             cv2.putText(header_mesh, "Mesh (accurate)", (10, 22),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-
             grid = np.concatenate([
                 header_gt,
                 np.concatenate(gt_views[:3], axis=1),
@@ -183,13 +207,19 @@ def main():
                 np.concatenate(mesh_views[3:], axis=1),
             ], axis=0)
             grid = cv2.resize(grid, (gridW, gridH))
-            proc.stdin.write(grid.tobytes())
+            grid_proc.stdin.write(grid.tobytes())
+
             if (i + 1) % 10 == 0:
                 print(f"  [{i+1}/{len(frame_ids)}]")
 
-        proc.stdin.close()
-        proc.wait()
-        print(f"Video: {vid_path} ({len(frame_ids)} frames, {args.fps}fps)")
+        # Close all writers
+        grid_proc.stdin.close()
+        grid_proc.wait()
+        print(f"Video: {grid_path} ({len(frame_ids)} frames)")
+        for vid in range(6):
+            view_procs[vid].stdin.close()
+            view_procs[vid].wait()
+            print(f"Video: {args.output}/sequence_v{vid}.mp4")
 
 
 if __name__ == "__main__":
