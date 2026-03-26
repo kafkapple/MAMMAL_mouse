@@ -42,6 +42,7 @@ class ComparisonConfig:
     silhouette_color_a: Tuple[int, int, int] = (80, 80, 255)   # bright red (BGR) for BEFORE
     silhouette_color_b: Tuple[int, int, int] = (80, 255, 80)   # bright green (BGR) for AFTER
     label_bar_height: int = 40  # height of colored label bar at top
+    render_bg_color: Tuple[int, int, int] = (255, 255, 255)  # white background for mesh render
 
 
 @dataclass
@@ -198,6 +199,7 @@ class MeshComparison:
         T = cam["T"].flatten()  # world-to-camera translation
 
         W, H = self.config.image_size
+        bg_color = getattr(self.config, 'render_bg_color', (255, 255, 255))
 
         # Project all vertices to 2D
         pts_cam = (R @ vertices.T).T + T  # (N, 3)
@@ -208,8 +210,8 @@ class MeshComparison:
         # Get vertex colors from texture
         vert_colors = self._sample_vertex_colors(vertices)[:, :3]  # (N, 3) RGB
 
-        # Rasterize faces using OpenCV fillPoly with z-buffer
-        image = np.zeros((H, W, 3), dtype=np.uint8)
+        # Rasterize faces using OpenCV fillPoly
+        image = np.full((H, W, 3), bg_color, dtype=np.uint8)
         z_buffer = np.full((H, W), np.inf, dtype=np.float64)
 
         # Sort faces by mean depth (back-to-front painter's algorithm)

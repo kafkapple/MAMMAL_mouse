@@ -89,7 +89,7 @@ def main():
         p2h = (K @ pc.T).T
         d = p2h[:, 2]
         p2 = p2h[:, :2] / p2h[:, 2:]
-        img = np.zeros((1024, 1152, 3), dtype=np.uint8)
+        img = np.full((1024, 1152, 3), 255, dtype=np.uint8)  # white background
         for fi in np.argsort(-d[faces].mean(axis=1)):
             f = faces[fi]
             if (d[f] < 0).any():
