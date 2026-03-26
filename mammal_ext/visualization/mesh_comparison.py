@@ -1,3 +1,4 @@
+# no-split: cohesive module — rendering + comparison + video export tightly coupled
 """
 Mesh Comparison Module
 
@@ -414,25 +415,13 @@ class MeshComparison:
             row = np.concatenate([gt_vis, overlay_a, overlay_b], axis=1)
             result.images[f"compare_v{vid}"] = row
 
-            # Textured rendering comparison: [GT | BEFORE overlay | AFTER overlay]
-            # Renders textured mesh directly on GT image for pixel-accurate alignment
+            # Textured rendering: [GT | BEFORE mesh | AFTER mesh] — separate panels, no overlay
             if self.texture_image is not None:
-                tex_a_bgr = self._render_textured(verts_a, vid)  # BGR
-                tex_b_bgr = self._render_textured(verts_b, vid)  # BGR
+                tex_a_bgr = self._render_textured(verts_a, vid)  # BGR on black bg
+                tex_b_bgr = self._render_textured(verts_b, vid)  # BGR on black bg
 
-                # Overlay on GT (mesh replaces GT pixels where rendered)
-                mask_a = (tex_a_bgr.sum(axis=2) > 0)
-                mask_b = (tex_b_bgr.sum(axis=2) > 0)
-
-                overlay_tex_a = gt_img.copy()
-                overlay_tex_a[mask_a] = cv2.addWeighted(
-                    gt_img, 0.3, tex_a_bgr, 0.7, 0)[mask_a]
-                overlay_tex_b = gt_img.copy()
-                overlay_tex_b[mask_b] = cv2.addWeighted(
-                    gt_img, 0.3, tex_b_bgr, 0.7, 0)[mask_b]
-
-                tex_a_labeled = self._add_label(overlay_tex_a, f"BEFORE ({label_a}) textured", bar_color=bar_a)
-                tex_b_labeled = self._add_label(overlay_tex_b, f"AFTER ({label_b}) textured", bar_color=bar_b)
+                tex_a_labeled = self._add_label(tex_a_bgr, f"BEFORE ({label_a})", bar_color=bar_a)
+                tex_b_labeled = self._add_label(tex_b_bgr, f"AFTER ({label_b})", bar_color=bar_b)
                 gt_labeled = self._add_label(gt_img, f"GT (view {vid}, frame {frame_id})")
 
                 tex_row = np.concatenate([gt_labeled, tex_a_labeled, tex_b_labeled], axis=1)
