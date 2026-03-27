@@ -98,6 +98,26 @@ accurate:         독립 프레임 고품질. fast 대비 4배 iteration.
 | **Optimal interval** | **4 M5 frames (0.2s): 7.1% body, 900 keyframes, ~52h/4GPU** |
 | Status | ✅ Completed |
 
+### E5: Production 900-Keyframe Fitting (in progress)
+
+| 항목 | 값 |
+|------|---|
+| Config | `accurate` (step1=200, step2=50) |
+| Frames | 900 keyframes (video interval=20, M5 interval=4) |
+| GPU | 4 (Part1), 5 (Part2), 6 (Part3), 7 (Part4) — 225 keyframes each |
+| Output | `results/fitting/production_keyframes_part{1-4}/` → merged `production_900_merged/` |
+| **Progress** | P1 ✅ P2 ✅ P3 216/225 P4 215/225 (98%) |
+| **Next** | merge → interpolate 3600 → smooth video → UV transplant |
+
+### Visualization Outputs
+
+| Output | Path | Content |
+|--------|------|---------|
+| Refit comparison | `results/comparison/refit_23/` | IoU chart, best/worst 6-view, videos |
+| 100-frame sequence | `results/comparison/sequence/` | 6-view grid + per-view videos |
+| Interpolated smooth | `results/comparison/sequence_interpolated/` | 397fr vertex lerp |
+| Dense smooth | `results/comparison/sequence_dense/` | M5 0-99 at 20fps |
+
 ## Analysis Tools
 
 | Script | Purpose | Usage |
