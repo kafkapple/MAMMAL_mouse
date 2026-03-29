@@ -158,7 +158,7 @@ python scripts/uv_transplant_refit.py \
 - [x] Sample 3 OBJs load with correct texture in Blender — renders at `results/comparison/texture_verify/`
 - [x] FaceLift team confirmed: static texture sufficient, mm 좌표 그대로 전달, 프레임 1:1 대응
 - [x] `exports/keyframe_indices.txt` 생성 — 900 keyframe video frames (step=20), 900/900 cross-checked
-- [ ] FaceLift team 확인: `obj_textured/` 필요 여부 (vs geometry-only `obj/`만 전달)
+- [x] FaceLift team 확인: `obj_textured/` 전달 (UV 포함 버전이 `transplant_uv.py` skip 가능 → 더 효율적. geometry-only 별도 불필요)
 
 ### Visualization Outputs
 
