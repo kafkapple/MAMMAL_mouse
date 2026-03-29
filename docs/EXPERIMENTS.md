@@ -120,10 +120,40 @@ accurate:         독립 프레임 고품질. fast 대비 4배 iteration.
 |------|-------|-------|
 | **Frame alignment** | video interval=5 (M5 dataset) | pose-splatter uses same interval — must match |
 | **Keyframe interval** | M5 interval=4 (900 keyframes, 0.2s gap) | Slerp interpolates to full 3600 |
-| **OBJ source** | `results/fitting/production_3600_slerp/obj/` | 3600 slerp-interpolated OBJs |
+| **OBJ source** | `results/fitting/production_3600_slerp/obj/` | 3600 slerp-interpolated OBJs, 14522 verts each ✅ |
 | **Texture** | `exports/texture_final.png` (static) | Per-frame texture status: **unverified** — confirm with FaceLift team |
-| **UV transplant** | `scripts/uv_transplant_refit.py --src ... --dst ...` | Auto-discovers all frames in src dir |
+| **UV transplant output** | `results/fitting/production_3600_slerp/obj_textured/` | OBJ + `.mtl` + texture ref |
 | **Coordinate system** | MAMMAL (mm, -Y up) | FaceLift expects: confirm transform needed |
+
+### UV Transplant Pipeline
+
+MAMMAL 피팅은 매 프레임 vertex 위치만 출력 (geometry-only OBJ). UV 좌표는 mesh topology가
+고정(14522 verts, same face connectivity)이므로 template에서 1회 읽어 전 프레임에 적용.
+
+```
+bare OBJ (v + f)  ──▶  uv_transplant_refit.py  ──▶  textured OBJ (v + vt + f v/vt)
+                                                      + mouse_texture.mtl
+                                                      (mtllib reference in each OBJ)
+```
+
+```bash
+# Production 3600 slerp OBJs
+python scripts/uv_transplant_refit.py \
+    --src results/fitting/production_3600_slerp/obj/ \
+    --dst results/fitting/production_3600_slerp/obj_textured/ \
+    --texture exports/texture_final.png
+
+# 출력 검증 (샘플 3개 Blender/viewer 로드)
+# first: step_2_frame_000000.obj
+# mid:   step_2_frame_009000.obj
+# last:  step_2_frame_017995.obj
+```
+
+**Validation checklist before FaceLift handoff**:
+- [ ] All 3600 OBJs have `mtllib mouse_texture.mtl` header
+- [ ] `mouse_texture.mtl` references correct texture path
+- [ ] Sample 3 OBJs load with correct texture in Blender (texture not black/white)
+- [ ] Confirm with FaceLift team: static texture sufficient vs per-frame texture needed
 
 ### Visualization Outputs
 
