@@ -111,8 +111,10 @@ accurate:         독립 프레임 고품질. fast 대비 4배 iteration.
 | **Slerp 3600** | `results/fitting/production_3600_slerp/obj/` — 3600 OBJ ✅ |
 | **Videos** | `results/comparison/production_3600_slerp/` — 7 mesh-only views ✅ |
 | **GT overlay** | `results/comparison/production_3600_slerp_gt/` — 6-view ✅ (83MB) |
-| **Status** | ✅ Completed (fitting + slerp + GT overlay). |
-| **Next** | UV texture transplant → FaceLift handoff |
+| **UV transplant** | `results/fitting/production_3600_slerp/obj_textured/` — 3600 OBJ + MTL ✅ |
+| **Blender verify** | `results/comparison/texture_verify/` — frame 0/9000/17995 렌더 ✅ |
+| **Status** | ✅ Completed (fitting + slerp + GT overlay + UV transplant + Blender verify). |
+| **Next** | FaceLift team 확인 (static texture 충분? 좌표계 변환?) → handoff |
 
 ### FaceLift Handoff Spec
 
