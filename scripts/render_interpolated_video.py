@@ -5,8 +5,19 @@ Render smooth video by interpolating vertices between sparse OBJ keyframes.
 Takes N OBJ files at sparse intervals and generates smooth video by
 linearly interpolating vertex positions between adjacent keyframes.
 
+Modes:
+    --interp-factor 1  : Dense (no interpolation), streaming 1 OBJ at a time
+    --interp-factor N  : Sparse keyframes → N interpolated frames between each pair
+
 Usage:
-    # Interpolate 100 PoC frames (step=120) → smooth 400-frame video
+    # Dense 3600-frame GT|Mesh comparison (streaming, low RAM)
+    CUDA_VISIBLE_DEVICES=5 python scripts/render_interpolated_video.py \
+        --data-dir data/raw/markerless_mouse_1_nerf/ \
+        --obj-dir results/fitting/production_3600_slerp/obj/ \
+        --output results/comparison/production_3600_slerp_gt/ \
+        --views 0 1 2 3 4 5 --interp-factor 1 --fps 100
+
+    # Sparse keyframe interpolation (original use case)
     CUDA_VISIBLE_DEVICES=5 python scripts/render_interpolated_video.py \
         --obj-dir /home/joon/data/synthetic/textured_obj/ \
         --interp-factor 4 --views 3 --fps 10
@@ -39,21 +50,19 @@ def main():
     parser.add_argument("--output", default="results/comparison/sequence_interpolated/")
     parser.add_argument("--views", nargs="+", type=int, default=[3])
     parser.add_argument("--interp-factor", type=int, default=4,
-                        help="Interpolation steps between keyframes")
+                        help="Interpolation steps between keyframes. Use 1 for dense/no-interp streaming mode.")
     parser.add_argument("--fps", type=int, default=10)
     args = parser.parse_args()
 
     os.makedirs(args.output, exist_ok=True)
 
-    # Load OBJs
+    # Enumerate OBJ files (do NOT pre-load — stream on demand)
     obj_files = sorted([f for f in os.listdir(args.obj_dir) if f.endswith(".obj") and not f.endswith(".bak")])
     frame_ids = [int(f.split("frame_")[1].split(".")[0]) for f in obj_files]
-    print(f"Loading {len(frame_ids)} keyframes...")
-    all_verts = {}
-    for fid, fname in zip(frame_ids, obj_files):
-        all_verts[fid] = load_verts(os.path.join(args.obj_dir, fname))
+    obj_paths = {fid: os.path.join(args.obj_dir, fname) for fid, fname in zip(frame_ids, obj_files)}
+    print(f"Found {len(frame_ids)} OBJ files (streaming mode, ~1 OBJ in RAM at a time)")
 
-    # Setup rendering
+    # Setup rendering — shared across all views
     import pickle
     with open(os.path.join(args.data_dir, "new_cam.pkl"), "rb") as f:
         cams_raw = pickle.load(f)
@@ -96,17 +105,12 @@ def main():
                          (int(fc[2]), int(fc[1]), int(fc[0])))
         return img
 
-    def load_gt(frame_id, view_id):
-        cap = cv2.VideoCapture(os.path.join(args.data_dir, f"videos_undist/{view_id}.mp4"))
-        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id)
-        ret, frame = cap.read()
-        cap.release()
-        return frame if ret else np.zeros((1024, 1152, 3), dtype=np.uint8)
-
-    # Generate interpolated frames
     N = args.interp_factor
+    # Each pair (A, B) contributes N frames: A, A+1/N, ..., A+(N-1)/N
+    # The final B of the last pair is written separately after the loop.
+    # This half-open interval [A, B) avoids duplicate frames at segment boundaries.
     total_frames = (len(frame_ids) - 1) * N + 1
-    print(f"Generating {total_frames} frames ({len(frame_ids)} keyframes × {N} interp)")
+    print(f"Generating {total_frames} frames ({len(frame_ids)} OBJs × {N} interp factor)")
 
     for vid in args.views:
         W, H = 1152 * 2, 1024
@@ -121,41 +125,52 @@ def main():
         proc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
+        # Open GT video once per view (avoid per-frame open/close)
+        gt_cap = cv2.VideoCapture(os.path.join(args.data_dir, f"videos_undist/{vid}.mp4"))
+
+        def get_gt_frame(frame_id):
+            gt_cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id)
+            ret, frame = gt_cap.read()
+            return frame if ret else np.zeros((1024, 1152, 3), dtype=np.uint8)
+
         count = 0
+        va = load_verts(obj_paths[frame_ids[0]])  # load first frame
+
         for k in range(len(frame_ids) - 1):
             fid_a, fid_b = frame_ids[k], frame_ids[k + 1]
-            va, vb = all_verts[fid_a], all_verts[fid_b]
+            vb = load_verts(obj_paths[fid_b])  # load only next frame
 
             for s in range(N):
                 alpha = s / N
                 verts = va * (1 - alpha) + vb * alpha
-                # Interpolate GT frame ID for approximate GT
                 gt_fid = int(fid_a + (fid_b - fid_a) * alpha)
 
-                gt = load_gt(gt_fid, vid)
+                gt = get_gt_frame(gt_fid)
                 mesh = render_mesh(verts, vid)
                 cv2.putText(gt, f"GT f{gt_fid}", (10, 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-                cv2.putText(mesh, f"Mesh (interp {alpha:.1f})", (10, 30),
+                cv2.putText(mesh, f"Mesh (interp {alpha:.2f})", (10, 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
                 frame = cv2.resize(np.concatenate([gt, mesh], axis=1), (W, H))
                 proc.stdin.write(frame.tobytes())
                 count += 1
 
-            if (k + 1) % 10 == 0:
-                print(f"  [{k+1}/{len(frame_ids)-1}] keyframes, {count} total frames")
+            va = vb  # slide window: next iteration's "a" is current "b"
 
-        # Last keyframe
-        verts = all_verts[frame_ids[-1]]
-        gt = load_gt(frame_ids[-1], vid)
-        mesh = render_mesh(verts, vid)
+            if (k + 1) % 100 == 0:
+                print(f"  [{k+1}/{len(frame_ids)-1}] OBJs processed, {count} frames written")
+
+        # Last keyframe (closes the half-open interval)
+        gt = get_gt_frame(frame_ids[-1])
+        mesh = render_mesh(va, vid)
         cv2.putText(gt, f"GT f{frame_ids[-1]}", (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-        cv2.putText(mesh, "Mesh (keyframe)", (10, 30),
+        cv2.putText(mesh, "Mesh (last)", (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
         frame = cv2.resize(np.concatenate([gt, mesh], axis=1), (W, H))
         proc.stdin.write(frame.tobytes())
 
+        gt_cap.release()
         proc.stdin.close()
         proc.wait()
         print(f"Video: {vid_path} ({count+1} frames, {args.fps}fps)")
