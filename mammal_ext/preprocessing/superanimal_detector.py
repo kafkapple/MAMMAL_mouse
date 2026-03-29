@@ -1,3 +1,4 @@
+# no-split: SuperAnimal detector — model/inference/postprocess in single class
 """
 SuperAnimal-TopViewMouse based keypoint detection for MAMMAL
 

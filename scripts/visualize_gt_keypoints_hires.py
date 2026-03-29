@@ -1,3 +1,4 @@
+# no-split: GT keypoint visualizer — data loading and rendering tightly coupled
 #!/usr/bin/env python3
 """
 High-resolution GT keypoint visualization with improved label positioning.

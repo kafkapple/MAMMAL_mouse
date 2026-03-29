@@ -1,3 +1,4 @@
+# no-split: original MAMMAL body model — do not modify
 """
 This file is used to simulate the skinning process and constraints used in blender.
 

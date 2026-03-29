@@ -1,3 +1,4 @@
+# no-split: ablation comparison script — single-pass multi-metric analysis
 #!/usr/bin/env python
 """
 Ablation Study: Mesh Comparison Script

@@ -1,3 +1,4 @@
+# no-split: monocular fitting entry point — full pipeline in single pass
 #!/usr/bin/env python3
 """
 Monocular MAMMAL Fitting Pipeline

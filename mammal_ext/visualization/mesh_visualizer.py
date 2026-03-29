@@ -1,3 +1,4 @@
+# no-split: mesh visualizer — camera/render/export state shared across methods
 """
 Mesh Visualizer Module
 

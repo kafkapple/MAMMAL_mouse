@@ -1,3 +1,4 @@
+# no-split: UV renderer — projection/rasterization/texture sampling tightly coupled
 """
 UV Renderer Module
 

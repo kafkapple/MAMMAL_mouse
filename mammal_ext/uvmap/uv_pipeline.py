@@ -1,3 +1,4 @@
+# no-split: UV mapping pipeline — sequential stages share intermediate state
 """
 UV Map Generation Pipeline
 

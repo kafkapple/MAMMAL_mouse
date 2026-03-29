@@ -1,3 +1,4 @@
+# no-split: keypoint annotator v2 — GUI event loop + annotation state inseparable
 """
 Enhanced Keypoint Annotation Tool with Zoom and Visibility Control
 """

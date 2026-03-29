@@ -1,3 +1,4 @@
+# no-split: unified GUI annotator — event loop + state management must stay together
 """
 Unified Annotation Tool: Mask + Keypoint
 Integrates SAM-based mask annotation and semantic keypoint annotation

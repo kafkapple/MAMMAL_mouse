@@ -1,3 +1,4 @@
+# no-split: Rerun exporter — entity/transform/mesh data tightly coupled
 """
 Rerun Exporter Module
 

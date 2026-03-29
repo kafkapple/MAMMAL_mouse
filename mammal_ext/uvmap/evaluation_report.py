@@ -1,3 +1,4 @@
+# no-split: evaluation report — metrics/charts/output in single cohesive pass
 """
 UV Map Evaluation Report Generator
 

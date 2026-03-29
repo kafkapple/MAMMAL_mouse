@@ -1,3 +1,4 @@
+# no-split: experiment evaluator — load/compute/report in single sequential pass
 #!/usr/bin/env python
 """
 Evaluate mesh fitting results and generate comprehensive reports.

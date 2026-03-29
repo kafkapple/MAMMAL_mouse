@@ -1,3 +1,4 @@
+# no-split: texture optimization loop — loss/gradient/update tightly coupled
 """
 Texture Optimizer Module
 

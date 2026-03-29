@@ -1,3 +1,4 @@
+# no-split: textured renderer — UV/texture/rasterization pipeline in single class
 """
 Textured Mesh Renderer Module
 

@@ -98,7 +98,7 @@ accurate:         독립 프레임 고품질. fast 대비 4배 iteration.
 | **Optimal interval** | **4 M5 frames (0.2s): 7.1% body, 900 keyframes, ~52h/4GPU** |
 | Status | ✅ Completed |
 
-### E5: Production 900-Keyframe Fitting (in progress)
+### E5: Production 900-Keyframe Fitting ✅
 
 | 항목 | 값 |
 |------|---|
@@ -106,8 +106,13 @@ accurate:         독립 프레임 고품질. fast 대비 4배 iteration.
 | Frames | 900 keyframes (video interval=20, M5 interval=4) |
 | GPU | 4 (Part1), 5 (Part2), 6 (Part3), 7 (Part4) — 225 keyframes each |
 | Output | `results/fitting/production_keyframes_part{1-4}/` → merged `production_900_merged/` |
-| **Progress** | P1 ✅ P2 ✅ P3 216/225 P4 215/225 (98%) |
-| **Next** | merge → interpolate 3600 → smooth video → UV transplant |
+| **Progress** | P1 ✅ P2 ✅ P3 ✅ P4 ✅ (100%) |
+| **Merge** | `results/fitting/production_900_merged/` ✅ |
+| **Slerp 3600** | `results/fitting/production_3600_slerp/obj/` — 3600 OBJ ✅ |
+| **Videos** | `results/comparison/production_3600_slerp/` — 7 mesh-only views ✅ |
+| **GT overlay** | `results/comparison/production_3600_slerp_gt/` — in progress |
+| **Status** | ✅ Completed (fitting + slerp). GT overlay rendering. |
+| **Next** | UV texture transplant → FaceLift handoff |
 
 ### Visualization Outputs
 

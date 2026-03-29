@@ -1,3 +1,4 @@
+# no-split: single Optuna optimization loop — splitting breaks objective/callback coupling
 """
 Optuna-based UV Map Parameter Optimization
 

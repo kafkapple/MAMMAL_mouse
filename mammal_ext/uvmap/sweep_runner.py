@@ -1,3 +1,4 @@
+# no-split: HPO sweep orchestrator — tightly coupled trial/metric/logging flow
 """WandB Sweep runner for UV texture hyperparameter optimization.
 
 Main optimizer class and entry point for running WandB sweeps.

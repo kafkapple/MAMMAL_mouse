@@ -1,3 +1,4 @@
+# no-split: temporal mesh animation — shared frame state across functions
 #!/usr/bin/env python
 """
 Mesh Animation Video Generator

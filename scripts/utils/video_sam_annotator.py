@@ -1,3 +1,4 @@
+# no-split: video SAM annotator — frame iteration + mask state + GUI coupled
 """
 Video Frame Extraction + SAM Interactive Annotation
 Gradio-based web UI for extracting frames and annotating mouse regions

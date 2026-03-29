@@ -1,3 +1,4 @@
+# no-split: Blender mesh animation — Blender API calls require sequential state
 #!/usr/bin/env python
 """
 Blender Mesh Animation Script

@@ -1,3 +1,4 @@
+# no-split: single experiment run — setup/execute/teardown must stay together
 """
 UV Map Experiment Runner
 
