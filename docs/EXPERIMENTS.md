@@ -110,8 +110,8 @@ accurate:         독립 프레임 고품질. fast 대비 4배 iteration.
 | **Merge** | `results/fitting/production_900_merged/` ✅ |
 | **Slerp 3600** | `results/fitting/production_3600_slerp/obj/` — 3600 OBJ ✅ |
 | **Videos** | `results/comparison/production_3600_slerp/` — 7 mesh-only views ✅ |
-| **GT overlay** | `results/comparison/production_3600_slerp_gt/` — v0✅ v1✅ v2-v5 in progress |
-| **Status** | ✅ Completed (fitting + slerp). GT overlay rendering. |
+| **GT overlay** | `results/comparison/production_3600_slerp_gt/` — 6-view ✅ (83MB) |
+| **Status** | ✅ Completed (fitting + slerp + GT overlay). |
 | **Next** | UV texture transplant → FaceLift handoff |
 
 ### FaceLift Handoff Spec
@@ -163,7 +163,7 @@ python scripts/uv_transplant_refit.py \
 | 100-frame sequence | `results/comparison/sequence/` | 6-view grid + per-view videos |
 | Interpolated smooth | `results/comparison/sequence_interpolated/` | 397fr vertex lerp |
 | Dense smooth | `results/comparison/sequence_dense/` | M5 0-99 at 20fps |
-| GT overlay (3600fr) | `results/comparison/production_3600_slerp_gt/` | 6-view GT\|Mesh 100fps |
+| GT overlay (3600fr) | `results/comparison/production_3600_slerp_gt/` | 6-view GT\|Mesh 100fps ✅ |
 
 ## Analysis Tools
 
