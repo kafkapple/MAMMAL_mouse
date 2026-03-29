@@ -150,9 +150,9 @@ python scripts/uv_transplant_refit.py \
 ```
 
 **Validation checklist before FaceLift handoff**:
-- [ ] All 3600 OBJs have `mtllib mouse_texture.mtl` header
-- [ ] `mouse_texture.mtl` references correct texture path
-- [ ] Sample 3 OBJs load with correct texture in Blender (texture not black/white)
+- [x] All 3600 OBJs have `mtllib mouse_texture.mtl` header
+- [x] `mouse_texture.mtl` references correct texture path (`../../../../exports/texture_final.png`)
+- [x] Sample 3 OBJs load with correct texture in Blender — renders at `results/comparison/texture_verify/`
 - [ ] Confirm with FaceLift team: static texture sufficient vs per-frame texture needed
 
 ### Visualization Outputs
