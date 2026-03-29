@@ -5,7 +5,7 @@
 set -e
 cd "$(dirname "$0")/.."
 source /home/joon/anaconda3/etc/profile.d/conda.sh
-conda activate mouse
+conda activate mammal_stable
 
 GPU_ID=${1:-5}
 echo "=== Fitting Parameter Sweep on GPU $GPU_ID ==="

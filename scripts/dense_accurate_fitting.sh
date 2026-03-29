@@ -10,7 +10,7 @@
 set -e
 cd "$(dirname "$0")/.."
 source /home/joon/anaconda3/etc/profile.d/conda.sh
-conda activate mouse
+conda activate mammal_stable
 
 GPU_ID=${1:?Usage: $0 <GPU_ID> <START_M5> <END_M5>}
 START_M5=${2:?Provide START_M5 index}

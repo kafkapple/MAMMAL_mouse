@@ -11,12 +11,12 @@ set -e
 echo ""
 echo "📦 [1/9] Conda 환경 재생성..."
 conda deactivate 2>/dev/null || true
-conda remove -n mouse --all -y 2>/dev/null || true
-conda create -n mouse python=3.9 -y
+conda remove -n mammal_stable --all -y 2>/dev/null || true
+conda create -n mammal_stable python=3.9 -y
 
 # Conda 환경 활성화
 source ~/anaconda3/etc/profile.d/conda.sh
-conda activate mouse
+conda activate mammal_stable
 
 # CUDA 11.8 환경 변수 설정
 echo ""
@@ -137,7 +137,7 @@ echo "✅ 모든 설치가 완료되었습니다!"
 echo "========================================="
 echo ""
 echo "다음 명령어로 환경을 활성화하세요:"
-echo "  conda activate mouse"
+echo "  conda activate mammal_stable"
 echo ""
 echo "프로그램 실행:"
 echo "  bash run.sh"
