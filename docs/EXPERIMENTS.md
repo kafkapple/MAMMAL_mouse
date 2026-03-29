@@ -125,7 +125,8 @@ accurate:         독립 프레임 고품질. fast 대비 4배 iteration.
 | **OBJ source** | `results/fitting/production_3600_slerp/obj/` | 3600 slerp-interpolated OBJs, 14522 verts each ✅ |
 | **Texture** | `exports/texture_final.png` (static) | Per-frame texture status: **unverified** — confirm with FaceLift team |
 | **UV transplant output** | `results/fitting/production_3600_slerp/obj_textured/` | OBJ + `.mtl` + texture ref |
-| **Coordinate system** | MAMMAL (mm, -Y up) | FaceLift expects: confirm transform needed |
+| **Keyframe list** | `exports/keyframe_indices.txt` | 900 keyframes (video frame 번호, step=20) ✅ |
+| **Coordinate system** | MAMMAL (mm, -Y up) | FaceLift `coordinate_utils.py`가 처리 — 사전 변환 불필요 ✅ |
 
 ### UV Transplant Pipeline
 
@@ -155,7 +156,9 @@ python scripts/uv_transplant_refit.py \
 - [x] All 3600 OBJs have `mtllib mouse_texture.mtl` header
 - [x] `mouse_texture.mtl` references correct texture path (`../../../../exports/texture_final.png`)
 - [x] Sample 3 OBJs load with correct texture in Blender — renders at `results/comparison/texture_verify/`
-- [ ] Confirm with FaceLift team: static texture sufficient vs per-frame texture needed
+- [x] FaceLift team confirmed: static texture sufficient, mm 좌표 그대로 전달, 프레임 1:1 대응
+- [x] `exports/keyframe_indices.txt` 생성 — 900 keyframe video frames (step=20), 900/900 cross-checked
+- [ ] FaceLift team 확인: `obj_textured/` 필요 여부 (vs geometry-only `obj/`만 전달)
 
 ### Visualization Outputs
 
