@@ -108,7 +108,7 @@ accurate:         독립 프레임 고품질. fast 대비 4배 iteration.
 | Output | `results/fitting/production_keyframes_part{1-4}/` → merged `production_900_merged/` |
 | **Progress** | P1 ✅ P2 ✅ P3 ✅ P4 ✅ (100%) |
 | **Merge** | `results/fitting/production_900_merged/` ✅ |
-| **Slerp 3600** | `results/fitting/production_3600_slerp/obj/` — 3600 OBJ ✅ |
+| **Slerp 3600** | `results/fitting/production_3600_slerp/obj/` — 3600 OBJ ✅ (7.1% body error; fast-motion frames may have self-intersection) |
 | **Videos** | `results/comparison/production_3600_slerp/` — 7 mesh-only views ✅ |
 | **GT overlay** | `results/comparison/production_3600_slerp_gt/` — 6-view ✅ (83MB) |
 | **UV transplant** | `results/fitting/production_3600_slerp/obj_textured/` — 3600 OBJ + MTL ✅ |
@@ -123,7 +123,7 @@ accurate:         독립 프레임 고품질. fast 대비 4배 iteration.
 | **Frame alignment** | video interval=5 (M5 dataset) | pose-splatter uses same interval — must match |
 | **Keyframe interval** | M5 interval=4 (900 keyframes, 0.2s gap) | Slerp interpolates to full 3600 |
 | **OBJ source** | `results/fitting/production_3600_slerp/obj/` | 3600 slerp-interpolated OBJs, 14522 verts each ✅ |
-| **Texture** | `exports/texture_final.png` (static) | Per-frame texture status: **unverified** — confirm with FaceLift team |
+| **Texture** | `exports/texture_final.png` (static) | Use as GS **initialization**, not strong prior — static texture can't capture dynamic fur/lighting |
 | **UV transplant output** | `results/fitting/production_3600_slerp/obj_textured/` | OBJ + `.mtl` + texture ref |
 | **Keyframe list** | `exports/keyframe_indices.txt` | 900 keyframes (video frame 번호, step=20) ✅ |
 | **Coordinate system** | MAMMAL (mm, -Y up) | FaceLift `coordinate_utils.py`가 처리 — 사전 변환 불필요 ✅ |
