@@ -1,3 +1,4 @@
+# no-split: original MAMMAL paper fitter — single-class optimization pipeline, splitting breaks algorithm locality
 # ===== GPU Configuration (MUST be before torch import) =====
 # Extracted to mammal_ext.config.gpu for reusability
 from mammal_ext.config import configure_gpu
@@ -658,6 +659,8 @@ class MouseFitter():
         return loss_theta 
 
     def set_previous_frame(self, previous_params): 
+        # Set init_thetas for theta regularization loss (needed for resume mode)
+        self.init_thetas = previous_params["thetas"].detach().to(self.device)
         self.last_params = {} 
         for k,v in previous_params.items(): 
             self.last_params.update({
