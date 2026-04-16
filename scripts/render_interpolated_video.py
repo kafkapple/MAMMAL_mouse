@@ -51,7 +51,9 @@ def main():
     parser.add_argument("--views", nargs="+", type=int, default=[3])
     parser.add_argument("--interp-factor", type=int, default=4,
                         help="Interpolation steps between keyframes. Use 1 for dense/no-interp streaming mode.")
-    parser.add_argument("--fps", type=int, default=10)
+    parser.add_argument("--fps", type=int, default=20,
+                        help="Output fps. Default 20 matches M5 interval=5 real-time "
+                             "(raw video 100fps / interval 5). Use 100 only for --interp-factor=5 dense.")
     args = parser.parse_args()
 
     os.makedirs(args.output, exist_ok=True)

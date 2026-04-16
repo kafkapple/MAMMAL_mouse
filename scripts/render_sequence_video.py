@@ -30,7 +30,8 @@ def main():
     parser.add_argument("--obj-dir", default="/home/joon/data/synthetic/textured_obj/")
     parser.add_argument("--output", default="results/comparison/sequence/")
     parser.add_argument("--views", nargs="+", type=int, default=[3])
-    parser.add_argument("--fps", type=int, default=5)
+    parser.add_argument("--fps", type=int, default=20,
+                        help="Output fps. Default 20 matches M5 interval=5 real-time.")
     parser.add_argument("--device", default="cuda")
     args = parser.parse_args()
 
