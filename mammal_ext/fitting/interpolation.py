@@ -102,6 +102,7 @@ def _quat_to_axis_angle(q: np.ndarray) -> np.ndarray:
     q = q / n
     if q[0] < 0.0:
         q = -q
+    # After the flip q[0] ∈ [0, 1] by construction; clip defends against float noise.
     w = np.clip(q[0], 0.0, 1.0)
     angle = 2.0 * np.arccos(w)
     s = np.sqrt(max(1.0 - w * w, 0.0))
