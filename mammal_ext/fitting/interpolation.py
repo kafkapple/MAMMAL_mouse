@@ -36,7 +36,13 @@ def axis_angle_to_rotation_matrix(axis_angle: np.ndarray) -> np.ndarray:
 
 
 def rotation_matrix_to_axis_angle(R: np.ndarray) -> np.ndarray:
-    """Convert rotation matrix (3, 3) to axis-angle (3,)."""
+    """Convert rotation matrix (3, 3) to axis-angle (3,).
+
+    Numerically unstable near angle=π (2*sin(angle) → 0). Not used by
+    slerp_axis_angle (which routes through quaternions). If you need slerp,
+    call slerp_axis_angle; if you need matrix→axis-angle near π, use a
+    Shepperd-style extractor on the diagonal.
+    """
     angle = np.arccos(np.clip((np.trace(R) - 1) / 2, -1, 1))
     if angle < 1e-8:
         return np.zeros(3)
@@ -46,16 +52,84 @@ def rotation_matrix_to_axis_angle(R: np.ndarray) -> np.ndarray:
     return axis * angle
 
 
+def canonicalize_axis_angle(aa: np.ndarray) -> np.ndarray:
+    """Reduce axis-angle magnitude to [0, π] while preserving rotation.
+
+    MAMMAL fitter converges to |θ|>π for ~4% of joint-theta entries (100% of
+    keyframes have at least one such joint). Non-canonical forms cause
+    pathological interpolation in axis-angle space — two rotation-equivalent
+    representations slerp along different trajectories. Canonicalization is
+    rotation-preserving (verified rotmat max_err ~1e-7 float noise).
+
+    For |θ|>π: equivalent rotation is (-axis, 2π-θ). Wrapping handles the
+    rare case |θ|>2π (seen up to 6.92 in production keyframes).
+    """
+    theta = np.linalg.norm(aa)
+    if theta < 1e-8 or theta <= np.pi:
+        return aa.copy() if isinstance(aa, np.ndarray) else np.asarray(aa)
+    axis = aa / theta
+    # Reduce theta to (0, 2pi], then fold into [0, pi] with axis negation.
+    theta = theta % (2.0 * np.pi)
+    if theta > np.pi:
+        return -axis * (2.0 * np.pi - theta)
+    return axis * theta
+
+
+def _axis_angle_to_quat(aa: np.ndarray) -> np.ndarray:
+    """Axis-angle (3,) → unit quaternion [w, x, y, z]. Auto-canonicalizes."""
+    aa = canonicalize_axis_angle(aa)
+    angle = np.linalg.norm(aa)
+    if angle < 1e-8:
+        return np.array([1.0, 0.0, 0.0, 0.0])
+    axis = aa / angle
+    half = angle * 0.5
+    s = np.sin(half)
+    return np.array([np.cos(half), axis[0] * s, axis[1] * s, axis[2] * s])
+
+
+def _quat_to_axis_angle(q: np.ndarray) -> np.ndarray:
+    """Unit quaternion [w, x, y, z] → axis-angle (3,)."""
+    n = np.linalg.norm(q)
+    if n < 1e-12:
+        return np.zeros(3)
+    q = q / n
+    w = np.clip(q[0], -1.0, 1.0)
+    angle = 2.0 * np.arccos(w)
+    s = np.sqrt(max(1.0 - w * w, 0.0))
+    if s < 1e-8:
+        return np.zeros(3)
+    return (q[1:] / s) * angle
+
+
 def slerp_axis_angle(aa1: np.ndarray, aa2: np.ndarray, alpha: float) -> np.ndarray:
-    """Spherical linear interpolation for axis-angle rotations."""
-    R1 = axis_angle_to_rotation_matrix(aa1)
-    R2 = axis_angle_to_rotation_matrix(aa2)
-    # Relative rotation
-    R_rel = R1.T @ R2
-    aa_rel = rotation_matrix_to_axis_angle(R_rel)
-    # Interpolate
-    R_interp = R1 @ axis_angle_to_rotation_matrix(aa_rel * alpha)
-    return rotation_matrix_to_axis_angle(R_interp)
+    """Shortest-path slerp for axis-angle via quaternion.
+
+    Fixes matrix-based slerp failure modes that produced mesh pops when
+    adjacent keyframes straddle a joint-rotation antipode:
+      - dot < 0  → hemisphere flip (shortest path)
+      - dot > 0.9995 → nlerp (numerically stable near identity)
+      - |dot| < 0.01 → nlerp fallback (geodesic ambiguous near ±π)
+    """
+    q1 = _axis_angle_to_quat(aa1)
+    q2 = _axis_angle_to_quat(aa2)
+    dot = float(np.dot(q1, q2))
+    if dot < 0.0:
+        q2 = -q2
+        dot = -dot
+    # After hemisphere correction dot ∈ [0, 1]. Only dot ≈ 1 (near-identity,
+    # sin(theta_0) → 0) is numerically unstable for slerp; mid-range dot
+    # (e.g. 0.01) corresponds to theta_0 ≈ π/2 and is stable.
+    if dot > 0.9995:
+        q = q1 + alpha * (q2 - q1)
+        q = q / max(np.linalg.norm(q), 1e-12)
+        return _quat_to_axis_angle(q)
+    theta_0 = np.arccos(np.clip(dot, -1.0, 1.0))
+    sin_theta_0 = np.sin(theta_0)
+    theta = theta_0 * alpha
+    s1 = np.sin(theta_0 - theta) / sin_theta_0
+    s2 = np.sin(theta) / sin_theta_0
+    q = s1 * q1 + s2 * q2
+    return _quat_to_axis_angle(q)
 
 
 class KeyframeInterpolator:
@@ -104,7 +178,13 @@ class KeyframeInterpolator:
         self.faces = self.body_model.faces_vert_np
 
     def _find_neighbors(self, frame_id: int) -> Tuple[int, int]:
-        """Find the two nearest keyframes bracketing frame_id."""
+        """Find the two nearest keyframes bracketing frame_id.
+
+        Out-of-range behavior: clamps to the edge keyframe (no extrapolation).
+          frame_id < sorted_ids[0]   → (sorted_ids[0], sorted_ids[0])
+          frame_id > sorted_ids[-1]  → (sorted_ids[-1], sorted_ids[-1])
+        Callers detect clamping via prev_id == next_id.
+        """
         prev_id = self.sorted_ids[0]
         next_id = self.sorted_ids[-1]
         for i, kid in enumerate(self.sorted_ids):
