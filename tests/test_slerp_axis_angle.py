@@ -101,10 +101,10 @@ class TestCanonicalizeSequence:
         assert gap < 0.5, f"midpoint too far from endpoint (gap={gap:.3f} rad) — hemisphere correction failed"
 
     def test_mixed_sequence_slerp_endpoints(self):
-        # Mixed sequence [θ>π, θ<π, θ>π] can make adjacent canon quats antipodal.
+        # Mixed sequence [θ>π, θ<π] makes adjacent canon quats antipodal.
         # slerp_axis_angle's hemisphere correction (dot<0 → q2=-q2) must handle this.
-        aa_big1 = np.array([3.1, 0.0, 0.0])   # > π
-        aa_small = np.array([0.9, 0.0, 0.0])  # < π
+        aa_big1 = np.array([3.20, 0.0, 0.0])  # > π (canon flips axis)
+        aa_small = np.array([0.9, 0.0, 0.0])  # < π (canon unchanged)
         # Slerp at α=0 and α=1 must still return the endpoints (within float noise)
         assert _allclose(slerp_axis_angle(aa_big1, aa_small, 0.0),
                          canonicalize_axis_angle(aa_big1))

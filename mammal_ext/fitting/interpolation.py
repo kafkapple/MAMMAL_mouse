@@ -88,12 +88,21 @@ def _axis_angle_to_quat(aa: np.ndarray) -> np.ndarray:
 
 
 def _quat_to_axis_angle(q: np.ndarray) -> np.ndarray:
-    """Unit quaternion [w, x, y, z] → axis-angle (3,)."""
+    """Unit quaternion [w, x, y, z] → canonical axis-angle (3,), |θ|≤π.
+
+    Ensures scalar component w ≥ 0 (q and -q represent the same rotation; we
+    pick the representative with non-negative scalar). Without this, slerp
+    output via hemisphere-corrected quaternion can yield |θ|>π even when both
+    endpoints are canonical — a subtle bug that only surfaces in
+    cross-hemisphere sequences (e.g. θ_a > π with θ_b < π).
+    """
     n = np.linalg.norm(q)
     if n < 1e-12:
         return np.zeros(3)
     q = q / n
-    w = np.clip(q[0], -1.0, 1.0)
+    if q[0] < 0.0:
+        q = -q
+    w = np.clip(q[0], 0.0, 1.0)
     angle = 2.0 * np.arccos(w)
     s = np.sqrt(max(1.0 - w * w, 0.0))
     if s < 1e-8:
