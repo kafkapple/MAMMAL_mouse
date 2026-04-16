@@ -156,7 +156,8 @@ class KeyframeInterpolator:
 
         for f in files:
             fid = int(f.split("frame_")[1].split(".")[0])
-            p = pickle.load(open(f, "rb"))
+            with open(f, "rb") as fh:
+                p = pickle.load(fh)
             # Convert to numpy
             d = {}
             for k, v in p.items():

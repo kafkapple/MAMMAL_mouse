@@ -12,13 +12,18 @@ If a list of visually observed pop frames is supplied, also emit
 a correlation summary (hit / miss / false-positive).
 
 Usage:
-    CUDA_VISIBLE_DEVICES= python scripts/diagnostic_slerp.py \
-        --params-dir results/fitting/production_900_merged/ \
+    # Requires CUDA context (params .pkl contain CUDA tensors saved via
+    # pickle.dump; deserializing triggers torch storage restoration that
+    # fails if cuda.is_available() is False — regardless of map_location).
+    # No kernels are launched here, so sm_120-incompatible PyTorch (e.g.
+    # mammal_stable) works as long as a Blackwell GPU is visible.
+    python scripts/diagnostic_slerp.py \
+        --params-dir results/fitting/production_900_merged/params/ \
         --output results/reports/slerp_diagnostic.csv
 
     # Optional: cross-reference visual pops
     python scripts/diagnostic_slerp.py \
-        --params-dir results/fitting/production_900_merged/ \
+        --params-dir results/fitting/production_900_merged/params/ \
         --output results/reports/slerp_diagnostic.csv \
         --visual-pops 1320,5520,9480
 """
@@ -49,7 +54,8 @@ def _load_keyframe_thetas(params_dir: str) -> Dict[int, np.ndarray]:
     out = {}
     for f in files:
         fid = int(f.split("frame_")[1].split(".")[0])
-        p = pickle.load(open(f, "rb"))
+        with open(f, "rb") as fh:
+            p = pickle.load(fh)
         thetas = p["thetas"]
         if hasattr(thetas, "detach"):
             thetas = thetas.detach().cpu().numpy()

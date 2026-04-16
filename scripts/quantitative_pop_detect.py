@@ -140,16 +140,21 @@ def main():
     if intervals:
         print(f"  loaded {len(intervals)} flagged slerp intervals for correlation")
 
-    # Build rows: one per frame (frame_id corresponds to fids[i+1] for accel)
+    # Build rows: one per frame (frame_id corresponds to fids[i+1] for accel).
+    # Velocity is reported as the centered average (dv[i] backward + dv[i+1]
+    # forward, both exist for i in 0..N-3 which matches accel's domain) so
+    # the column is frame-aligned with accel_mean rather than forward-biased.
     rows = []
     for i, acc in enumerate(accel):
         fid = fids[i + 1]  # centered frame
         slerp_flag = _in_any_interval(fid, intervals)
+        vel_centered = 0.5 * (float(dv[i]) + float(dv[i + 1]))
+        vel_z_centered = 0.5 * (float(vel_z[i]) + float(vel_z[i + 1]))
         rows.append({
             "frame_id": fid,
-            "velocity_mean": float(dv[i + 1]) if i + 1 < len(dv) else float(dv[-1]),
+            "velocity_centered": vel_centered,
             "accel_mean": float(acc),
-            "vel_zscore": float(vel_z[i + 1]) if i + 1 < len(vel_z) else float(vel_z[-1]),
+            "vel_zscore": vel_z_centered,
             "accel_zscore": float(acc_z[i]),
             "pop_flag": "POP" if acc_z[i] > args.threshold else "",
             "slerp_flag": slerp_flag or "",
