@@ -159,15 +159,23 @@ class UVMapPipeline:
             data_dir = cfg.get('data', {}).get('data_dir', '')
             views_to_use = cfg.get('data', {}).get('views_to_use', [0,1,2,3,4,5])
         else:
-            # Default paths
-            data_dir = 'data/examples/markerless_mouse_1_nerf'
+            # Default paths (post-refactor: data moved to data/raw/)
+            data_dir = 'data/raw/markerless_mouse_1_nerf'
             views_to_use = [0,1,2,3,4,5]
 
         # Resolve data_dir path
         if not os.path.isabs(data_dir):
-            # Try relative to project root
-            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            data_dir = os.path.join(project_root, data_dir)
+            # project_root = 3 levels up: uvmap/uv_pipeline.py → uvmap/ → mammal_ext/ → MAMMAL_mouse/
+            project_root = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), '..', '..')
+            )
+            candidate = os.path.join(project_root, data_dir)
+            # Fallback: legacy data/examples/ path (pre-refactor on bori)
+            if not os.path.exists(candidate):
+                legacy = os.path.join(project_root, 'data', 'examples', 'markerless_mouse_1_nerf')
+                if os.path.exists(legacy):
+                    candidate = legacy
+            data_dir = candidate
 
         # Load camera pickle
         cam_path = os.path.join(data_dir, 'new_cam.pkl')
