@@ -2,6 +2,8 @@
 
 > MAMMAL, OpenGL, OpenCV, Blender 좌표계 및 변환, PoseSplatter 정렬
 
+> 🔗 **Cross-project bridge**: MAMMAL ↔ FaceLift novel view render는 `docs/coordinates/MAMMAL_FACELIFT_BRIDGE.md` 참조 (2026-04-17 MVP 검증 완료).
+
 ---
 
 ## 주요 3D 좌표계
@@ -261,6 +263,7 @@ for i in range(6):
 
 | 문서 | 내용 |
 |------|------|
+| **[MAMMAL_FACELIFT_BRIDGE](../coordinates/MAMMAL_FACELIFT_BRIDGE.md)** | **Cross-project**: MAMMAL → FaceLift novel view render transform (MVP 검증 2026-04-17) |
 | [VISUALIZATION_GUIDE](../guides/VISUALIZATION_GUIDE.md) | 메쉬 시각화 및 Blender 연동 |
 | [UVMAP_GUIDE](../guides/UVMAP_GUIDE.md) | Blender 내보내기 좌표 변환 |
 | [ARCHITECTURE](ARCHITECTURE.md) | MAMMAL 시스템 좌표계 맥락 |

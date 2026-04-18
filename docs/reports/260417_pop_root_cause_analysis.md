@@ -5,6 +5,10 @@
 **Status**: ✅ 4 root causes identified + validated. 1 patch landed + tested. Remediation partial.
 **Supersedes**: `260416_paper_fast_rerun_research_note.md` (rerun plan 폐기 — 근거 이 문서)
 
+> 🔗 **Related SSOT**: [260417_mesh_quality_failure_modes.md](260417_mesh_quality_failure_modes.md) — Pop (F1-F5) + Belly-dent (F6) 통합 taxonomy
+> 🔗 **Empirical validation**: `../../results/reports/260417_canon_vs_paper_validation.md` — Canon patch pop frame +0.54 IoU
+> 🔗 **Belly-dent update**: [260417_belly_deformer_investigation.md](260417_belly_deformer_investigation.md) — F6j (belly_stretch_deformer missing) 가설 empirical 약화
+
 ---
 
 ## 1. Prior Hypothesis (from handoff 260416_1637)
@@ -71,6 +75,39 @@ From `keyframe_outlier_detect.py` (accel_z > 5):
 - Scale varies 113.9 → 128.0 (10%+ within single animal sequence). Max per-KF delta 13.07.
 - Bone length delta max 4.67 mm between consecutive keyframes.
 - Both should be constant for single-animal fit. Drift indicates missing regularization.
+
+### Root cause #6: Spatial shape quality — belly-dent / candy-wrapper **(added 2026-04-17 per /audit --fact --devil)**
+
+Distinct failure-mode from pop (F1-F4): **공간 축 shape 왜곡 at single frame**, not temporal discontinuity.
+
+**Symptoms** (user-reported, GT RGB 대비 grid image):
+- Belly-dent: 배쪽 함몰, 비정상 mesh 표면
+- 팔다리 뒤틀림, 꼬리 관통 (ref: 260323_mesh_refit_experiment_report.md §2)
+- Candy-wrapper artifact in extreme pose (ref: 260327_lbs_skinning_analysis.md §1)
+
+**Contributing mechanisms** (cross-referenced):
+
+| Sub-cause | Evidence | Source |
+|-----------|----------|--------|
+| **F6a**: LBS no blend shapes — pose-dependent correctives 부재 (vs SMPL 207, SMAL pose correctives) | 260327 §2.3 MAMMAL vs SMPL 비교표 | 260327_lbs_skinning_analysis.md |
+| **F6b**: Rearing/extreme pose OOD — T-pose init에서 local minimum | Frame 10080/9840 accurate Δ=0.04 (vs 일반 +0.15) | 260327 §3.2 |
+| **F6c**: paper_fast `mask_loss=0` → silhouette under-fit → belly 정밀 영역 under-regularized | 260323 §3.2: paper_fast vs accurate mask_step2=0 vs 3000 | 260323_mesh_refit_experiment_report.md |
+| **F6d**: Pre-computed mask 없음 → rendered silhouette mask 의존 (자기순환) | 260327 §3.2 | 260327 |
+| **F6e**: Bone-length per-frame variation (F5와 연결) — 해부학 상수 미pin | 260327 §6.1 #5 | 260327 |
+
+**Temporal vs Spatial 실패 분리**:
+- F1-F5 = **시간 축**: frame i와 frame i+1 사이 pop (interpolation / fitter regularization)
+- F6 = **공간 축**: single-frame shape quality (LBS 모델 한계 / 포즈 OOD / silhouette regularization)
+- 두 mode는 원인·fix가 **직교**. F1-F5 해결은 belly-dent을 자동으로 해결하지 않는다.
+
+**Current investigation status**:
+- Quantitative metric: `belly_iou_diagnostic.py` v1 (2D bbox proxy) — vertex-group 기반 v2 미구축
+- Empirical test (H-B5, 2026-04-17 실행): refit_accurate_23 (mask_loss=3000) vs production_3600_slerp (mask_loss=0) 동일 23 frame belly IoU 직접 비교 → F6c 검증
+
+**Remediation track** (separate from T1-T6 pop track):
+- **Short-term** (next session): F6c check via H-B5, F6b rearing init template (260327 §4.3 E2)
+- **Mid-term** (1-2 months): F6a LBS blend shapes (Phase 3, 260327 §4)
+- **Integrated**: T4 (fitter-level fix) scope 확장 — `|θ|≤π` + bone_length pin + scale pin + mask_loss default↑ + rearing detection
 
 ---
 

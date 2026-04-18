@@ -33,6 +33,27 @@ MAMMAL fitting 결과(mesh parameters)와 multi-view 영상으로부터 UV textu
 | `results/fitting/{experiment}/uvmap/uv_mask.png` | 유효 UV 영역 마스크 |
 | `results/fitting/{experiment}/uvmap/texture.pt` | PyTorch tensor 저장 |
 
+### ⭐ Canonical Production Texture (SSOT, 2026-04-18 late, post P0 deployment)
+
+| 경로 | 상태 | ΔE vs GT | 용도 |
+|------|:---:|:---:|------|
+| `results/sweep/production_p0/texture_final.png` | ✅ **Canonical (NEW)** | **mean 17.7** (12.7-22.8) | **P0 gamma 2.2 + hist match**. Dark-brown body, ICML figures 사용. `scripts/novel_view_render.py --texture-img` 권장 default |
+| `results/sweep/run_wild-sweep-9/texture_final.png` | 🔵 Reference raw-average | ~100+ (olive-gray) | WandB HPO top score (0.836) but `do_optimization=false` → raw average projection. Olive-gray appearance. **Reference only**; P0's source |
+| `exports/sequence/texture_final.png` | ❌ **Broken (do not use)** | N/A | 흰색+smudges incomplete. 과거 default 오류 — 사용 금지 |
+
+→ 코드 default: `scripts/novel_view_render.py:222-225`에 명시됨 (예정 업데이트: P0로 변경)
+→ **P0 생성 방법**: `python scripts/texture_multipath_experiment.py --obj {obj} --output {dir}` → `texture_p0_gamma.png`
+→ **근거 보고서**: `docs/reports/260418_texture_multipath_comparison.md`
+→ **향후 개선안 P2.5 (occlusion-aware projection)**: 같은 보고서 §4 참조 — 예상 ΔE < 17
+
+### Texture Quality 역사
+
+| Date | 상태 | 측정 ΔE | 비고 |
+|------|:---:|:---:|------|
+| 2026-01-27 | sweep-9 raw-average deploy | 미측정 (~100+) | WandB Bayesian HPO, `fusion=average, do_opt=false` |
+| 2026-04-18 (AM) | sweep-9 = 당시 "canonical" 지정 | 미측정 | broken exports/sequence 대체 |
+| 2026-04-18 (late) | P0 gamma+hist → **새 canonical** | **17.7** | /audit --fact --devil로 P1 debug 대신 P0 band-aid 채택 |
+
 ---
 
 ## 아키텍처

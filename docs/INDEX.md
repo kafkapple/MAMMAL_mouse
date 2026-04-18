@@ -27,7 +27,13 @@ docs/
 │   ├── PAPER.md
 │   └── EXPERIMENTS.md
 │
-├── research/                # 날짜별 연구노트
+├── coordinates/             # Cross-project 좌표 bridge (SSOT 역할)
+│   └── MAMMAL_FACELIFT_BRIDGE.md
+│
+├── research/                # 날짜별 연구노트 (탐색, 초기 가설)
+│   └── YYMMDD_*.md
+│
+├── reports/                 # 검증된 분석 + 결과 (SSOT)
 │   └── YYMMDD_*.md
 │
 └── setup/                   # 환경 설정
@@ -64,6 +70,39 @@ docs/
 | **[COORDINATES](reference/COORDINATES.md)** | 좌표계 (MAMMAL -Y up / OpenGL / OpenCV / Blender), 변환, PoseSplatter 정렬 |
 | **[PAPER](reference/PAPER.md)** | 논문 설정 (iterations, wsil=0), Citation, paper_fast config |
 | **[EXPERIMENTS](reference/EXPERIMENTS.md)** | 실험 config, Keypoint/View ablation, Batch runs, Background 실행 |
+
+---
+
+## Cross-Project Coord Bridges (coordinates/)
+
+검증된 좌표계 통합 문서 (cross-repo reference).
+
+| 문서 | 내용 |
+|------|------|
+| **[MAMMAL_FACELIFT_BRIDGE](coordinates/MAMMAL_FACELIFT_BRIDGE.md)** | MAMMAL → FaceLift novel view render transform pipeline (MVP 검증 2026-04-17) |
+
+---
+
+## 검증된 분석·결과 (reports/)
+
+SSOT 분석 문서. `research/` 는 탐색, `reports/` 는 검증된 결론.
+
+| 날짜 | 주제 |
+|------|------|
+| [260417](reports/260417_pop_root_cause_analysis.md) | Pop root cause analysis (F1-F6) + 패치 검증 |
+| [260417](reports/260417_mesh_quality_failure_modes.md) | **SSOT** — Pop + Belly-dent 통합 failure mode taxonomy |
+| [260417](reports/260417_belly_deformer_investigation.md) | F6j (belly_stretch_deformer 누락) 가설 empirical 약화 |
+| [260417](reports/260417_novel_view_mvp_research_note.md) | Novel view MVP 검증 + coord integration 기록 |
+| [260418](reports/260418_session_plan_priority.md) | Session plan + priority after pop fix + novel view MVP |
+| [260418](reports/260418_phase_a_belly_findings.md) | Phase A belly correlation (N=23, preliminary — superseded by extension) |
+| [260418](reports/260418_phase_a_extension_report.md) | **Phase A extension (N=100) Pearson+Spearman + per-view baseline** — kinematic hypotheses no-evidence |
+| [260416](reports/260416_mammal_3600_slerp_status_audit.md) | 3600 slerp 상태 감사 (pre-canon) |
+| [260416](reports/260416_paper_fast_rerun_research_note.md) | *(Superseded by 260417 root_cause)* paper_fast rerun 가설 |
+| [260416](reports/260416_paper_vs_production_comparison.md) | Paper_fast vs production 비교 |
+| [260327](reports/260327_lbs_skinning_analysis.md) | LBS skinning + blend shape 부재 분석 |
+| [260323](reports/260323_mesh_refit_experiment_report.md) | 23-frame accurate refit 실험 |
+
+※ 추가로 `results/reports/` 에 일부 세션 운영 artifacts: `260417_canon_vs_paper_validation.md`, `260417_g3_refit_vs_badkf_overlap.md`, `260417_phase0_belly_findings.md` (docs/reports/ 와 상호 참조됨)
 
 ---
 
@@ -117,4 +156,4 @@ docs/
 
 ---
 
-*Last updated: 2026-02-06*
+*Last updated: 2026-04-17*

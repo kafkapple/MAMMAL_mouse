@@ -1,3 +1,5 @@
+> ⚠️ **Superseded by**: [260417_pop_root_cause_analysis.md](260417_pop_root_cause_analysis.md) — Rerun plan falsified (H1 determinism + H2 lineage). Canon slerp patch resolves pop without rerun.
+
 # Research Note: paper_fast 3600 Rerun — Pre-Execution Analysis
 
 **Date**: 2026-04-16
