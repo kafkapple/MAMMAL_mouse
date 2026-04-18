@@ -167,15 +167,35 @@ def main():
         print(f"saved: {p}")
         renders[name] = img
 
-    # Grid
+    # Grid with detailed legend panel
     H = max(r.shape[0] for r in renders.values())
     W_ = max(r.shape[1] for r in renders.values())
-    bar = 28
-    grid = np.full((H + bar, W_ * 3, 3), 255, np.uint8)
+    bar = 36
+    legend_h = 140
+    grid = np.full((bar + H + legend_h, W_ * 3, 3), 255, np.uint8)
     for i, name in enumerate([v[0] for v in views]):
-        cv2.putText(grid, f"{name} (belly=RED, top5 joints=GREEN)", (i * W_ + 8, 20),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 0), 2)
+        cv2.putText(grid, f"{name} view", (i * W_ + 10, 26),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.72, (0, 0, 0), 2)
         grid[bar:bar + H, i * W_:(i + 1) * W_] = renders[name]
+
+    # Legend panel with color swatches
+    y0 = bar + H
+    items = [
+        ((220, 30, 30),  "RED   : Belly vertices (N=%d, y in [40,90] torso AND z < z25 ventral)" % belly_mask.sum()),
+        ((30, 220, 30),  "GREEN : Top-5 binding joints [23,46,42,38,19] -- all z<3, correct ventral"),
+        ((80, 80, 220),  "BLUE  : Other 135 joints (spine, head, limbs, tail, small spheres)"),
+        ((200, 200, 200),"GRAY  : Non-belly mesh vertices (head, tail, dorsal, limbs)"),
+    ]
+    for idx, (col, txt) in enumerate(items):
+        yy = y0 + 24 + idx * 26
+        cv2.rectangle(grid, (16, yy - 14), (48, yy + 4), col, -1)
+        cv2.rectangle(grid, (16, yy - 14), (48, yy + 4), (0, 0, 0), 1)
+        cv2.putText(grid, txt, (60, yy), cv2.FONT_HERSHEY_SIMPLEX, 0.52, (0, 0, 0), 1)
+
+    # Title
+    cv2.putText(grid, "F6g Belly Skinning Viz  |  MAMMAL canon frame 1800  |  LBS weights analysis",
+                (10, y0 + 18), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (60, 60, 60), 1)
+
     gp = out / "f6g_3d_viz_grid.png"
     cv2.imwrite(str(gp), cv2.cvtColor(grid, cv2.COLOR_RGB2BGR))
     print(f"saved: {gp}")
