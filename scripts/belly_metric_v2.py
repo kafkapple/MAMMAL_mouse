@@ -32,10 +32,12 @@ def load_obj_verts(obj_path):
 
 
 def belly_mask_indices(verts, margin_mm=20.0):
-    """Canon mesh: Y=head-to-tail, Z=vertical. Belly = torso y∈[40,90] AND z_low."""
+    """Canon mesh: Y=head-to-tail, Z=vertical. Belly = torso y∈[40,90] AND z∈[5, z_med].
+    z<5 = paws (ground-touching); excluded. z>z_med = upper body/dorsal; excluded.
+    """
     y = verts[:, 1]; z = verts[:, 2]
-    z_thr = np.percentile(z, 25)
-    mask = (y >= 40.0) & (y <= 90.0) & (z < z_thr)
+    z_med = float(np.percentile(z, 50))
+    mask = (y >= 40.0) & (y <= 90.0) & (z >= 5.0) & (z <= z_med)
     return np.where(mask)[0]
 
 

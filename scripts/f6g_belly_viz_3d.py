@@ -107,21 +107,25 @@ def main():
         W = W.T
     tj_tpose = m["t_pose_joints"]  # T-pose joint positions (need to transform to canon pose)
 
-    # Belly vertices (canon coord: Y = head-to-tail, Z = vertical w/ ground at z≈0)
-    # True belly = torso ventral = y∈[40,90] (not head y>90 / tail y<30) AND z_low (ventral)
+    # Belly vertices — CORRECTED after user catch "why belly on hind leg?"
+    # Prior z<z25 (=4mm) caught PAWS, not belly. True belly skin at z≈5-17 (above paws, below body center).
+    # Canon: Y=head-to-tail (head y=124, tail y=2), Z=vertical (ground z≈0, dorsal z≈51).
     y = verts[:, 1]; z = verts[:, 2]
-    z_thr = np.percentile(z, 25)  # lower quartile = ventral side
-    y_min, y_max = 40.0, 90.0  # torso range (exclude head y>90, tail y<40)
-    belly_mask = (y >= y_min) & (y <= y_max) & (z < z_thr)
-    print(f"belly verts: {belly_mask.sum()}  (torso y[{y_min},{y_max}] AND z<{z_thr:.1f})")
+    z_med = np.percentile(z, 50)
+    z_paw_top = 5.0  # paws z<5 (ground-touching); above = body
+    y_min, y_max = 40.0, 90.0
+    belly_mask = (y >= y_min) & (y <= y_max) & (z >= z_paw_top) & (z <= z_med)
+    print(f"belly verts: {belly_mask.sum()}  (torso y[{y_min},{y_max}] AND z∈[{z_paw_top},{z_med:.1f}] -- paws excluded)")
 
     # Build vertex colors: gray base, RED for belly
     vc = np.full((verts.shape[0], 4), [200, 200, 200, 255], dtype=np.uint8)
     vc[belly_mask] = [220, 30, 30, 255]  # red
 
-    # Top-5 dominant joints on (correctly-identified) belly — from D5 re-run 2026-04-19
-    # Previous [123,134,130,138,137] were for head (mis-labeled); corrected:
-    top5 = [23, 46, 42, 38, 19]
+    # Top-5 dominant joints on (truly-identified) belly — after v3 correction 2026-04-19
+    # v1 [123,134,130,138,137]: head (y > y_max-20mm was wrong axis)
+    # v2 [23,46,42,38,19]: paws (z<z25 caught ground-touching paws, not belly)
+    # v3 [49,52,53,51,4]: real belly — canon centroids at y∈[41,75] torso, z∈[8,17] body ventral
+    top5 = [49, 52, 53, 51, 4]
 
     # Transform T-pose joints to canon. Approximation: use LBS to get joint positions.
     # Simpler proxy: scale T-pose joints from [-0.5, 0.9] to canon mesh scale
@@ -181,8 +185,8 @@ def main():
     # Legend panel with color swatches
     y0 = bar + H
     items = [
-        ((220, 30, 30),  "RED   : Belly vertices (N=%d, y in [40,90] torso AND z < z25 ventral)" % belly_mask.sum()),
-        ((30, 220, 30),  "GREEN : Top-5 binding joints [23,46,42,38,19] -- all z<3, correct ventral"),
+        ((220, 30, 30),  "RED   : Belly vertices (N=%d, y in [40,90] torso AND z in [5,z50] excl. paws)" % belly_mask.sum()),
+        ((30, 220, 30),  "GREEN : Top-5 belly-binding joints [49,52,53,51,4] -- canon z in [8,17] ventral body"),
         ((80, 80, 220),  "BLUE  : Other 135 joints (spine, head, limbs, tail, small spheres)"),
         ((200, 200, 200),"GRAY  : Non-belly mesh vertices (head, tail, dorsal, limbs)"),
     ]

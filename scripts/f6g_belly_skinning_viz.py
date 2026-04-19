@@ -34,16 +34,16 @@ def load_obj_verts(obj_path: str) -> np.ndarray:
 
 
 def identify_belly_vertices(verts: np.ndarray, margin_mm: float = 20.0) -> np.ndarray:
-    """Canon mesh convention (verified via F1 viz 2026-04-19):
-    Y = head-to-tail (head at y_max, tail at y_min)
-    Z = vertical (ground at z≈0, dorsal top at z_max)
-    X = left-right width
+    """Canon mesh convention (verified via iterative 3D viz 2026-04-19):
+    Y = head-to-tail (head y=124, tail y=2)
+    Z = vertical (ground z≈0, dorsal z≈51)
 
-    True belly = torso ventral = y∈[40,90] (not head >90 / tail <40) AND z_low (ventral).
+    True belly = torso y∈[40,90] AND z∈[5, z_median] (above paws z<5, below body center).
+    Prior z<z25 (=4mm) caught paws instead of belly.
     """
     y = verts[:, 1]; z = verts[:, 2]
-    z_thr = np.percentile(z, 25)  # lower quartile = ventral side
-    mask = (y >= 40.0) & (y <= 90.0) & (z < z_thr)
+    z_med = float(np.percentile(z, 50))
+    mask = (y >= 40.0) & (y <= 90.0) & (z >= 5.0) & (z <= z_med)
     return mask  # (N,) bool
 
 
