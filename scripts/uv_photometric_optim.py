@@ -73,7 +73,7 @@ def main():
         PerspectiveCameras, RasterizationSettings, MeshRenderer, MeshRasterizer,
         SoftPhongShader, TexturesUV, AmbientLights, PointLights)
     from pytorch3d.structures import Meshes
-    from pytorch3d.ops import interpolate_face_attributes
+    from pytorch3d.utils import cameras_from_opencv_projection
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[env] device={device}, torch={torch.__version__}")
@@ -132,22 +132,14 @@ def main():
 
     # ===== Render helper =====
     def render_view(verts_t, K_np, R_np, T_np, H, W, tex_hwc):
-        # pytorch3d PerspectiveCameras expects specific format
-        # OpenCV K, R, T → pytorch3d (x-flip, y-flip, camera looks at +z by default in pytorch3d)
-        # Simplest: use pytorch3d's FoVPerspectiveCameras-free alternative via RasterizationSettings w/ NDC
-        # Actually for K-style cameras, use PerspectiveCameras(focal_length, principal_point)
-        fx, fy = K_np[0, 0], K_np[1, 1]
-        cx, cy = K_np[0, 2], K_np[1, 2]
-        # pytorch3d: focal in NDC units; convert
-        focal = torch.tensor([[fx, fy]], dtype=torch.float32, device=device)
-        pp = torch.tensor([[cx, cy]], dtype=torch.float32, device=device)
+        # Use pytorch3d.utils.cameras_from_opencv_projection for proper OpenCV→P3D conversion
         R_pt = torch.tensor(R_np, dtype=torch.float32, device=device).unsqueeze(0)
         T_pt = torch.tensor(T_np, dtype=torch.float32, device=device).unsqueeze(0)
-        # PyTorch3D uses row-major; flip convention
-        # Construct camera in screen space
-        cam = PerspectiveCameras(focal_length=focal, principal_point=pp,
-                                  image_size=((H, W),), R=R_pt, T=T_pt,
-                                  in_ndc=False, device=device)
+        K_pt = torch.tensor(K_np, dtype=torch.float32, device=device).unsqueeze(0)
+        img_size_pt = torch.tensor([[H, W]], dtype=torch.float32, device=device)
+        cam = cameras_from_opencv_projection(R=R_pt, tvec=T_pt, camera_matrix=K_pt,
+                                              image_size=img_size_pt)
+        cam = cam.to(device)
 
         # Mesh + texture
         faces_uv_batch = faces_uv_t.unsqueeze(0)
@@ -188,6 +180,20 @@ def main():
 
     # ===== Optimization loop =====
     optimizer = torch.optim.Adam([texture_param], lr=args.lr)
+
+    # Debug: save iter-0 render for visual verification
+    with torch.no_grad():
+        d0 = train_data[0]
+        r0 = render_view(d0["verts"], d0["K"], d0["R"], d0["T"], d0["H"], d0["W"],
+                         texture_param.clamp(0, 1))
+        r0_np = (r0.detach().cpu().numpy() * 255).astype(np.uint8)
+        debug = np.concatenate([
+            (d0["img"].cpu().numpy() * 255).astype(np.uint8),
+            r0_np
+        ], axis=1)
+        cv2.imwrite(str(out / "debug_iter0_gt_vs_render.png"),
+                    cv2.cvtColor(debug, cv2.COLOR_RGB2BGR))
+        print(f"[debug] saved iter-0 GT|render: {out}/debug_iter0_gt_vs_render.png")
 
     history = []
     t0 = time.time()
