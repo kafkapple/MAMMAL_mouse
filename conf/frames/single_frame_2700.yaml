@@ -1,0 +1,10 @@
+# @package _global_
+# Single-frame refit config for J2 POC: frame 2700 (worst belly outlier)
+#
+# Usage:
+#   ./run_experiment.sh baseline_6view_keypoint frames=single_frame_2700 optim=accurate
+
+fitter:
+  start_frame: 2700
+  end_frame: 2705     # exclusive end — 1 frame only (2700)
+  interval: 5

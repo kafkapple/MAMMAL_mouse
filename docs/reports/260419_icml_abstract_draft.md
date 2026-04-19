@@ -6,24 +6,23 @@
 
 ---
 
-## Method Section Draft (~180 words)
+## Method Section Draft v0.2 (~150 words)
 
-We fit a parametric 3D mouse mesh (MAMMAL, 14,522 vertices, 140
-joints, 21 bones) to each frame of 6-view synchronized video using
-the original 3-stage optimization pipeline (mask, joint, body).
-To eliminate temporal artifacts from quaternion double-cover and
-bone-length extrapolation, we introduce **canonical axis-angle
-interpolation** (|θ|≤π canonicalization before quaternion slerp),
-which reduces single-frame pop artifacts by +0.54 global IoU
-across 48/48 detected pop frames. The mesh provides a proxy
-reconstruction from below that complements GS-LRM's novel-view
-renderings where bottom-view supervision is absent.
-
-For texture, we gamma-correct the WandB-HPO-optimized UV texture
-(γ=2.2 with histogram matching against ground-truth RGB) to
-mitigate background-leakage artifacts from the baseline
-averaging-fusion pipeline. The deployed texture achieves ΔE
-(CIELAB) = 17.7 against ground-truth body color.
+We fit MAMMAL (14,522 vertices, 140 joints) to each frame of
+6-view video using the original 3-stage pipeline. To eliminate
+temporal artifacts from quaternion double-cover and bone-length
+extrapolation during interpolation, we introduce **canonical
+axis-angle slerp** (|θ|≤π canonicalization before quaternion
+conversion), reducing single-frame pop artifacts by +0.54 global
+IoU across 48/48 detected pop frames. The mesh provides a
+bottom-view proxy complementing GS-LRM where bottom supervision
+is absent. For texture, we gamma-correct the HPO-optimized UV
+texture (γ=2.2 with histogram-matching against GT RGB),
+achieving ΔE (CIELAB) = 17.7 against ground-truth body color.
+Across N=78 uniformly-sampled frames with a vertex-group 3D
+belly IoU metric, the mesh achieves mean belly-region IoU 0.84
+(vs global 0.65), with a single 6σ outlier during a rearing
+posture (1.3% failure rate).
 
 ## Known Limitations
 
