@@ -43,13 +43,14 @@ while read fid; do
         fitter.interval=5 \
         optim=accurate \
         > "$LOG" 2>&1
-    # Find most recent fitting dir (timestamped by Hydra)
-    LATEST_DIR=$(ls -t results/fitting/markerless_mouse_1_nerf_v012345_kp22_2026* 2>/dev/null | head -1)
-    if [ -n "$LATEST_DIR" ] && [ -f "$LATEST_DIR/obj/step_2_frame_${FID_PAD}.obj" ]; then
-        cp "$LATEST_DIR/obj/step_2_frame_${FID_PAD}.obj" "$OUT_OBJ"
+    # Find most recent fitting dir (timestamped by Hydra) — use `ls -d` with full path
+    LATEST_DIR=$(ls -td results/fitting/markerless_mouse_1_nerf_v012345_kp22_2026* 2>/dev/null | head -1)
+    SRC_OBJ="$LATEST_DIR/obj/step_2_frame_${FID_PAD}.obj"
+    if [ -n "$LATEST_DIR" ] && [ -f "$SRC_OBJ" ]; then
+        cp "$SRC_OBJ" "$OUT_OBJ"
         rm -rf "$LATEST_DIR"  # cleanup to avoid disk filling up
     else
-        echo "[WARN] frame $fid: output obj not found, skipping cleanup"
+        echo "[WARN] frame $fid: $SRC_OBJ not found, skipping cleanup"
     fi
 done < "$FRAME_LIST"
 
