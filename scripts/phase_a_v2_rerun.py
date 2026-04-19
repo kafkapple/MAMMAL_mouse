@@ -44,9 +44,10 @@ def project(v, K, R, T):
 
 
 def belly_hull_and_iou(verts, K, R, T, gt_mask, H, W):
+    # v3: belly = torso y∈[40,90] AND z∈[5, z_med] (paws z<5 excluded)
     y, z = verts[:, 1], verts[:, 2]
-    z_thr = np.percentile(z, 25)
-    belly_idx = np.where((y >= 40.0) & (y <= 90.0) & (z < z_thr))[0]
+    z_med = float(np.percentile(z, 50))
+    belly_idx = np.where((y >= 40.0) & (y <= 90.0) & (z >= 5.0) & (z <= z_med))[0]
     if len(belly_idx) < 3:
         return None, None, 0
     uv_b, d_b = project(verts[belly_idx], K, R, T)
