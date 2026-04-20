@@ -60,7 +60,7 @@ def masked_psnr_ssim(render_bgr, gt_bgr, gt_fg_mask):
     # Union of fg masks (for body region)
     both_fg = gt_fg_mask & render_fg_mask
     if both_fg.sum() < 100:
-        return 0.0, 0.0, 0
+        return None, None, int(both_fg.sum())
 
     r_rgb = cv2.cvtColor(render_bgr, cv2.COLOR_BGR2RGB)
     g_rgb = cv2.cvtColor(gt_bgr, cv2.COLOR_BGR2RGB)
@@ -73,7 +73,7 @@ def masked_psnr_ssim(render_bgr, gt_bgr, gt_fg_mask):
     # Masked SSIM: compute on cropped tight bbox of union mask
     ys, xs = np.where(both_fg)
     if len(ys) < 100:
-        return float(psnr_val), 0.0, int(both_fg.sum())
+        return float(psnr_val), None, int(both_fg.sum())
     y0, y1 = max(0, ys.min() - 20), min(r_rgb.shape[0], ys.max() + 20)
     x0, x1 = max(0, xs.min() - 20), min(r_rgb.shape[1], xs.max() + 20)
     r_crop = r_rgb[y0:y1, x0:x1]
@@ -131,12 +131,17 @@ def main():
             except Exception as e:
                 print(f"err f{fid} v{vid}: {e}")
                 continue
+            if psnr is None:
+                print(f"  f{fid} v{vid}: skipped (fg overlap {n_px} < 100 px)")
+                continue
             rows.append({
                 "frame": fid, "view": vid,
-                "psnr": round(psnr, 3), "ssim": round(ssim, 4),
+                "psnr": round(psnr, 3),
+                "ssim": round(ssim, 4) if ssim is not None else "",
                 "n_fg_px": n_px,
             })
-            print(f"  f{fid} v{vid}: PSNR={psnr:.2f} SSIM={ssim:.3f} n_px={n_px}")
+            ssim_str = f"{ssim:.3f}" if ssim is not None else "—"
+            print(f"  f{fid} v{vid}: PSNR={psnr:.2f} SSIM={ssim_str} n_px={n_px}")
 
     out = Path(args.output); out.parent.mkdir(parents=True, exist_ok=True)
     if rows:
@@ -144,14 +149,16 @@ def main():
             w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
             w.writeheader(); w.writerows(rows)
     psnrs = [r["psnr"] for r in rows]
-    ssims = [r["ssim"] for r in rows]
+    ssims = [r["ssim"] for r in rows if r["ssim"] != ""]
     print(f"\n{'='*60}")
-    print(f"PSNR/SSIM Summary (N={len(rows)} frame×view pairs)")
+    print(f"PSNR/SSIM Summary (N={len(rows)} frame×view pairs, SSIM N={len(ssims)})")
     print(f"  PSNR mean: {np.mean(psnrs):.2f}  min: {min(psnrs):.2f}  max: {max(psnrs):.2f}")
-    print(f"  SSIM mean: {np.mean(ssims):.4f}  min: {min(ssims):.4f}  max: {max(ssims):.4f}")
+    if ssims:
+        print(f"  SSIM mean: {np.mean(ssims):.4f}  min: {min(ssims):.4f}  max: {max(ssims):.4f}")
     print(f"\nMoReMouse AAAI-2026 benchmark (real):")
     print(f"  PSNR 18.42, SSIM 0.948, LPIPS 0.087")
-    print(f"\nDiff vs MoReMouse: PSNR {np.mean(psnrs)-18.42:+.2f}, SSIM {np.mean(ssims)-0.948:+.4f}")
+    print(f"\nDiff vs MoReMouse: PSNR {np.mean(psnrs)-18.42:+.2f}"
+          + (f", SSIM {np.mean(ssims)-0.948:+.4f}" if ssims else ""))
 
 
 if __name__ == "__main__":

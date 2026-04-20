@@ -81,7 +81,8 @@ def main():
     ap.add_argument("--post-dir", default="results/fitting/refit_outliers_152/obj/")
     ap.add_argument("--frame-list", default="conf/frames/outlier_severe_152.txt")
     ap.add_argument("--data-dir", default="data/raw/markerless_mouse_1_nerf/")
-    ap.add_argument("--output", default="docs/reports/260419_refit_comparison.csv")
+    ap.add_argument("--output", default="results/fitting/refit_outliers_152/comparison.csv")
+    ap.add_argument("--severe-thr", type=float, default=-0.2)
     args = ap.parse_args()
 
     with open(os.path.join(args.data_dir, "new_cam.pkl"), "rb") as f:
@@ -124,6 +125,12 @@ def main():
             row["pre_iou_belly"] = round(pre_m["iou_belly_v2"], 4)
             row["post_iou_belly"] = round(post_m["iou_belly_v2"], 4)
             row["d_iou_belly"] = round(post_m["iou_belly_v2"] - pre_m["iou_belly_v2"], 4)
+        if pre_m["belly_delta"] is not None and post_m["belly_delta"] is not None:
+            row["pre_belly_delta"] = round(pre_m["belly_delta"], 4)
+            row["post_belly_delta"] = round(post_m["belly_delta"], 4)
+            row["d_belly_delta"] = round(post_m["belly_delta"] - pre_m["belly_delta"], 4)
+            row["recovered"] = int(pre_m["belly_delta"] < args.severe_thr and
+                                   post_m["belly_delta"] >= args.severe_thr)
         rows.append(row)
 
     for cap in mask_caps: cap.release()
@@ -155,6 +162,23 @@ def main():
             print(f"\nBelly IoU: pre mean {np.mean([r['pre_iou_belly'] for r in rows if 'pre_iou_belly' in r]):.3f} → "
                   f"post mean {np.mean([r['post_iou_belly'] for r in rows if 'post_iou_belly' in r]):.3f}  "
                   f"(Δ {np.mean(d_b):+.3f})")
+
+        delta_rows = [r for r in rows if "pre_belly_delta" in r]
+        if delta_rows:
+            severe_pre = sum(1 for r in delta_rows if r["pre_belly_delta"] < args.severe_thr)
+            severe_post = sum(1 for r in delta_rows if r["post_belly_delta"] < args.severe_thr)
+            recovered = sum(r["recovered"] for r in delta_rows)
+            n_input = len(frames)
+            n_measured = len(delta_rows)
+            print(f"\nBelly-dent (belly_iou - global_iou, threshold {args.severe_thr}):")
+            print(f"  input list:  {n_input} frames  (measured {n_measured}, skipped {n_input - n_measured})")
+            print(f"  severe pre:  {severe_pre}/{n_measured} measured ({100*severe_pre/n_measured:.1f}%)")
+            print(f"  severe post: {severe_post}/{n_measured} measured ({100*severe_post/n_measured:.1f}%)")
+            if severe_pre:
+                print(f"  recovered (severe → non-severe): {recovered}/{severe_pre} of pre-severe "
+                      f"({100*recovered/severe_pre:.1f}%)")
+            print(f"  recovered / input list: {recovered}/{n_input} "
+                  f"({100*recovered/n_input:.1f}% — reportable for ICML belly-dent rate reduction)")
 
 
 if __name__ == "__main__":
