@@ -1,0 +1,2 @@
+frame,pre_raster_iou,post_raster_iou,d_raster_iou,pre_raster_iou_min,post_raster_iou_min,pre_chamfer_px,post_chamfer_px,d_chamfer_px,n_views,pre_convex_iou,post_convex_iou,d_convex_iou,pre_belly_iou,post_belly_iou,d_belly_iou
+1450,0.7866252355213402,0.8089754784377717,0.022350242916431506,0.7356415781261609,0.7889687044758126,7.59642235438029,6.955331166585286,-0.6410911877950038,6,0.6142,0.6266,0.0124,,,

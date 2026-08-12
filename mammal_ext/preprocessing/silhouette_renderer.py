@@ -22,7 +22,7 @@ class SilhouetteRenderer:
     Differentiable silhouette renderer for mesh fitting
     """
 
-    def __init__(self, image_size=(480, 640), device='cuda'):
+    def __init__(self, image_size=(480, 640), device='cuda', bin_size=None, max_faces_per_bin=None):
         """
         Args:
             image_size: (H, W) tuple
@@ -39,6 +39,8 @@ class SilhouetteRenderer:
             blur_radius=np.log(1. / 1e-4 - 1.) * 1e-5,  # Soft rasterization
             faces_per_pixel=50,
             perspective_correct=True,
+            bin_size=bin_size,
+            max_faces_per_bin=max_faces_per_bin,
         )
 
         # Soft silhouette shader
